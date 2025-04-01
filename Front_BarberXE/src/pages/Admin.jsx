@@ -7,6 +7,7 @@ import TableClients from "../components/CrudClient.jsx";
 import TableServices from "../components/CrudService.jsx";
 import TableIngresos from "../components/CrudIncome.jsx";
 import TableEgresos from "../components/CrudEgress.jsx";
+import LineChart1 from "../components/Grafic.jsx";
 
 const AdminPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -25,6 +26,7 @@ const AdminPage = () => {
         <div className={`p-6 transition-all duration-300 ${isCollapsed ? "ml-16" : "ml-64"}`}>
           <Routes>
             {/* Define la ruta para Empleados */}
+            <Route path="/" element={<LineChart1 isCollapsed={isCollapsed} />} />
             <Route path="/Empleados" element={<TableEmployees isCollapsed={isCollapsed} />} />
             <Route path="/Clientes" element={<TableClients isCollapsed={isCollapsed} />} />
             <Route path="/Servicios" element={<TableServices isCollapsed={isCollapsed} />} />
