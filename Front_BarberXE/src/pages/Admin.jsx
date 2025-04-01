@@ -5,6 +5,8 @@ import Navbar from "../components/Navbar";         // Navbar siempre visible
 import TableEmployees from "../components/CrudEmployees.jsx"; // Componente a mostrar
 import TableClients from "../components/CrudClient.jsx";
 import TableServices from "../components/CrudService.jsx";
+import TableIngresos from "../components/CrudIncome.jsx";
+import TableEgresos from "../components/CrudEgress.jsx";
 
 const AdminPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -26,6 +28,8 @@ const AdminPage = () => {
             <Route path="/Empleados" element={<TableEmployees isCollapsed={isCollapsed} />} />
             <Route path="/Clientes" element={<TableClients isCollapsed={isCollapsed} />} />
             <Route path="/Servicios" element={<TableServices isCollapsed={isCollapsed} />} />
+            <Route path="/Caja/Ingreso" element={<TableIngresos isCollapsed={isCollapsed} />} />
+            <Route path="/Caja/Egreso" element={<TableEgresos isCollapsed={isCollapsed} />} />
           </Routes>
         </div>
       </div>
