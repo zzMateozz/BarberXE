@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Pencil, Trash2, PlusCircle } from "lucide-react";
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
   table: "w-full table-auto border-collapse",
-  th: "min-w-[80px] py-1 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
+  th: "min-w-[80px] py-2 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
   td: "py-2 px-2 md:py-4 md:px-3 text-center text-xs md:text-base border-b border-gray-200",
   button:
     "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
@@ -20,6 +21,9 @@ const TableEmployees = ({ isCollapsed }) => {
       apellido: "Sánchez",
       telefono: "3123456789",
       estado: "Activo",
+      cargo: "Barbero",
+      correo: "",
+      contrasena: "",
     },
     {
       cedula: "56473829",
@@ -27,43 +31,13 @@ const TableEmployees = ({ isCollapsed }) => {
       apellido: "Martínez",
       telefono: "3234567890",
       estado: "Inactivo",
+      cargo: "Cajero",
+      correo: "laura@correo.com",
+      contrasena: "1234",
     },
-    {
-      cedula: "84726394",
-      nombre: "Pedro",
-      apellido: "Ramírez",
-      telefono: "3345678901",
-      estado: "Activo",
-    },
-    {
-      cedula: "23984756",
-      nombre: "Marta",
-      apellido: "López",
-      telefono: "3456789012",
-      estado: "Inactivo",
-    },
-    {
-      cedula: "39482756",
-      nombre: "José",
-      apellido: "González",
-      telefono: "3567890123",
-      estado: "Activo",
-    },
-    {
-      cedula: "48273691",
-      nombre: "Ana",
-      apellido: "Hernández",
-      telefono: "3678901234",
-      estado: "Inactivo",
-    },
-    {
-      cedula: "12983746",
-      nombre: "Luis",
-      apellido: "Torres",
-      telefono: "3789012345",
-      estado: "Activo",
-    },
+    // Agregar más empleados según sea necesario
   ]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -72,8 +46,12 @@ const TableEmployees = ({ isCollapsed }) => {
     apellido: "",
     telefono: "",
     estado: "",
+    cargo: "Barbero",
+    correo: "",
+    contrasena: "",
   });
   const [editIndex, setEditIndex] = useState(null);
+  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar contraseña
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -89,6 +67,9 @@ const TableEmployees = ({ isCollapsed }) => {
         apellido: "",
         telefono: "",
         estado: "",
+        cargo: "Barbero",
+        correo: "",
+        contrasena: "",
       });
       setEditIndex(null);
     }
@@ -102,6 +83,9 @@ const TableEmployees = ({ isCollapsed }) => {
       apellido: "",
       telefono: "",
       estado: "",
+      cargo: "Barbero",
+      correo: "",
+      contrasena: "",
     });
     setEditIndex(null);
   };
@@ -191,6 +175,7 @@ const TableEmployees = ({ isCollapsed }) => {
                 <th className={styles.th}>Apellido</th>
                 <th className={styles.th}>Teléfono</th>
                 <th className={styles.th}>Estado</th>
+                <th className={styles.th}>Cargo</th>
                 <th className={styles.th}>Acciones</th>
               </tr>
             </thead>
@@ -213,6 +198,7 @@ const TableEmployees = ({ isCollapsed }) => {
                       {emp.estado}
                     </span>
                   </td>
+                  <td className={styles.td}>{emp.cargo}</td>
                   <td className={styles.td}>
                     <button
                       onClick={() => openModal(i)}
@@ -259,7 +245,7 @@ const TableEmployees = ({ isCollapsed }) => {
 
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[70vh] overflow-y-auto">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
                 <PlusCircle className="w-6 h-6 text-red-500" />{" "}
                 {editIndex !== null ? "Editar Empleado" : "Añadir Empleado"}
@@ -297,6 +283,64 @@ const TableEmployees = ({ isCollapsed }) => {
                     <option value="Inactivo">Inactivo</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cargo
+                  </label>
+                  <select
+                    name="cargo"
+                    value={formData.cargo}
+                    onChange={handleChange}
+                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="Barbero">Barbero</option>
+                    <option value="Cajero">Cajero</option>
+                  </select>
+                </div>
+
+                {formData.cargo === "Cajero" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Correo
+                      </label>
+                      <input
+                        type="email"
+                        name="correo"
+                        value={formData.correo}
+                        onChange={handleChange}
+                        placeholder="Ingrese correo"
+                        className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Contraseña
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name="contrasena"
+                          value={formData.contrasena}
+                          onChange={handleChange}
+                          placeholder="Ingrese contraseña"
+                          className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-2 flex items-center"
+                        >
+                          {showPassword ? <EyeSlashIcon className="w-6 h-6" /> : <EyeIcon className="w-6 h-6" />}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex gap-4 justify-end">
                   <button
