@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Pencil, Trash2, PlusCircle } from "lucide-react";
+import { Pencil, Trash2} from "lucide-react";
+import {PlusCircleIcon } from "@heroicons/react/24/outline"
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
@@ -16,46 +17,19 @@ const TableServices = ({ isCollapsed }) => {
   const [services, setServices] = useState([
     {
       id: 1,
-      nombre: "Corte de cabello",
-      precio: "$20,000",
-      estado: "Activo",
-    },
-    {
-      id: 2,
       nombre: "Afeitado",
-      precio: "$15,000",
-      estado: "Activo",
-    },
-    {
-      id: 3,
-      nombre: "Baño de vapor",
       precio: "$10,000",
-      estado: "Inactivo",
-    },
-    {
-      id: 4,
-      nombre: "Corte y afeitado",
-      precio: "$35,000",
+      Duracion: "20 Min",
       estado: "Activo",
     },
-    {
-      id: 5,
-      nombre: "Peinado",
-      precio: "$25,000",
-      estado: "Activo",
-    },
-    {
-      id: 6,
-      nombre: "Tratamiento capilar",
-      precio: "$30,000",
-      estado: "Inactivo",
-    },
+    
   ]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     nombre: "",
     precio: "",
+    Duracion: "",
     estado: "Activo",
   });
   const [editIndex, setEditIndex] = useState(null);
@@ -71,6 +45,7 @@ const TableServices = ({ isCollapsed }) => {
       setFormData({
         nombre: "",
         precio: "",
+        Duracion: " ",
         estado: "Activo",
       });
       setEditIndex(null);
@@ -82,6 +57,7 @@ const TableServices = ({ isCollapsed }) => {
     setFormData({
       nombre: "",
       precio: "",
+      Duracion: "",
       estado: "Activo",
     });
     setEditIndex(null);
@@ -150,7 +126,7 @@ const TableServices = ({ isCollapsed }) => {
             onClick={() => openModal()}
             className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
           >
-            <PlusCircle className="w-6 h-6" /> Agregar
+            <PlusCircleIcon  className="w-6 h-6" /> Agregar
           </button>
           <input
             type="text"
@@ -172,6 +148,7 @@ const TableServices = ({ isCollapsed }) => {
                 <th className={styles.th}>#</th>
                 <th className={styles.th}>Nombre</th>
                 <th className={styles.th}>Precio</th>
+                <th className={styles.th}>Duracion</th>
                 <th className={styles.th}>Estado</th>
                 <th className={styles.th}>Acciones</th>
               </tr>
@@ -182,6 +159,7 @@ const TableServices = ({ isCollapsed }) => {
                   <td className={styles.td}>{indexOfFirstItem + i + 1}</td>
                   <td className={styles.td}>{service.nombre}</td>
                   <td className={styles.td}>{service.precio}</td>
+                  <td className={styles.td}>{service.Duracion}</td>
                   <td className={styles.td}>
                     <span
                       className={`py-1 px-2 rounded-full ${
@@ -241,11 +219,11 @@ const TableServices = ({ isCollapsed }) => {
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircle className="w-6 h-6 text-red-500" />{" "}
+                <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
                 {editIndex !== null ? "Editar Servicio" : "Añadir Servicio"}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {["nombre", "precio"].map((field) => (
+                {["nombre", "precio", "duracion"].map((field) => (
                   <div key={field}>
                     <label className="block text-sm font-medium text-gray-700">
                       {field.charAt(0).toUpperCase() + field.slice(1)}

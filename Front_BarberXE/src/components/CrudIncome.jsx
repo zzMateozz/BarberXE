@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Pencil, Trash2, PlusCircle } from "lucide-react";
+import { Pencil, Trash2} from "lucide-react";
+import {PlusCircleIcon } from "@heroicons/react/24/outline"
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
@@ -128,7 +129,7 @@ const TableIngresos = ({ isCollapsed }) => {
             onClick={() => openModal()}
             className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
           >
-            <PlusCircle className="w-6 h-6" /> Agregar
+            <PlusCircleIcon  className="w-6 h-6" /> Agregar
           </button>
           <input
             type="text"
@@ -207,7 +208,7 @@ const TableIngresos = ({ isCollapsed }) => {
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[70vh] overflow-y-auto">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircle className="w-6 h-6 text-red-500" />
+                <PlusCircleIcon  className="w-6 h-6 text-red-500" />
                 {editIndex !== null ? "Editar Ingreso" : "Añadir Ingreso"}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">

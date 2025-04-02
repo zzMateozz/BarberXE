@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Pencil, Trash2, PlusCircle } from "lucide-react";
+import { Pencil, Trash2} from "lucide-react";
+import { EyeIcon, EyeSlashIcon, PlusCircleIcon } from "@heroicons/react/24/outline";
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
@@ -13,6 +14,7 @@ const styles = {
 };
 
 const TableClients = ({ isCollapsed }) => {
+  const [showPassword, setShowPassword] = useState(false);
   const [clients, setClients] = useState([
     {
       cedula: "10293847",
@@ -89,6 +91,7 @@ const TableClients = ({ isCollapsed }) => {
         apellido: "",
         telefono: "",
         correo: "",
+        contraseña: "",
       });
       setEditIndex(null);
     }
@@ -102,6 +105,7 @@ const TableClients = ({ isCollapsed }) => {
       apellido: "",
       telefono: "",
       correo: "",
+      contraseña: "",
     });
     setEditIndex(null);
   };
@@ -166,7 +170,7 @@ const TableClients = ({ isCollapsed }) => {
             onClick={() => openModal()}
             className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
           >
-            <PlusCircle className="w-6 h-6" /> Agregar
+       < PlusCircleIcon className="w-6 h-6" /> Agregar
           </button>
           <input
             type="text"
@@ -251,16 +255,46 @@ const TableClients = ({ isCollapsed }) => {
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircle className="w-6 h-6 text-red-500" />{" "}
+                <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
                 {editIndex !== null ? "Editar Cliente" : "Añadir Cliente"}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {["cedula", "nombre", "apellido", "telefono", "correo"].map(
-                  (field) => (
-                    <div key={field}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {field.charAt(0).toUpperCase() + field.slice(1)}
-                      </label>
+                {[
+                  "cedula",
+                  "nombre",
+                  "apellido",
+                  "telefono",
+                  "correo",
+                  "contraseña",
+                ].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                    </label>
+                    {field === "contraseña" ? (
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name={field}
+                          value={formData[field]}
+                          onChange={handleChange}
+                          placeholder={`Ingrese ${field}`}
+                          className="mt-1 w-full border rounded-md py-2 px-3 pr-10 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-3 flex items-center"
+                        >
+                          {showPassword ? (
+                            <EyeSlashIcon className= "w-6 h-6" />
+                          ) : (
+                            <EyeIcon className= "w-6 h-6" />
+                          )}
+                        </button>
+                      </div>
+                    ) : (
                       <input
                         type="text"
                         name={field}
@@ -270,10 +304,9 @@ const TableClients = ({ isCollapsed }) => {
                         className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
                         required
                       />
-                    </div>
-                  )
-                )}
-
+                    )}
+                  </div>
+                ))}
                 <div className="flex gap-4 justify-end">
                   <button
                     type="button"
