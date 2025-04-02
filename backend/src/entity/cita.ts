@@ -20,4 +20,7 @@ export class Cita {
     @ManyToMany(() => Servicio)
     @JoinTable()
     servicios!: Servicio[];
+    corte: import("c:/Users/Lopex/Documents/Trabajos_U/Software 2/BarberXE/backend/src/entity/corte").Corte;
+    duracionTotal: number;
+    precioTotal: number;
 }

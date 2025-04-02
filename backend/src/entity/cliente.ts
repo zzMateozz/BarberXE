@@ -17,7 +17,7 @@ export class Cliente {
     telefono!: string;
 
     @OneToOne(() => User, (user) => user.cliente)
-    user!: User;
+    user?: User;
 
     @OneToMany(() => Cita, (cita) => cita.cliente)
     citas!: Cita[];
