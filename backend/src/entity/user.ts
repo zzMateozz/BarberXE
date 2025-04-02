@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from "typeorm";
 import { Empleado } from "./empleado";
 import { Cliente } from "./cliente";
 @Entity()
@@ -12,9 +12,13 @@ export class User {
     @Column()
     contraseña!: string;
 
-    @OneToOne(() => Empleado, (empleado) => empleado.user)
-    empleado!: Empleado;
+    // Relación 1:1 con Empleado
+    @OneToOne(() => Empleado, empleado => empleado.user, { cascade: true })
+    @JoinColumn({ name: 'empleadoId' })
+    empleado?: Empleado;
 
-    @OneToOne(() => Cliente, (cliente) => cliente.user)
-    cliente!: Cliente;
+    // Relación 1:1 con Cliente
+    @OneToOne(() => Cliente, cliente => cliente.user, { cascade: true })
+    @JoinColumn({ name: 'clienteId' })
+    cliente?: Cliente;
 }

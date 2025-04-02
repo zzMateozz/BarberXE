@@ -19,4 +19,5 @@ export class Servicio {
     @ManyToMany(() => Corte)
     @JoinTable()
     cortes!: Corte[];
+    duracion: number;
 }

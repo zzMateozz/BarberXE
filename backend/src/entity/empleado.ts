@@ -18,7 +18,7 @@ export class Empleado {
     telefono!: string;
 
     @OneToOne(() => User, (user) => user.empleado)
-    user!: User;
+    user?: User;
 
     @OneToMany(() => Cita, (cita) => cita.empleado)
     citas!: Cita[];
