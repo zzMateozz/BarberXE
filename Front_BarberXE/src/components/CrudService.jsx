@@ -1,53 +1,47 @@
 import React, { useState } from "react";
-import { Pencil, Trash2} from "lucide-react";
-import {PlusCircleIcon } from "@heroicons/react/24/outline"
+import { Pencil, Trash2, Upload } from "lucide-react";
+import { PlusCircleIcon } from "@heroicons/react/24/outline";
 
-const styles = {
-  tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
-  table: "w-full table-auto border-collapse",
-  th: "min-w-[80px] py-2 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
-  td: "py-2 px-2 md:py-4 md:px-3 text-center text-xs md:text-base border-b border-gray-200",
-  button:
-    "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
-  editButton: "text-blue-500 hover:bg-blue-100",
-  deleteButton: "text-red-500 hover:bg-red-100",
-};
-
-const TableServices = ({ isCollapsed }) => {
+const TableServices = () => {
   const [services, setServices] = useState([
     {
       id: 1,
       nombre: "Afeitado",
       precio: "$10,000",
-      Duracion: "20 Min",
+      duracion: "20 Min",
       estado: "Activo",
+      imagen: "https://img.freepik.com/foto-gratis/cliente-haciendo-corte-pelo-salon-peluqueria_1303-20861.jpg",
     },
-    
   ]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     nombre: "",
     precio: "",
-    Duracion: "",
+    duracion: "",
     estado: "Activo",
+    imagen: "",
   });
+
+  const [previewImage, setPreviewImage] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
 
   const openModal = (index = null) => {
     setShowModal(true);
     if (index !== null) {
       setFormData(services[index]);
+      setPreviewImage(services[index].imagen);
       setEditIndex(index);
     } else {
       setFormData({
         nombre: "",
         precio: "",
-        Duracion: " ",
+        duracion: "",
         estado: "Activo",
+        imagen: "",
       });
+      setPreviewImage(null);
       setEditIndex(null);
     }
   };
@@ -57,15 +51,29 @@ const TableServices = ({ isCollapsed }) => {
     setFormData({
       nombre: "",
       precio: "",
-      Duracion: "",
+      duracion: "",
       estado: "Activo",
+      imagen: "",
     });
+    setPreviewImage(null);
     setEditIndex(null);
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result);
+        setFormData((prev) => ({ ...prev, imagen: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -75,10 +83,7 @@ const TableServices = ({ isCollapsed }) => {
         prev.map((service, i) => (i === editIndex ? formData : service))
       );
     } else {
-      setServices((prev) => [
-        ...prev,
-        { ...formData, id: prev.length + 1 }, // Asegura un nuevo ID
-      ]);
+      setServices((prev) => [...prev, { ...formData, id: prev.length + 1 }]);
     }
     closeModal();
   };
@@ -87,36 +92,15 @@ const TableServices = ({ isCollapsed }) => {
     setServices((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Método de búsqueda
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
   };
 
-  // Filtrado de servicios según el término de búsqueda
   const filteredServices = services.filter((service) =>
     Object.values(service).some((val) =>
       val.toString().toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
-
-  // Paginación - Obtener servicios de la página actual
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentServices = filteredServices.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
-
-  // Total de páginas
-  const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
-
-  // Cambiar de página
-  const changePage = (page) => {
-    if (page > 0 && page <= totalPages) {
-      setCurrentPage(page); // Actualiza la página actual
-    }
-  };
 
   return (
     <section className="py-16 lg:py-20">
@@ -126,7 +110,7 @@ const TableServices = ({ isCollapsed }) => {
             onClick={() => openModal()}
             className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
           >
-            <PlusCircleIcon  className="w-6 h-6" /> Agregar
+            <PlusCircleIcon className="w-6 h-6" /> Agregar
           </button>
           <input
             type="text"
@@ -137,84 +121,56 @@ const TableServices = ({ isCollapsed }) => {
           />
         </div>
 
-        <div
-          className={`${styles.tableContainer} ${
-            isCollapsed ? "mx-4" : "mx-0"
-          }`}
-        >
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>#</th>
-                <th className={styles.th}>Nombre</th>
-                <th className={styles.th}>Precio</th>
-                <th className={styles.th}>Duracion</th>
-                <th className={styles.th}>Estado</th>
-                <th className={styles.th}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentServices.map((service, i) => (
-                <tr key={i} className="bg-neutral-100">
-                  <td className={styles.td}>{indexOfFirstItem + i + 1}</td>
-                  <td className={styles.td}>{service.nombre}</td>
-                  <td className={styles.td}>{service.precio}</td>
-                  <td className={styles.td}>{service.Duracion}</td>
-                  <td className={styles.td}>
-                    <span
-                      className={`py-1 px-2 rounded-full ${
-                        service.estado === "Activo"
-                          ? "bg-green-300 text-green-800"
-                          : "bg-red-300 text-red-800"
-                      }`}
-                    >
-                      {service.estado}
-                    </span>
-                  </td>
-                  <td className={styles.td}>
-                    <button
-                      onClick={() => openModal(i)}
-                      className={`${styles.button} ${styles.editButton} mr-2`}
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(i)}
-                      className={`${styles.button} ${styles.deleteButton}`}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Grid de tarjetas */}
+        {/* Grid de tarjetas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {filteredServices.map((service, i) => (
+            <div
+              key={i}
+              className="bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300"
+            >
+              <img
+                src={service.imagen}
+                alt={service.nombre}
+                className="w-full h-40 object-cover"
+              />
+              <div className="p-4">
+                <h3 className="text-xl font-semibold">{service.nombre}</h3>
+                <p className="text-gray-700 mt-1">
+                  <strong>Precio:</strong> {service.precio}
+                </p>
+                <p className="text-gray-700">
+                  <strong>Duración:</strong> {service.duracion}
+                </p>
+                <span
+                  className={`inline-block px-3 py-1 mt-2 text-sm font-semibold rounded-full ${
+                    service.estado === "Activo"
+                      ? "bg-green-300 text-green-800"
+                      : "bg-red-300 text-red-800"
+                  }`}
+                >
+                  {service.estado}
+                </span>
+                <div className="flex justify-center text-center gap-8 mt-4">
+                  <button
+                    onClick={() => openModal(i)}
+                    className="text-blue-500 hover:text-blue-700 hover:scale-110 transition-transform duration-200"
+                  >
+                    <Pencil size={22} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(i)}
+                    className="text-red-500 hover:text-red-700 hover:scale-110 transition-transform duration-200"
+                  >
+                    <Trash2 size={22} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-6">
-          <nav className="flex justify-center">
-            <ul className="flex space-x-2">
-              {[...Array(totalPages)].map((_, index) => {
-                const page = index + 1;
-                return (
-                  <li key={page}>
-                    <button
-                      onClick={() => changePage(page)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        page === currentPage
-                          ? "bg-red-500 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </div>
-
+        {/* Modal de formulario */}
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
@@ -223,38 +179,61 @@ const TableServices = ({ isCollapsed }) => {
                 {editIndex !== null ? "Editar Servicio" : "Añadir Servicio"}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {["nombre", "precio", "duracion"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {field.charAt(0).toUpperCase() + field.slice(1)}
-                    </label>
-                    <input
-                      type="text"
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      placeholder={`Ingrese ${field}`}
-                      className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                ))}
+                <input
+                  type="text"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  placeholder="Nombre"
+                  required
+                  className="w-full border p-2 rounded-md"
+                />
+                <input
+                  type="text"
+                  name="precio"
+                  value={formData.precio}
+                  onChange={handleChange}
+                  placeholder="Precio"
+                  required
+                  className="w-full border p-2 rounded-md"
+                />
+                <input
+                  type="text"
+                  name="duracion"
+                  value={formData.duracion}
+                  onChange={handleChange}
+                  placeholder="Duración"
+                  required
+                  className="w-full border p-2 rounded-md"
+                />
+                <select
+                  name="estado"
+                  value={formData.estado}
+                  onChange={handleChange}
+                  className="w-full border p-2 rounded-md"
+                >
+                  <option value="Activo">Activo</option>
+                  <option value="Inactivo">Inactivo</option>
+                </select>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Estado
-                  </label>
-                  <select
-                    name="estado"
-                    value={formData.estado}
-                    onChange={handleChange}
-                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                  </select>
-                </div>
-
+                {/* Subida de imagen con icono */}
+                <label className="border p-4 rounded-md flex flex-col items-center cursor-pointer">
+                  <Upload size={32} className="text-gray-500" />
+                  <span className="text-gray-500">Subir imagen</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+                {previewImage && (
+                  <img
+                    src={previewImage}
+                    alt="Preview"
+                    className="w-full h-40 object-cover mt-2 rounded-lg"
+                  />
+                )}
                 <div className="flex gap-4 justify-end">
                   <button
                     type="button"
