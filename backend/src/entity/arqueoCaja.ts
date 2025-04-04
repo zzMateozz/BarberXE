@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne, JoinColumn } from "typeorm";
 import { Empleado } from "./empleado";
 import { Corte } from "./corte";
 import { Ingreso } from "./ingreso";
@@ -9,21 +9,34 @@ export class ArqueoCaja {
     @PrimaryGeneratedColumn()
     idArqueo!: number;
 
-    @Column()
+    @Column("datetime")
     fechaInicio!: Date;
 
-    @Column()
-    fechaCierre!: Date;
+    @Column("datetime", { nullable: true })
+    fechaCierre!: Date | null;
 
+    // Relación con Empleado
     @ManyToOne(() => Empleado, (empleado) => empleado.arqueos)
+    @JoinColumn({ name: 'empleadoId' })
     empleado!: Empleado;
 
-    @OneToMany(() => Corte, (corte) => corte)
+    // Relación con Cortes (corregida)
+    @OneToMany(() => Corte, (corte) => corte.arqueo)
     cortes!: Corte[];
 
-    @OneToOne(() => Ingreso, (ingreso) => ingreso.arqueo)
-    ingreso!: Ingreso;
+    // Relación con Ingreso
+    @OneToOne(() => Ingreso, (ingreso) => ingreso.arqueo, { 
+        cascade: true,
+        nullable: true 
+    })
+    @JoinColumn({ name: 'ingresoId' })
+    ingreso?: Ingreso;
 
-    @OneToOne(() => Egreso, (egreso) => egreso.arqueo)
-    egreso!: Egreso;
+    // Relación con Egreso
+    @OneToOne(() => Egreso, (egreso) => egreso.arqueo, { 
+        cascade: true,
+        nullable: true 
+    })
+    @JoinColumn({ name: 'egresoId' })
+    egreso?: Egreso;
 }

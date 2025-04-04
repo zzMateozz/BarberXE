@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { CorteService } from '../services/corteService';
+import { CreateCorteDto } from '../dtos/Corte/CreateCorter.dto';
+import { UpdateCitaDto } from '../dtos/Cita/UpdateCita.dto';
+import { UpdateCorteDto } from '../dtos/Corte/UpdateCorte.dto';
 
 export class CorteController {
     private corteService: CorteService;
@@ -45,31 +48,35 @@ export class CorteController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            const corteData = req.body;
+            const corteData = new CreateCorteDto(req.body);
             const corte = await this.corteService.create(corteData);
             res.status(201).json(corte);
-        } catch (error) {
-            res.status(500).json({ message: 'Error al crear corte', error });
+        } catch (error: any) {
+            console.error('Error detallado:', error); // Log para depuración
+            res.status(500).json({
+                message: 'Error al crear corte',
+                error: error.message || 'Error desconocido' // Asegurar mensaje
+            });
         }
     };
 
     update = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const id = parseInt(req.params.id);
-            const corteData = req.body;
-            
-            const corte = await this.corteService.update(id, corteData);
-            
-            if (!corte) {
-                res.status(404).json({ message: 'Corte no encontrado' });
-                return;
+            try {
+                const id = parseInt(req.params.id);
+                const corteData = new UpdateCorteDto(req.body);
+                const empleado = await this.corteService.update(id, corteData);
+                res.status(200).json(empleado);
+            } catch (error: any) {
+                if (error.message.includes('no encontrado')) {
+                    res.status(404).json({ message: error.message });
+                } else {
+                    res.status(500).json({ 
+                        message: 'Error al actualizar Corte',
+                        error: error.message 
+                    });
+                }
             }
-            
-            res.status(200).json(corte);
-        } catch (error) {
-            res.status(500).json({ message: 'Error al actualizar corte', error });
-        }
-    };
+        };
 
     delete = async (req: Request, res: Response): Promise<void> => {
         try {

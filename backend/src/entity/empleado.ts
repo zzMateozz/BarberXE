@@ -17,6 +17,20 @@ export class Empleado {
     @Column()
     telefono!: string;
 
+    @Column({
+        type: 'enum',
+        enum: ['activo', 'inactivo'],
+        default: 'activo'
+    })
+    estado!: 'activo' | 'inactivo';
+
+    @Column({
+        type: 'enum',
+        enum: ['Barbero', 'Cajero'],
+        default: 'Barbero'
+    })
+    cargo!: 'Barbero' | 'Cajero';
+
     @OneToOne(() => User, (user) => user.empleado)
     user?: User;
 

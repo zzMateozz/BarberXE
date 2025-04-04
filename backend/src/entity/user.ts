@@ -13,12 +13,12 @@ export class User {
     contraseña!: string;
 
     // Relación 1:1 con Empleado
-    @OneToOne(() => Empleado, empleado => empleado.user, { cascade: true })
+    @OneToOne(() => Empleado, empleado => empleado.user, { cascade: true,onDelete: 'CASCADE' })
     @JoinColumn({ name: 'empleadoId' })
     empleado?: Empleado;
 
     // Relación 1:1 con Cliente
-    @OneToOne(() => Cliente, cliente => cliente.user, { cascade: true })
+    @OneToOne(() => Cliente, cliente => cliente.user, { cascade: true,onDelete: 'CASCADE' })
     @JoinColumn({ name: 'clienteId' })
     cliente?: Cliente;
 }

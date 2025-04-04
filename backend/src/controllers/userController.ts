@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { UserService } from '../services/userService';
 import { CreateUserDto } from '../dtos/User/CreateUser.dto';
 import { LoginUserDto } from '../dtos/User/LoginUser.dto';
+import { UpdateUserDto } from '../dtos/User/UpdateUser.dto';
 
 export class UserController {
     private userService: UserService;
@@ -85,7 +86,7 @@ export class UserController {
     update = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = parseInt(req.params.id);
-            const userData = req.body;
+            const userData = new UpdateUserDto(req.body);
             
             const user = await this.userService.update(id, userData);
             

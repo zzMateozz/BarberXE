@@ -13,11 +13,21 @@ export class Servicio {
     @Column()
     precio!: number;
 
+    @Column()
+    imagenUrl!: string; 
+
+    @Column({
+        type: 'enum',
+        enum: ['activo', 'inactivo'],
+        default: 'activo'
+    })
+    estado!: 'activo' | 'inactivo';
+
     @ManyToMany(() => Cita, (cita) => cita.servicios)
     citas!: Cita[];
 
     @ManyToMany(() => Corte)
     @JoinTable()
     cortes!: Corte[];
-    duracion: number;
+    duracion!: number;
 }

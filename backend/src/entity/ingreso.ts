@@ -6,9 +6,9 @@ export class Ingreso {
     @PrimaryGeneratedColumn()
     idIngreso!: number;
 
-    @Column()
+    @Column("decimal", { precision: 10, scale: 2 })
     monto!: number;
 
     @OneToOne(() => ArqueoCaja, (arqueo) => arqueo.ingreso)
-    arqueo!: ArqueoCaja;
+    arqueo?: ArqueoCaja; // Hacer opcional
 }

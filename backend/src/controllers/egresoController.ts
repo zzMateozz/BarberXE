@@ -29,7 +29,7 @@ export class EgresoController {
             
             res.status(200).json(egreso);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener egreso', error });
+            res.status(500).json({ message: 'Error al obtener Egreso', error });
         }
     };
 

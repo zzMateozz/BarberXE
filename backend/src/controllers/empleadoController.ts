@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { EmpleadoService } from '../services/empleadoService';
+import { UpdateEmpleadoDto } from '../dtos/Empleado/UpdateEmpleado.dto';
+import { CreateEmpleadoDto } from '../dtos/Empleado/CreateEmpleado.dto';
 
 export class EmpleadoController {
     private empleadoService: EmpleadoService;
@@ -35,7 +37,7 @@ export class EmpleadoController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            const empleadoData = req.body;
+            const empleadoData = new CreateEmpleadoDto(req.body);
             const empleado = await this.empleadoService.create(empleadoData);
             res.status(201).json(empleado);
         } catch (error) {
@@ -46,18 +48,18 @@ export class EmpleadoController {
     update = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = parseInt(req.params.id);
-            const empleadoData = req.body;
-            
+            const empleadoData = new UpdateEmpleadoDto(req.body);
             const empleado = await this.empleadoService.update(id, empleadoData);
-            
-            if (!empleado) {
-                res.status(404).json({ message: 'Empleado no encontrado' });
-                return;
-            }
-            
             res.status(200).json(empleado);
-        } catch (error) {
-            res.status(500).json({ message: 'Error al actualizar empleado', error });
+        } catch (error: any) {
+            if (error.message.includes('no encontrado')) {
+                res.status(404).json({ message: error.message });
+            } else {
+                res.status(500).json({ 
+                    message: 'Error al actualizar empleado',
+                    error: error.message 
+                });
+            }
         }
     };
 

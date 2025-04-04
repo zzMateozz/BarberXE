@@ -20,5 +20,13 @@ export const ServicioRepository = AppDataSource.getRepository(Servicio).extend({
             .leftJoinAndSelect('servicio.cortes', 'cortes')
             .where('servicio.idServicio = :id', { id })
             .getOne();
+    },
+
+    async findAllWithRelations() {
+        return this.createQueryBuilder('servicio')
+            .leftJoinAndSelect('servicio.citas', 'citas')
+            .leftJoinAndSelect('servicio.cortes', 'cortes')
+            .orderBy('servicio.nombre', 'ASC')
+            .getMany();
     }
 });

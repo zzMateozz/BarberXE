@@ -6,6 +6,8 @@ import { UpdateUserDto } from '../dtos/User/UpdateUser.dto';
 import { LoginUserDto } from '../dtos/User/LoginUser.dto';
 import { Empleado } from '../entity/empleado';
 import { Cliente } from '../entity/cliente';
+import { Cita } from '../entity/cita';
+import { ArqueoCaja } from '../entity/arqueoCaja';
 
 export class UserService {
     async findAll(): Promise<User[]> {
@@ -126,14 +128,49 @@ export class UserService {
         const queryRunner = UserRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
-
+    
         try {
             const user = await this.findById(id);
             if (!user) {
                 throw new Error('Usuario no encontrado');
             }
-
-            // Eliminar relaciones primero si es necesario
+    
+            // 1. Eliminar citas asociadas al empleado (si existe)
+            if (user.empleado) {
+                // Primero eliminar las relaciones many-to-many si existen
+                await queryRunner.manager.query(
+                    `DELETE FROM cita_servicios_servicio WHERE citaIdCita IN 
+                    (SELECT idCita FROM cita WHERE empleadoIdEmpleado = ?)`,
+                    [user.empleado.idEmpleado]
+                );
+    
+                // Luego eliminar las citas
+                await queryRunner.manager.delete(Cita, { 
+                    empleado: { idEmpleado: user.empleado.idEmpleado } 
+                });
+    
+                // Eliminar arqueos de caja asociados al empleado
+                await queryRunner.manager.delete(ArqueoCaja, {
+                    empleado: { idEmpleado: user.empleado.idEmpleado }
+                });
+            }
+    
+            // 2. Eliminar citas asociadas al cliente (si existe)
+            if (user.cliente) {
+                // Primero eliminar las relaciones many-to-many si existen
+                await queryRunner.manager.query(
+                    `DELETE FROM cita_servicios_servicio WHERE citaIdCita IN 
+                    (SELECT idCita FROM cita WHERE clienteIdCliente = ?)`,
+                    [user.cliente.idCliente]
+                );
+    
+                // Luego eliminar las citas
+                await queryRunner.manager.delete(Cita, { 
+                    cliente: { idCliente: user.cliente.idCliente } 
+                });
+            }
+    
+            // 3. Eliminar empleado o cliente asociado
             if (user.empleado) {
                 await queryRunner.manager.delete(Empleado, user.empleado.idEmpleado);
             }
@@ -141,12 +178,22 @@ export class UserService {
             if (user.cliente) {
                 await queryRunner.manager.delete(Cliente, user.cliente.idCliente);
             }
-
+    
+            // 4. Finalmente eliminar el usuario
             await queryRunner.manager.delete(User, id);
+            
             await queryRunner.commitTransaction();
         } catch (error) {
             await queryRunner.rollbackTransaction();
-            throw error;
+            
+            // Mejorar el mensaje de error para diagnóstico
+            console.error('Error detallado al eliminar usuario:', {
+                userId: id,
+                error: error instanceof Error ? error.message : error,
+                stack: error instanceof Error ? error.stack : undefined
+            });
+            
+            throw new Error(`Error al eliminar usuario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
         } finally {
             await queryRunner.release();
         }

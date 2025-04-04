@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, ManyToOne, JoinColumn } from "typeorm";
 import { Servicio } from "./servicio";
+import { ArqueoCaja } from "./arqueoCaja";
 
 @Entity()
 export class Corte {
@@ -9,6 +10,15 @@ export class Corte {
     @Column()
     estilo!: string;
 
+    @Column()
+    imagenUrl!: string;
+
+    // Relación con Servicios (mantenemos esta)
     @ManyToMany(() => Servicio, (servicio) => servicio.cortes)
     servicios!: Servicio[];
+
+    // Añadimos relación con ArqueoCaja (que faltaba)
+    @ManyToOne(() => ArqueoCaja, (arqueo) => arqueo.cortes)
+    @JoinColumn({ name: 'arqueoId' })
+    arqueo!: ArqueoCaja;
 }

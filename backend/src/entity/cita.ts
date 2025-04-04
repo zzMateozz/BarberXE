@@ -8,8 +8,11 @@ export class Cita {
     @PrimaryGeneratedColumn()
     idCita!: number;
 
-    @Column()
+    @Column({ type: 'timestamp' }) // Cambiado a timestamp para fecha y hora
     fecha!: Date;
+    
+    @Column({ nullable: true })
+    imagenUrl?: string;
 
     @ManyToOne(() => Cliente, (cliente) => cliente.citas)
     cliente!: Cliente;
@@ -20,7 +23,4 @@ export class Cita {
     @ManyToMany(() => Servicio)
     @JoinTable()
     servicios!: Servicio[];
-    corte: import("c:/Users/Lopex/Documents/Trabajos_U/Software 2/BarberXE/backend/src/entity/corte").Corte;
-    duracionTotal: number;
-    precioTotal: number;
 }

@@ -63,11 +63,20 @@ export class ClienteController {
 
     delete = async (req: Request, res: Response): Promise<void> => {
         try {
-        const id = parseInt(req.params.id);
-        await this.clienteService.delete(id);
-        res.status(204).send();
-        } catch (error) {
-        res.status(500).json({ message: 'Error al eliminar cliente', error });
+            const id = parseInt(req.params.id);
+            await this.clienteService.delete(id);
+            res.status(204).send();
+        } catch (error: any) {
+            console.error('Error en ClienteController.delete:', error);
+            
+            const statusCode = error.message.includes('no encontrado') ? 404 : 500;
+            
+            res.status(statusCode).json({
+                message: 'Error al eliminar cliente',
+                error: process.env.NODE_ENV === 'development' 
+                    ? error.message 
+                    : 'Ocurrió un error al eliminar el cliente'
+            });
         }
     };
 
