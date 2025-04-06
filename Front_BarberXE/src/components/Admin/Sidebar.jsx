@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
-import iconoAdmin from "../assets/barberia1.png";
+import iconoAdmin from "../../assets/barberia1.png";
 import { 
   HomeIcon, UserGroupIcon, UsersIcon, CalendarIcon, 
   CalculatorIcon, DocumentCurrencyDollarIcon, DocumentPlusIcon 
@@ -54,6 +54,13 @@ const Sidebar = ({ isCollapsed }) => {
           <Link to="/Servicios" className="flex items-center gap-2">
             <DocumentPlusIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Servicios</span>}
+          </Link>
+        </li>
+        
+        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
+          <Link to="/Cortes" className="flex items-center gap-2">
+            <DocumentPlusIcon className="h-6 w-6 text-white" />
+            {!isCollapsed && <span>Cortes</span>}
           </Link>
         </li>
 

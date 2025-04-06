@@ -34,6 +34,15 @@ export const fetchUsers = async () => {
   return handleResponse(response);
 };
 
+export const loginUser = async (credentials) => {
+  const response = await fetch(`${API_BASE_URL}/users/login`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(credentials),
+  });
+  return handleResponse(response);
+};
+
 export const createUser = async (userData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/users`,{

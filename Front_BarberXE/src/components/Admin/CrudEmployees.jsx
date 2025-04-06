@@ -12,7 +12,8 @@ import {
   deleteEmployee,
   searchEmployeesByName,
   createUser,
-} from "../services/EmployeeService.js";
+} from "../../services/EmployeeService.js";
+import { toast } from "react-toastify";
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
@@ -23,6 +24,16 @@ const styles = {
     "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
   editButton: "text-blue-500 hover:bg-blue-100",
   deleteButton: "text-red-500 hover:bg-red-100",
+};
+
+const ValidationMessage = ({ message, isValid }) => {
+  if (!message) return null;
+  
+  return (
+    <div className={`text-sm mt-1 ${isValid ? "text-green-600" : "text-red-600"}`}>
+      {message}
+    </div>
+  );
 };
 
 const TableEmployees = ({ isCollapsed }) => {
@@ -42,9 +53,97 @@ const TableEmployees = ({ isCollapsed }) => {
     contraseña: "",
     idUsuario: null,
   });
-  const [editIndex, setEditIndex] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+
+  // Estados para errores de validación
+  const [nombreError, setNombreError] = useState("");
+  const [apellidoError, setApellidoError] = useState("");
+  const [telefonoError, setTelefonoError] = useState("");
+  const [usuarioError, setUsuarioError] = useState("");
+  const [contraseñaError, setContraseñaError] = useState("");
+
+  const getInputBorderClass = (value, error) => {
+    if (!value) return "border-gray-300";
+    return error ? "border-red-500 focus:ring-red-500" : "border-green-500 focus:ring-green-500";
+  };
+
+  // Validaciones
+  useEffect(() => {
+    if (formData.nombre) {
+      if (formData.nombre.length < 3) {
+        setNombreError("El nombre debe tener al menos 3 caracteres");
+      } else if (formData.nombre.length > 30) {
+        setNombreError("El nombre no debe exceder 30 caracteres");
+      } else {
+        setNombreError("");
+      }
+    } else {
+      setNombreError("");
+    }
+  }, [formData.nombre]);
+
+  useEffect(() => {
+    if (formData.apellido) {
+      if (formData.apellido.length < 3) {
+        setApellidoError("El apellido debe tener al menos 3 caracteres");
+      } else if (formData.apellido.length > 30) {
+        setApellidoError("El apellido no debe exceder 30 caracteres");
+      } else {
+        setApellidoError("");
+      }
+    } else {
+      setApellidoError("");
+    }
+  }, [formData.apellido]);
+
+  useEffect(() => {
+    if (formData.telefono) {
+      if (!/^\d+$/.test(formData.telefono)) {
+        setTelefonoError("El teléfono solo debe contener números");
+      } else if (formData.telefono.length < 7) {
+        setTelefonoError("El teléfono debe tener al menos 7 dígitos");
+      } else if (formData.telefono.length > 10) {
+        setTelefonoError("El teléfono no debe exceder 10 dígitos");
+      } else {
+        setTelefonoError("");
+      }
+    } else {
+      setTelefonoError("");
+    }
+  }, [formData.telefono]);
+
+  useEffect(() => {
+    if (formData.usuario) {
+      if (formData.cargo === "Cajero") {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
+        if (!emailRegex.test(formData.usuario)) {
+          setUsuarioError("Correo inválido. Debe incluir @ y terminar en .com");
+        } else {
+          setUsuarioError("");
+        }
+      } else {
+        setUsuarioError("");
+      }
+    } else {
+      setUsuarioError("");
+    }
+  }, [formData.usuario, formData.cargo]);
+
+  useEffect(() => {
+    if (formData.contraseña) {
+      if (formData.contraseña.length < 8) {
+        setContraseñaError("La contraseña debe tener al menos 8 caracteres");
+      } else if (formData.contraseña.length > 12) {
+        setContraseñaError("La contraseña no debe exceder 12 caracteres");
+      } else if (!/^[a-zA-Z0-9]{8,12}$/.test(formData.contraseña)) {
+        setContraseñaError("La contraseña solo debe contener letras y números");
+      } else {
+        setContraseñaError("");
+      }
+    } else {
+      setContraseñaError("");
+    }
+  }, [formData.contraseña]);
 
   // Cargar empleados al montar el componente
   useEffect(() => {
@@ -72,7 +171,6 @@ const TableEmployees = ({ isCollapsed }) => {
         try {
           const results = await searchEmployeesByName(searchTerm);
           setEmployees(results);
-          setCurrentPage(1);
         } catch (err) {
           setError(err.message);
         }
@@ -96,21 +194,24 @@ const TableEmployees = ({ isCollapsed }) => {
     }
   }, [searchTerm]);
 
-  const openModal = (index = null) => {
+  const openModal = (employeeId = null) => {
     setShowModal(true);
-    if (index !== null) {
-      const employee = employees[index];
-      setFormData({
-        nombre: employee.nombre,
-        apellido: employee.apellido,
-        telefono: employee.telefono,
-        estado: employee.estado,
-        cargo: employee.cargo || "Barbero", // Mantener el cargo original
-        usuario: employee.usuario || "",
-        contraseña: "********", // Mostrar placeholder para contraseña
-        idUsuario: employee.idUsuario || null,
-      });
-      setEditIndex(index);
+    setEditingEmployeeId(employeeId);
+    
+    if (employeeId !== null) {
+      const employee = employees.find(emp => emp.idEmpleado === employeeId);
+      if (employee) {
+        setFormData({
+          nombre: employee.nombre,
+          apellido: employee.apellido,
+          telefono: employee.telefono,
+          estado: employee.estado,
+          cargo: employee.cargo || "Barbero",
+          usuario: employee.usuario || "",
+          contraseña: "********",
+          idUsuario: employee.idUsuario || null,
+        });
+      }
     } else {
       setFormData({
         nombre: "",
@@ -122,8 +223,14 @@ const TableEmployees = ({ isCollapsed }) => {
         contraseña: "",
         idUsuario: null,
       });
-      setEditIndex(null);
     }
+    
+    // Resetear errores
+    setNombreError("");
+    setApellidoError("");
+    setTelefonoError("");
+    setUsuarioError("");
+    setContraseñaError("");
   };
 
   const closeModal = () => {
@@ -138,15 +245,21 @@ const TableEmployees = ({ isCollapsed }) => {
       contraseña: "",
       idUsuario: null,
     });
-    setEditIndex(null);
+    setEditingEmployeeId(null);
     setError(null);
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    let processedValue = value;
+    if (name === "telefono") {
+      processedValue = value.replace(/\D/g, '');
+    }
+    
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: processedValue,
       ...(name === "cargo" &&
         value === "Barbero" && {
           usuario: "",
@@ -157,30 +270,58 @@ const TableEmployees = ({ isCollapsed }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validaciones básicas
+    if (nombreError || apellidoError || telefonoError) {
+      toast.error("Por favor corrija los errores en el formulario");
+      return;
+    }
+    
+    if (!formData.nombre || !formData.apellido || !formData.telefono) {
+      toast.error("Los campos nombre, apellido y teléfono son obligatorios");
+      return;
+    }
+  
+    // Validaciones específicas para Cajeros
+    if ((editingEmployeeId === null && formData.cargo === "Cajero") && 
+        (usuarioError || contraseñaError || !formData.usuario || !formData.contraseña)) {
+      toast.error("Para cajeros, usuario y contraseña son obligatorios y deben ser válidos");
+      return;
+    }
+  
     try {
-      if (editIndex !== null) {
-        // Obtener el cargo original del empleado
-        const originalCargo = employees[editIndex].cargo;
-        const employeeId = employees[editIndex].idEmpleado;
-
-        // Actualizar solo los campos permitidos (sin cambiar cargo, usuario o contraseña)
-        const updatedEmployee = await updateEmployee(employeeId, {
+      if (editingEmployeeId !== null) {
+        // 1. Buscar el empleado original para obtener su cargo actual
+        const originalEmployee = employees.find(emp => emp.idEmpleado === editingEmployeeId);
+        
+        // 2. Preparar datos para actualización (sin incluir el cargo)
+        const updateData = {
           nombre: formData.nombre,
           apellido: formData.apellido,
           telefono: formData.telefono,
           estado: formData.estado,
-          cargo: originalCargo, // Mantener el cargo original
-        });
-
-        setEmployees((prev) =>
-          prev.map((emp, i) =>
-            i === editIndex ? { ...updatedEmployee, cargo: originalCargo } : emp
+          cargo: originalEmployee.cargo // Mantenemos el cargo original
+        };
+      
+        // 3. Actualizar en el backend
+        await updateEmployee(editingEmployeeId, updateData);
+      
+        // 4. Actualizar el estado local
+        setEmployees(prev => 
+          prev.map(emp => 
+            emp.idEmpleado === editingEmployeeId ? { 
+              ...emp,          // Mantenemos todos los datos existentes
+              ...updateData     // Aplicamos solo los cambios permitidos
+            } : emp
           )
         );
-      } else {
+        
+        toast.success("Empleado actualizado con éxito");
+      } 
+       else {
+        // Creación de nuevo empleado
         if (formData.cargo === "Cajero") {
-          // Crear usuario primero para cajeros
-          const userResponse = await createUser({
+          const response = await createUser({
             usuario: formData.usuario,
             contraseña: formData.contraseña,
             empleado: {
@@ -191,16 +332,17 @@ const TableEmployees = ({ isCollapsed }) => {
               estado: formData.estado,
             },
           });
-
-          setEmployees((prev) => [
+  
+          setEmployees(prev => [
             ...prev,
             {
-              ...userResponse.empleado,
-              cargo: "Cajero",
-            },
+              ...response.empleado,
+              usuario: response.usuario,
+              idUsuario: response.idUsuario
+            }
           ]);
+          toast.success("Cajero creado con éxito");
         } else {
-          // Crear empleado normal (barbero)
           const newEmployee = await createEmployee({
             nombre: formData.nombre,
             apellido: formData.apellido,
@@ -208,39 +350,31 @@ const TableEmployees = ({ isCollapsed }) => {
             estado: formData.estado,
             cargo: formData.cargo,
           });
-          setEmployees((prev) => [
+          
+          setEmployees(prev => [
             ...prev,
             {
               ...newEmployee,
               cargo: formData.cargo,
-            },
+            }
           ]);
+          toast.success("Barbero creado con éxito");
         }
       }
       closeModal();
     } catch (err) {
-      setError(err.message);
+      console.error("Error en handleSubmit:", err);
+      toast.error(err.response?.data?.message || err.message || "Error al guardar empleado");
     }
   };
 
-  const handleDelete = async (index) => {
+  const handleDelete = async (employeeId) => {
     try {
-      await deleteEmployee(employees[index].idEmpleado);
-      setEmployees((prev) => prev.filter((_, i) => i !== index));
+      await deleteEmployee(employeeId);
+      setEmployees(prev => prev.filter(emp => emp.idEmpleado !== employeeId));
+      toast.success("Empleado eliminado con éxito");
     } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  // Paginación
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentEmployees = employees.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(employees.length / itemsPerPage);
-
-  const changePage = (page) => {
-    if (page > 0 && page <= totalPages) {
-      setCurrentPage(page);
+      toast.error(err.message || "Ocurrió un error al eliminar el empleado");
     }
   };
 
@@ -280,11 +414,7 @@ const TableEmployees = ({ isCollapsed }) => {
           />
         </div>
 
-        <div
-          className={`${styles.tableContainer} ${
-            isCollapsed ? "mx-4" : "mx-0"
-          }`}
-        >
+        <div className={`${styles.tableContainer} ${isCollapsed ? "mx-4" : "mx-0"}`}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -297,8 +427,8 @@ const TableEmployees = ({ isCollapsed }) => {
               </tr>
             </thead>
             <tbody>
-              {currentEmployees.map((emp, i) => (
-                <tr key={i} className="bg-neutral-100">
+              {employees.map((emp) => (
+                <tr key={emp.idEmpleado} className="bg-neutral-100">
                   <td className={styles.td}>{emp.nombre}</td>
                   <td className={styles.td}>{emp.apellido}</td>
                   <td className={styles.td}>{emp.telefono}</td>
@@ -316,13 +446,13 @@ const TableEmployees = ({ isCollapsed }) => {
                   <td className={styles.td}>{emp.cargo || "Barbero"}</td>
                   <td className={styles.td}>
                     <button
-                      onClick={() => openModal(i)}
+                      onClick={() => openModal(emp.idEmpleado)}
                       className={`${styles.button} ${styles.editButton} mr-2`}
                     >
                       <Pencil size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(i)}
+                      onClick={() => handleDelete(emp.idEmpleado)}
                       className={`${styles.button} ${styles.deleteButton}`}
                     >
                       <Trash2 size={18} />
@@ -334,36 +464,12 @@ const TableEmployees = ({ isCollapsed }) => {
           </table>
         </div>
 
-        <div className="mt-6">
-          <nav className="flex justify-center">
-            <ul className="flex space-x-2">
-              {[...Array(totalPages)].map((_, index) => {
-                const page = index + 1;
-                return (
-                  <li key={page}>
-                    <button
-                      onClick={() => changePage(page)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        page === currentPage
-                          ? "bg-red-500 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </div>
-
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
                 <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
-                {editIndex !== null ? "Editar Empleado" : "Añadir Empleado"}
+                {editingEmployeeId !== null ? "Editar Empleado" : "Añadir Empleado"}
               </h2>
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -371,22 +477,69 @@ const TableEmployees = ({ isCollapsed }) => {
                 </div>
               )}
               <form onSubmit={handleSubmit} className="space-y-4">
-                {["nombre", "apellido", "telefono"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {field.charAt(0).toUpperCase() + field.slice(1)}
-                    </label>
-                    <input
-                      type="text"
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      placeholder={`Ingrese ${field}`}
-                      className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Nombre
+                  </label>
+                  <input
+                    type="text"
+                    name="nombre"
+                    value={formData.nombre}
+                    onChange={handleChange}
+                    placeholder="Ingrese nombre (3-30 caracteres)"
+                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.nombre, nombreError)}`}
+                    required
+                    minLength={3}
+                    maxLength={30}
+                  />
+                  <ValidationMessage message={nombreError} isValid={false} />
+                  {formData.nombre && !nombreError && (
+                    <ValidationMessage message="Nombre válido" isValid={true} />
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Apellido
+                  </label>
+                  <input
+                    type="text"
+                    name="apellido"
+                    value={formData.apellido}
+                    onChange={handleChange}
+                    placeholder="Ingrese apellido (3-30 caracteres)"
+                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.apellido, apellidoError)}`}
+                    required
+                    minLength={3}
+                    maxLength={30}
+                  />
+                  <ValidationMessage message={apellidoError} isValid={false} />
+                  {formData.apellido && !apellidoError && (
+                    <ValidationMessage message="Apellido válido" isValid={true} />
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    name="telefono"
+                    value={formData.telefono}
+                    onChange={handleChange}
+                    placeholder="Ingrese teléfono (7-10 dígitos)"
+                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.telefono, telefonoError)}`}
+                    required
+                    minLength={7}
+                    maxLength={10}
+                    pattern="[0-9]{7,10}"
+                  />
+                  <ValidationMessage message={telefonoError} isValid={false} />
+                  {formData.telefono && !telefonoError && (
+                    <ValidationMessage message="Teléfono válido" isValid={true} />
+                  )}
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -408,7 +561,7 @@ const TableEmployees = ({ isCollapsed }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Cargo
                   </label>
-                  {editIndex !== null ? (
+                  {editingEmployeeId !== null ? (
                     <input
                       type="text"
                       value={formData.cargo}
@@ -429,21 +582,25 @@ const TableEmployees = ({ isCollapsed }) => {
                   )}
                 </div>
 
-                {formData.cargo === "Cajero" && editIndex === null && (
+                {formData.cargo === "Cajero" && editingEmployeeId === null && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Nombre de Usuario
                       </label>
                       <input
-                        type="text"
+                        type="email"
                         name="usuario"
                         value={formData.usuario}
                         onChange={handleChange}
-                        placeholder="Ingrese nombre de usuario"
-                        className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                        placeholder="correo@ejemplo.com"
+                        className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.usuario, usuarioError)}`}
                         required
                       />
+                      <ValidationMessage message={usuarioError} isValid={false} />
+                      {formData.usuario && !usuarioError && (
+                        <ValidationMessage message="Usuario válido" isValid={true} />
+                      )}
                     </div>
 
                     <div>
@@ -456,9 +613,11 @@ const TableEmployees = ({ isCollapsed }) => {
                           name="contraseña"
                           value={formData.contraseña}
                           onChange={handleChange}
-                          placeholder="Ingrese contraseña"
-                          className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                          placeholder="Ingrese contraseña (8-12 caracteres)"
+                          className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.contraseña, contraseñaError)}`}
                           required
+                          minLength={8}
+                          maxLength={12}
                         />
                         <button
                           type="button"
@@ -472,6 +631,10 @@ const TableEmployees = ({ isCollapsed }) => {
                           )}
                         </button>
                       </div>
+                      <ValidationMessage message={contraseñaError} isValid={false} />
+                      {formData.contraseña && !contraseñaError && (
+                        <ValidationMessage message="Contraseña válida" isValid={true} />
+                      )}
                     </div>
                   </>
                 )}
@@ -486,8 +649,14 @@ const TableEmployees = ({ isCollapsed }) => {
                   <button
                     type="submit"
                     className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
+                    disabled={
+                      nombreError ||
+                      apellidoError ||
+                      telefonoError ||
+                      (formData.cargo === "Cajero" && (usuarioError || contraseñaError))
+                    }
                   >
-                    {editIndex !== null ? "Actualizar" : "Guardar"}
+                    {editingEmployeeId !== null ? "Actualizar" : "Guardar"}
                   </button>
                 </div>
               </form>

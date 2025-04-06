@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom"; // Maneja las rutas
-import Sidebar from "../components/Sidebar";       // Sidebar siempre visible
-import Navbar from "../components/Navbar";         // Navbar siempre visible
-import TableEmployees from "../components/CrudEmployees.jsx"; // Componente a mostrar
-import TableClients from "../components/CrudClient.jsx";
-import TableServices from "../components/CrudService.jsx";
-import TableIngresos from "../components/CrudIncome.jsx";
-import TableEgresos from "../components/CrudEgress.jsx";
-import LineChart1 from "../components/Grafic.jsx";
+import Sidebar from "../components/Admin/Sidebar.jsx";       // Sidebar siempre visible
+import Navbar from "../components/Admin/Navbar.jsx";         // Navbar siempre visible
+import TableEmployees from "../components/Admin/CrudEmployees.jsx"; // Componente a mostrar
+import TableClients from "../components/Admin/CrudClient.jsx";
+import TableServices from "../components/Admin/CrudService.jsx";
+import TableIngresos from "../components/Admin/CrudIncome.jsx";
+import TableEgresos from "../components/Admin/CrudEgress.jsx";
+import LineChart1 from "../components/Admin/Grafic.jsx";
+import TableCortes from "../components/Admin/CrudCortes.jsx";
 
 const AdminPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -30,6 +31,7 @@ const AdminPage = () => {
             <Route path="/Empleados" element={<TableEmployees isCollapsed={isCollapsed} />} />
             <Route path="/Clientes" element={<TableClients isCollapsed={isCollapsed} />} />
             <Route path="/Servicios" element={<TableServices isCollapsed={isCollapsed} />} />
+            <Route path="/Cortes" element={<TableCortes isCollapsed={isCollapsed} />} />
             <Route path="/Caja/Ingreso" element={<TableIngresos isCollapsed={isCollapsed} />} />
             <Route path="/Caja/Egreso" element={<TableEgresos isCollapsed={isCollapsed} />} />
           </Routes>
