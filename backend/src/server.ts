@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import { config } from 'dotenv';
 import { AppDataSource } from './config/database';
@@ -24,7 +25,12 @@ app.use(express.json());
 app.get("/", (req, res) => {
     res.send("Servidor funcionando 🚀");
 });
+
 // Rutas
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')), (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    next();
+});
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/arqueos', arqueoCajaRoutes);
 app.use('/api/citas', citaRoutes);
