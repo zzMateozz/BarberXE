@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { CorteService } from '../services/corteService';
 import { CreateCorteDto } from '../dtos/Corte/CreateCorter.dto';
-import { UpdateCitaDto } from '../dtos/Cita/UpdateCita.dto';
+import * as fs from 'fs';
 import { UpdateCorteDto } from '../dtos/Corte/UpdateCorte.dto';
+import path from 'path';
 
 export class CorteController {
     private corteService: CorteService;
@@ -48,20 +49,29 @@ export class CorteController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            console.log("Body recibido:", req.body); // Debería mostrar { estilo: 'valor' }
-            console.log("Archivo recibido:", req.file); // Debería mostrar info del archivo
+            console.log("Body recibido:", req.body);
+            console.log("Archivo recibido:", req.file);
     
             if (!req.body.estilo) {
                 throw new Error('El campo estilo es requerido');
             }
     
-            const imagenUrl = req.file 
-                ? `/uploads/${req.file.filename}` 
-                : '';
+            // Verifica que el archivo se recibió correctamente
+            if (!req.file) {
+                throw new Error('No se recibió ningún archivo de imagen');
+            }
+    
+            const imagenUrl = `/uploads/${req.file.filename}`;
+            
+            // Verifica que el archivo existe físicamente
+            const filePath = path.join(__dirname, '../../', imagenUrl);
+            if (!fs.existsSync(filePath)) {
+                throw new Error('El archivo no se guardó correctamente en el servidor');
+            }
     
             const corteData = new CreateCorteDto({
-                estilo: req.body.estilo, // Asegúrate de tomar el estilo del body
-                imagenUrl,
+                estilo: req.body.estilo,
+                imagenUrl: imagenUrl // Asegúrate de incluir la URL
             });
     
             const corte = await this.corteService.create(corteData);
