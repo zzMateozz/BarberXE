@@ -203,12 +203,12 @@ const TableCortes = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     {filteredCortes.map((corte, i) => (
-                        <div key={i} className="bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+                        <div key={i} className=" w-60 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
                             {corte.imagenUrl ? (
                                 <img
                                     src={corte.imagenUrl}
                                     alt={`Corte ${corte.estilo}`}
-                                    className="w-full h-40 object-cover"
+                                    className="w-full h-60 object-cover"
                                     onError={(e) => {
                                         e.target.onerror = null;
                                         e.target.src = 'https://via.placeholder.com/300x200?text=Imagen+no+disponible';
