@@ -62,7 +62,6 @@ export class CorteController {
             const corteData = new CreateCorteDto({
                 estilo: req.body.estilo, // Asegúrate de tomar el estilo del body
                 imagenUrl,
-                servicioIds: req.body.servicioIds || []
             });
     
             const corte = await this.corteService.create(corteData);
@@ -80,22 +79,28 @@ export class CorteController {
         try {
             const id = parseInt(req.params.id);
             
-            // Si hay una nueva imagen, obtener su URL
-            const updates: any = {...req.body};
+            // Preparar los datos de actualización (sin servicioIds)
+            const updates: any = {
+                estilo: req.body.estilo
+            };
+            
+            // Si hay una nueva imagen, actualizar la URL
             if (req.file) {
                 updates.imagenUrl = `/uploads/${req.file.filename}`;
             }
             
             const corteData = new UpdateCorteDto(updates);
             const corte = await this.corteService.update(id, corteData);
+            
             res.status(200).json(corte);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
                 res.status(404).json({ message: error.message });
             } else {
+                console.error('Error en update:', error);
                 res.status(500).json({ 
                     message: 'Error al actualizar Corte',
-                    error: error.message 
+                    error: error.message
                 });
             }
         }
@@ -106,8 +111,16 @@ export class CorteController {
             const id = parseInt(req.params.id);
             await this.corteService.delete(id);
             res.status(204).send();
-        } catch (error) {
-            res.status(500).json({ message: 'Error al eliminar corte', error });
+        } catch (error: any) {
+            if (error.message.includes('no encontrado')) {
+                res.status(404).json({ message: error.message });
+            } else {
+                console.error('Error en delete:', error);
+                res.status(500).json({ 
+                    message: 'Error al eliminar corte', 
+                    error: error.message 
+                });
+            }
         }
     };
 }
