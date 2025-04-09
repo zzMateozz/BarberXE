@@ -7,6 +7,7 @@ import {
     updateCut,
     deleteCut,
 } from "../../services/CortesServices.js"; // Asegúrate de que la ruta sea correcta
+
 const IMAGE_BASE_URL = 'http://localhost:3000';
 
 const TableCortes = () => {
