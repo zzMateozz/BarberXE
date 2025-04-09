@@ -11,7 +11,6 @@ import {
 const IMAGE_BASE_URL = 'http://localhost:3000';
 
 const TableCortes = () => {
-
     const [cortes, setCortes] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [showModal, setShowModal] = useState(false);
@@ -80,9 +79,14 @@ const TableCortes = () => {
             const formDataToSend = new FormData();
             formDataToSend.append('estilo', formData.estilo);
             
-            // Asegúrate de que la imagen esté correctamente adjuntada
+            // Solo agregar servicios si existen
+            if (formData.servicioIds) {
+                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
+            }
+            
+            // Verifica que la imagen exista antes de agregarla
             if (formData.imagen instanceof File) {
-                formDataToSend.append('imagen', formData.imagen);
+                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
             }
     
             let response;
@@ -199,12 +203,12 @@ const TableCortes = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     {filteredCortes.map((corte, i) => (
-                        <div key={i} className="bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+                        <div key={i} className=" w-60 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
                             {corte.imagenUrl ? (
                                 <img
                                     src={corte.imagenUrl}
                                     alt={`Corte ${corte.estilo}`}
-                                    className="w-full h-40 object-cover"
+                                    className="w-full h-60 object-cover"
                                     onError={(e) => {
                                         e.target.onerror = null;
                                         e.target.src = 'https://via.placeholder.com/300x200?text=Imagen+no+disponible';
