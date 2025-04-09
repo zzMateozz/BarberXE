@@ -38,15 +38,20 @@ const handleResponse = async (response) => {
         try {
             const response = await fetch(`${API_BASE_URL}/cortes`, {
                 method: 'POST',
-                headers: getHeaders(),
+                headers: {
+                    // No incluyas 'Content-Type' para FormData
+                    ...(localStorage.getItem('authToken') && {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    })
+                },
                 body: formData
             });
-            
+    
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Error al crear corte');
             }
-            
+    
             const result = await response.json();
             // Asegurar que la URL de la imagen sea completa
             if (result.imagenUrl) {
