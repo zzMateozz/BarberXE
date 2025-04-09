@@ -1,6 +1,5 @@
 export class CreateCorteDto {
-    readonly estilo: string;
-    readonly servicioIds?: number[]; // Ahora es opcional
+    readonly estilo: string;// Ahora es opcional
     readonly imagenUrl: string;
 
     constructor(data: any) {
@@ -9,7 +8,6 @@ export class CreateCorteDto {
         }
 
         this.estilo = data.estilo;
-        this.imagenUrl = data.imagenUrl;
-        this.servicioIds = data.servicioIds || []; // Default: array vacío
+        this.imagenUrl = data.imagenUrl; // Default: array vacío
     }
 }
