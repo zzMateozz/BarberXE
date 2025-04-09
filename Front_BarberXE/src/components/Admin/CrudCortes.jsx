@@ -11,6 +11,7 @@ import {
 const IMAGE_BASE_URL = 'http://localhost:3000';
 
 const TableCortes = () => {
+
     const [cortes, setCortes] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [showModal, setShowModal] = useState(false);
@@ -79,14 +80,9 @@ const TableCortes = () => {
             const formDataToSend = new FormData();
             formDataToSend.append('estilo', formData.estilo);
             
-            // Solo agregar servicios si existen
-            if (formData.servicioIds) {
-                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
-            }
-            
-            // Verifica que la imagen exista antes de agregarla
+            // Asegúrate de que la imagen esté correctamente adjuntada
             if (formData.imagen instanceof File) {
-                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
+                formDataToSend.append('imagen', formData.imagen);
             }
     
             let response;
