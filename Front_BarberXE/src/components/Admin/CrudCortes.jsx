@@ -77,29 +77,51 @@ const TableCortes = () => {
         e.preventDefault();
         try {
             const formDataToSend = new FormData();
-            
-            // Asegúrate de que el nombre del campo coincide con el esperado en el backend
             formDataToSend.append('estilo', formData.estilo);
             
+            // Solo agregar servicios si existen
+            if (formData.servicioIds) {
+                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
+            }
+            
             // Verifica que la imagen exista antes de agregarla
-            if (formData.imagen) {
-                formDataToSend.append('imagen', formData.imagen);
+            if (formData.imagen instanceof File) {
+                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
             }
     
-            console.log("Datos a enviar:", {
-                estilo: formData.estilo,
-                tieneImagen: !!formData.imagen
-            });
-    
+            let response;
             if (editIndex !== null) {
-                const response = await updateCut(cortes[editIndex].idCorte, formDataToSend);
-                // Actualiza el estado con la respuesta del servidor
+                response = await updateCut(cortes[editIndex].idCorte, formDataToSend);
+                
+                // Crear URL temporal para la previsualización inmediata
+                let newImageUrl = cortes[editIndex].imagenUrl;
+                if (formData.imagen instanceof File) {
+                    newImageUrl = URL.createObjectURL(formData.imagen);
+                } else if (response.imagenUrl) {
+                    newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`;
+                }
+    
                 setCortes(prev => prev.map((item, idx) => 
-                    idx === editIndex ? response : item
+                    idx === editIndex ? {
+                        ...response,
+                        imagenUrl: newImageUrl
+                    } : item
                 ));
             } else {
-                const response = await createCut(formDataToSend);
-                setCortes(prev => [...prev, response]);
+                response = await createCut(formDataToSend);
+                
+                // Crear URL temporal para la previsualización inmediata
+                let newImageUrl = null;
+                if (formData.imagen instanceof File) {
+                    newImageUrl = URL.createObjectURL(formData.imagen);
+                } else if (response.imagenUrl) {
+                    newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`;
+                }
+    
+                setCortes(prev => [...prev, {
+                    ...response,
+                    imagenUrl: newImageUrl
+                }]);
             }
             
             closeModal();

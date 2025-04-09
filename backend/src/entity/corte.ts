@@ -13,10 +13,6 @@ export class Corte {
     @Column()
     imagenUrl!: string;
 
-    // Relación con Servicios (mantenemos esta)
-    @ManyToMany(() => Servicio, (servicio) => servicio.cortes)
-    servicios!: Servicio[];
-
     // Añadimos relación con ArqueoCaja (que faltaba)
     @ManyToOne(() => ArqueoCaja, (arqueo) => arqueo.cortes)
     @JoinColumn({ name: 'arqueoId' })

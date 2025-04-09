@@ -59,24 +59,29 @@ const handleResponse = async (response) => {
         }
     };
 
-        export const updateCut = async (id, cutData) => {
-        const formData = new FormData();
-        formData.append('estilo', cutData.estilo);
-        
-        if (cutData.imagen instanceof File) {
-            formData.append('imagen', cutData.imagen);
+    export const updateCut = async (id, formData) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/cortes/${id}`, {
+                method: 'PUT',
+                headers: {
+                    // No incluir 'Content-Type' para FormData, el navegador lo hará automáticamente
+                    ...(localStorage.getItem('authToken') && {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    })
+                },
+                body: formData,
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error al actualizar corte');
+            }
+    
+            return await response.json();
+        } catch (error) {
+            console.error('Error en updateCut:', error);
+            throw new Error(error.message || 'Error de conexión al actualizar corte');
         }
-        
-        const response = await fetch(`${API_BASE_URL}/cortes/${id}`, {
-            method: 'PUT',
-            headers: {
-            ...(localStorage.getItem('authToken') && {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            })
-            },
-            body: formData,
-        });
-        return handleResponse(response);
     };
     
     export const deleteCut = async (id) => {
