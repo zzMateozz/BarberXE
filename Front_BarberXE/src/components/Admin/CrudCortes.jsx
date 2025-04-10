@@ -11,6 +11,7 @@ import {
 const IMAGE_BASE_URL = 'http://localhost:3000';
 
 const TableCortes = () => {
+
     const [cortes, setCortes] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [showModal, setShowModal] = useState(false);
@@ -79,14 +80,9 @@ const TableCortes = () => {
             const formDataToSend = new FormData();
             formDataToSend.append('estilo', formData.estilo);
             
-            // Solo agregar servicios si existen
-            if (formData.servicioIds) {
-                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
-            }
-            
-            // Verifica que la imagen exista antes de agregarla
+            // Asegúrate de que la imagen esté correctamente adjuntada
             if (formData.imagen instanceof File) {
-                formDataToSend.append('servicioIds', JSON.stringify(formData.servicioIds));
+                formDataToSend.append('imagen', formData.imagen);
             }
     
             let response;
@@ -201,9 +197,9 @@ const TableCortes = () => {
             />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-20 gap-y-8 px-1 py-6">
                     {filteredCortes.map((corte, i) => (
-                        <div key={i} className=" w-60 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+                        <div key={i} className="w-60 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
                             {corte.imagenUrl ? (
                                 <img
                                     src={corte.imagenUrl}
