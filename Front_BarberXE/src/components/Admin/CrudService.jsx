@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Pencil, Trash2, Upload, Search, X } from "lucide-react";
+import { Pencil, Trash2, Upload, X } from "lucide-react";
 import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
   fetchServices,
@@ -287,60 +287,64 @@ const TableServices = () => {
             filteredServices.map((service, i) => (
               <div
                 key={i}
-                className=" w-64 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300"
+                className="w-64 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300 flex flex-col h-full" // Añade flex flex-col h-full
               >
-                <img
-                  src={
-                    service.imagen ||
-                    "https://via.placeholder.com/300x200?text=Imagen+no+disponible"
-                  }
-                  alt={service.nombre}
-                  className="w-full h-70 object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src =
-                      "https://via.placeholder.com/300x200?text=Imagen+no+disponible";
-                  }}
-                />
-                <div className="p-4">
-                  <h3 className="text-xl font-semibold">{service.nombre}</h3>
-                  <p className="text-gray-700 mt-1">
-                    <strong>Precio:</strong> ${service.precio}
-                  </p>
-                  <p className="text-gray-700">
-                    <strong>Duración:</strong> {service.duracion} min
-                  </p>
+                <div className="flex-grow">
+                  <img
+                    src={
+                      service.imagen ||
+                      "https://via.placeholder.com/300x200?text=Imagen+no+disponible"
+                    }
+                    alt={service.nombre}
+                    className="w-full h-70 object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "https://via.placeholder.com/300x200?text=Imagen+no+disponible";
+                    }}
+                  />
+                  <div className="p-4">
+                    <h3 className="text-xl font-semibold">{service.nombre}</h3>
+                    <p className="text-gray-700 mt-1">
+                      <strong>Precio:</strong> ${service.precio}
+                    </p>
+                    <p className="text-gray-700">
+                      <strong>Duración:</strong> {service.duracion} min
+                    </p>
 
-                  {/* Mostrar cortes asociados */}
-                  {service.cortes && service.cortes.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700">
-                        Cortes incluidos:
-                      </p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {service.cortes.map((corte) => (
-                          <span
-                            key={corte.idCorte}
-                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
-                          >
-                            {corte.estilo}
-                          </span>
-                        ))}
+                    {service.cortes && service.cortes.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-gray-700">
+                          Cortes incluidos:
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {service.cortes.map((corte) => (
+                            <span
+                              key={corte.idCorte}
+                              className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+                            >
+                              {corte.estilo}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <span
-                    className={`inline-block px-3 py-1 mt-2 text-sm font-semibold rounded-full ${
-                      service.estado === "activo"
-                        ? "bg-green-300 text-green-800"
-                        : "bg-red-300 text-red-800"
-                    }`}
-                  >
-                    {service.estado === "activo" ? "Activo" : "Inactivo"}
-                  </span>
+                    <span
+                      className={`inline-block px-3 py-1 mt-2 text-sm font-semibold rounded-full ${
+                        service.estado === "activo"
+                          ? "bg-green-300 text-green-800"
+                          : "bg-red-300 text-red-800"
+                      }`}
+                    >
+                      {service.estado === "activo" ? "Activo" : "Inactivo"}
+                    </span>
+                  </div>
+                </div>
 
-                  <div className="flex justify-center text-center gap-8 mt-4">
+          
+                <div className="p-4 mt-auto">
+                  <div className="flex justify-center gap-8">
                     <button
                       onClick={() => openModal(i)}
                       className="text-blue-500 hover:text-blue-700 hover:scale-110 transition-transform duration-200"
@@ -368,7 +372,6 @@ const TableServices = () => {
           )}
         </div>
 
-        {/* Modal principal para servicio */}
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
@@ -423,7 +426,6 @@ const TableServices = () => {
                   <option value="inactivo">Inactivo</option>
                 </select>
 
-                {/* Campo para seleccionar cortes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cortes asociados
@@ -438,7 +440,7 @@ const TableServices = () => {
                       : "Seleccionar cortes"}
                   </button>
 
-                  {/* Mostrar cortes seleccionados */}
+                  
                   {selectedCuts.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedCuts.map((corte) => (
@@ -497,7 +499,7 @@ const TableServices = () => {
           </div>
         )}
 
-        {/* Modal para selección de cortes */}
+     
         {showCutsModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
