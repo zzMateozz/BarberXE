@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Pencil, Trash2, Upload, Search, X } from "lucide-react";
+import { Pencil, Trash2, Upload, X } from "lucide-react";
 import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
   fetchServices,
   createService,
   updateService,
   deleteService,
-  searchServicesByName,
-  fetchAllCuts
+  fetchAllCuts,
 } from "../../services/ServiceService.js";
 
-const IMAGE_BASE_URL = 'http://localhost:3000';
+const IMAGE_BASE_URL = "http://localhost:3000";
 
 const TableServices = () => {
   const [services, setServices] = useState([]);
@@ -25,7 +24,7 @@ const TableServices = () => {
     duracion: "",
     estado: "activo",
     imagen: null,
-    corteIds: []
+    corteIds: [],
   });
   const [previewImage, setPreviewImage] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
@@ -39,15 +38,17 @@ const TableServices = () => {
       try {
         const [servicesData, cutsData] = await Promise.all([
           fetchServices(),
-          fetchAllCuts()
+          fetchAllCuts(),
         ]);
-        
-        const processedData = servicesData.map(service => ({
+
+        const processedData = servicesData.map((service) => ({
           ...service,
-          imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
-          cortes: service.cortes || []
+          imagen: service.imagenUrl
+            ? `${IMAGE_BASE_URL}${service.imagenUrl}`
+            : null,
+          cortes: service.cortes || [],
         }));
-        
+
         setServices(processedData);
         setAllCuts(cutsData);
       } catch (err) {
@@ -59,37 +60,6 @@ const TableServices = () => {
     loadInitialData();
   }, []);
 
-  // Manejar búsqueda
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      const data = await fetchServices();
-      const processedData = data.map(service => ({
-        ...service,
-        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
-        cortes: service.cortes || []
-      }));
-      setServices(processedData);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    setLoading(true);
-    try {
-      const data = await searchServicesByName(searchTerm);
-      const processedData = data.map(service => ({
-        ...service,
-        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
-        cortes: service.cortes || []
-      }));
-      setServices(processedData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Abrir modal de servicio
   const openModal = (index = null) => {
     setShowModal(true);
@@ -97,7 +67,7 @@ const TableServices = () => {
       const service = services[index];
       setFormData({
         ...service,
-        corteIds: service.cortes.map(c => c.idCorte)
+        corteIds: service.cortes.map((c) => c.idCorte),
       });
       setSelectedCuts(service.cortes);
       setPreviewImage(service.imagen);
@@ -109,7 +79,7 @@ const TableServices = () => {
         duracion: "",
         estado: "activo",
         imagen: null,
-        corteIds: []
+        corteIds: [],
       });
       setSelectedCuts([]);
       setPreviewImage(null);
@@ -124,10 +94,10 @@ const TableServices = () => {
 
   // Alternar selección de corte
   const toggleCutSelection = (cut) => {
-    setSelectedCuts(prev => {
-      const isSelected = prev.some(c => c.idCorte === cut.idCorte);
+    setSelectedCuts((prev) => {
+      const isSelected = prev.some((c) => c.idCorte === cut.idCorte);
       if (isSelected) {
-        return prev.filter(c => c.idCorte !== cut.idCorte);
+        return prev.filter((c) => c.idCorte !== cut.idCorte);
       } else {
         return [...prev, cut];
       }
@@ -136,9 +106,9 @@ const TableServices = () => {
 
   // Confirmar selección de cortes
   const confirmCutsSelection = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      corteIds: selectedCuts.map(c => c.idCorte)
+      corteIds: selectedCuts.map((c) => c.idCorte),
     }));
     setShowCutsModal(false);
   };
@@ -152,7 +122,7 @@ const TableServices = () => {
       duracion: "",
       estado: "activo",
       imagen: null,
-      corteIds: []
+      corteIds: [],
     });
     setSelectedCuts([]);
     setPreviewImage(null);
@@ -163,18 +133,18 @@ const TableServices = () => {
   // Manejar cambios en los inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Manejar cambio de imagen
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        imagen: file
+        imagen: file,
       }));
-      
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result);
@@ -188,22 +158,28 @@ const TableServices = () => {
     e.preventDefault();
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append('nombre', formData.nombre);
-      formDataToSend.append('precio', formData.precio);
-      formDataToSend.append('duracion', formData.duracion);
-      formDataToSend.append('estado', formData.estado);
-      
+      formDataToSend.append("nombre", formData.nombre);
+      formDataToSend.append("precio", formData.precio);
+      formDataToSend.append("duracion", formData.duracion);
+      formDataToSend.append("estado", formData.estado);
+
       if (formData.imagen instanceof File) {
-        formDataToSend.append('imagen', formData.imagen);
+        formDataToSend.append("imagen", formData.imagen);
       }
-      
+
       if (selectedCuts.length > 0) {
-        formDataToSend.append('corteIds', JSON.stringify(selectedCuts.map(c => c.idCorte)));
+        formDataToSend.append(
+          "corteIds",
+          JSON.stringify(selectedCuts.map((c) => c.idCorte))
+        );
       }
 
       if (editIndex !== null) {
-        const updatedService = await updateService(services[editIndex].idServicio, formDataToSend);
-        
+        const updatedService = await updateService(
+          services[editIndex].idServicio,
+          formDataToSend
+        );
+
         let newImageUrl = services[editIndex].imagen;
         if (formData.imagen instanceof File) {
           newImageUrl = URL.createObjectURL(formData.imagen);
@@ -211,16 +187,20 @@ const TableServices = () => {
           newImageUrl = `${IMAGE_BASE_URL}${updatedService.imagenUrl}`;
         }
 
-        setServices(prev =>
-          prev.map((service, i) => (i === editIndex ? {
-            ...updatedService,
-            imagen: newImageUrl,
-            cortes: selectedCuts
-          } : service))
+        setServices((prev) =>
+          prev.map((service, i) =>
+            i === editIndex
+              ? {
+                  ...updatedService,
+                  imagen: newImageUrl,
+                  cortes: selectedCuts,
+                }
+              : service
+          )
         );
       } else {
         const newService = await createService(formDataToSend);
-        
+
         let newImageUrl = null;
         if (formData.imagen instanceof File) {
           newImageUrl = URL.createObjectURL(formData.imagen);
@@ -228,11 +208,14 @@ const TableServices = () => {
           newImageUrl = `${IMAGE_BASE_URL}${newService.imagenUrl}`;
         }
 
-        setServices(prev => [...prev, {
-          ...newService,
-          imagen: newImageUrl,
-          cortes: selectedCuts
-        }]);
+        setServices((prev) => [
+          ...prev,
+          {
+            ...newService,
+            imagen: newImageUrl,
+            cortes: selectedCuts,
+          },
+        ]);
       }
       closeModal();
     } catch (err) {
@@ -257,12 +240,9 @@ const TableServices = () => {
     setSearchTerm(e.target.value);
   };
 
-  // Manejar tecla Enter en el buscador
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
+  const filteredServices = services.filter((service) =>
+    service.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // Mostrar loading
   if (loading) {
@@ -293,95 +273,78 @@ const TableServices = () => {
           >
             <PlusCircleIcon className="w-6 h-6" /> Agregar
           </button>
-          
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              placeholder="Buscar por nombre..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onKeyPress={handleKeyPress}
-              className="border border-gray-300 rounded-md py-2 px-3 pl-10 focus:ring-2 focus:ring-blue-500"
-            />
-            <Search 
-              className="absolute left-3 text-gray-400" 
-              size={18} 
-              onClick={handleSearch}
-            />
-            {isSearching && (
-              <button 
-                onClick={async () => {
-                  setSearchTerm("");
-                  const data = await fetchServices();
-                  const processedData = data.map(service => ({
-                    ...service,
-                    imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
-                    cortes: service.cortes || []
-                  }));
-                  setServices(processedData);
-                  setIsSearching(false);
-                }}
-                className="ml-2 text-sm text-red-500 hover:text-red-700"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
+          <input
+            type="text"
+            placeholder="Buscar nombre..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {services.length > 0 ? (
-            services.map((service, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-x-1 gap-y-8 px-1 py-6">
+          {filteredServices.length > 0 ? (
+            filteredServices.map((service, i) => (
               <div
                 key={i}
-                className="bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300"
+                className="w-64 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300 flex flex-col h-full" // Añade flex flex-col h-full
               >
-                <img
-                  src={service.imagen || 'https://via.placeholder.com/300x200?text=Imagen+no+disponible'}
-                  alt={service.nombre}
-                  className="w-full h-40 object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://via.placeholder.com/300x200?text=Imagen+no+disponible';
-                  }}
-                />
-                <div className="p-4">
-                  <h3 className="text-xl font-semibold">{service.nombre}</h3>
-                  <p className="text-gray-700 mt-1">
-                    <strong>Precio:</strong> ${service.precio}
-                  </p>
-                  <p className="text-gray-700">
-                    <strong>Duración:</strong> {service.duracion} min
-                  </p>
-                  
-                  {/* Mostrar cortes asociados */}
-                  {service.cortes && service.cortes.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700">Cortes incluidos:</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {service.cortes.map(corte => (
-                          <span 
-                            key={corte.idCorte}
-                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
-                          >
-                            {corte.estilo}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="flex-grow">
+                  <img
+                    src={
+                      service.imagen ||
+                      "https://via.placeholder.com/300x200?text=Imagen+no+disponible"
+                    }
+                    alt={service.nombre}
+                    className="w-full h-70 object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "https://via.placeholder.com/300x200?text=Imagen+no+disponible";
+                    }}
+                  />
+                  <div className="p-4">
+                    <h3 className="text-xl font-semibold">{service.nombre}</h3>
+                    <p className="text-gray-700 mt-1">
+                      <strong>Precio:</strong> ${service.precio}
+                    </p>
+                    <p className="text-gray-700">
+                      <strong>Duración:</strong> {service.duracion} min
+                    </p>
 
-                  <span
-                    className={`inline-block px-3 py-1 mt-2 text-sm font-semibold rounded-full ${
-                      service.estado === "activo"
-                        ? "bg-green-300 text-green-800"
-                        : "bg-red-300 text-red-800"
-                    }`}
-                  >
-                    {service.estado === "activo" ? "Activo" : "Inactivo"}
-                  </span>
-                  
-                  <div className="flex justify-center text-center gap-8 mt-4">
+                    {service.cortes && service.cortes.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-gray-700">
+                          Cortes incluidos:
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {service.cortes.map((corte) => (
+                            <span
+                              key={corte.idCorte}
+                              className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+                            >
+                              {corte.estilo}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <span
+                      className={`inline-block px-3 py-1 mt-2 text-sm font-semibold rounded-full ${
+                        service.estado === "activo"
+                          ? "bg-green-300 text-green-800"
+                          : "bg-red-300 text-red-800"
+                      }`}
+                    >
+                      {service.estado === "activo" ? "Activo" : "Inactivo"}
+                    </span>
+                  </div>
+                </div>
+
+          
+                <div className="p-4 mt-auto">
+                  <div className="flex justify-center gap-8">
                     <button
                       onClick={() => openModal(i)}
                       className="text-blue-500 hover:text-blue-700 hover:scale-110 transition-transform duration-200"
@@ -401,7 +364,7 @@ const TableServices = () => {
           ) : (
             <div className="col-span-full text-center py-10">
               <p className="text-gray-500 text-lg">
-                {isSearching 
+                {isSearching
                   ? "No se encontraron servicios con ese nombre"
                   : "No hay servicios registrados"}
               </p>
@@ -409,7 +372,6 @@ const TableServices = () => {
           )}
         </div>
 
-        {/* Modal principal para servicio */}
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
@@ -464,7 +426,6 @@ const TableServices = () => {
                   <option value="inactivo">Inactivo</option>
                 </select>
 
-                {/* Campo para seleccionar cortes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cortes asociados
@@ -474,16 +435,16 @@ const TableServices = () => {
                     onClick={openCutsModal}
                     className="w-full border border-gray-300 rounded-md p-2 text-left bg-white hover:bg-gray-50 transition-colors"
                   >
-                    {selectedCuts.length > 0 
+                    {selectedCuts.length > 0
                       ? `${selectedCuts.length} corte(s) seleccionado(s)`
                       : "Seleccionar cortes"}
                   </button>
+
                   
-                  {/* Mostrar cortes seleccionados */}
                   {selectedCuts.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedCuts.map(corte => (
-                        <span 
+                      {selectedCuts.map((corte) => (
+                        <span
                           key={corte.idCorte}
                           className="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded"
                         >
@@ -538,29 +499,31 @@ const TableServices = () => {
           </div>
         )}
 
-        {/* Modal para selección de cortes */}
+     
         {showCutsModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
               <h2 className="text-2xl font-semibold">Seleccionar Cortes</h2>
-              
+
               <div className="max-h-96 overflow-y-auto">
                 {allCuts.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">
-                    {allCuts.map(corte => (
-                      <div 
+                    {allCuts.map((corte) => (
+                      <div
                         key={corte.idCorte}
                         className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                          selectedCuts.some(c => c.idCorte === corte.idCorte)
-                            ? 'bg-blue-100 border-blue-300'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                          selectedCuts.some((c) => c.idCorte === corte.idCorte)
+                            ? "bg-blue-100 border-blue-300"
+                            : "bg-white border-gray-200 hover:bg-gray-50"
                         }`}
                         onClick={() => toggleCutSelection(corte)}
                       >
                         <div className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={selectedCuts.some(c => c.idCorte === corte.idCorte)}
+                            checked={selectedCuts.some(
+                              (c) => c.idCorte === corte.idCorte
+                            )}
                             readOnly
                             className="h-4 w-4 text-blue-600 rounded"
                           />
@@ -573,7 +536,7 @@ const TableServices = () => {
                   <p className="text-gray-500">No hay cortes disponibles</p>
                 )}
               </div>
-              
+
               <div className="flex justify-end gap-4">
                 <button
                   type="button"
