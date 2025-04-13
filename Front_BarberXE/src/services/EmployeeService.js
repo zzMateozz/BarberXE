@@ -13,7 +13,7 @@ const handleResponse = async (response) => {
 
 
 
-// Headers comunes
+
 const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
@@ -86,7 +86,6 @@ export const fetchEmployees = async () => {
       headers: getHeaders(),
     });
     
-    // Si la respuesta está vacía (204 No Content), devolvemos un objeto vacío
     if (response.status === 204) {
       return {};
     }

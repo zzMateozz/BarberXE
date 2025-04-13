@@ -9,7 +9,7 @@ const handleResponse = async (response) => {
     return response.json();
     };
 
-    // Headers comunes
+
     const getHeaders = () => {
         const headers = {};
         const token = localStorage.getItem('authToken');
@@ -53,7 +53,7 @@ const handleResponse = async (response) => {
             }
     
             const result = await response.json();
-            // Asegurar que la URL de la imagen sea completa
+
             if (result.imagenUrl) {
                 result.imagenUrl = `http://localhost:3000${result.imagenUrl}`;
             }
@@ -69,7 +69,6 @@ const handleResponse = async (response) => {
             const response = await fetch(`${API_BASE_URL}/cortes/${id}`, {
                 method: 'PUT',
                 headers: {
-                    // No incluir 'Content-Type' para FormData, el navegador lo hará automáticamente
                     ...(localStorage.getItem('authToken') && {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     })
@@ -95,7 +94,6 @@ const handleResponse = async (response) => {
         headers: getHeaders(),
         });
         
-        // Si la respuesta está vacía (204 No Content), devolvemos un objeto vacío
         if (response.status === 204) {
         return {};
         }

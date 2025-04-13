@@ -16,6 +16,9 @@ export class Servicio {
     @Column()
     imagenUrl!: string; 
 
+    @Column()
+    duracion!: string; 
+
     @Column({
         type: 'enum',
         enum: ['activo', 'inactivo'],
@@ -29,5 +32,4 @@ export class Servicio {
     @ManyToMany(() => Corte)
     @JoinTable()
     cortes!: Corte[];
-    duracion!: number;
 }

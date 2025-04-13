@@ -1,7 +1,7 @@
 export class UpdateServicioDto {
     readonly nombre?: string;
     readonly precio?: number;
-    readonly duracion?: number;
+    readonly duracion?: string;
     readonly imagenUrl?: string;
     readonly estado?: 'activo' | 'inactivo';
     readonly corteIds?: number[];
