@@ -1,5 +1,5 @@
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Ajusta según tu configuración
+const API_BASE_URL = 'http://localhost:3000/api'; 
 
 const handleResponse = async (response) => {
   if (!response.ok) {
@@ -12,7 +12,6 @@ const handleResponse = async (response) => {
 
 
 
-// Headers comunes
 const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
@@ -49,7 +48,6 @@ export const createUser = async (userData) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Agrega otros headers si son necesarios
       },
       body: JSON.stringify(userData),
     });
@@ -108,7 +106,6 @@ export const deleteClient = async (id) => {
     headers: getHeaders(),
   });
   
-  // Si la respuesta está vacía (204 No Content), devolvemos un objeto vacío
   if (response.status === 204) {
     return {};
   }

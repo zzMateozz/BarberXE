@@ -28,5 +28,11 @@ export const ServicioRepository = AppDataSource.getRepository(Servicio).extend({
             .leftJoinAndSelect('servicio.cortes', 'cortes')
             .orderBy('servicio.nombre', 'ASC')
             .getMany();
+    },
+    
+    async findAllWithCortes() {
+        return this.find({ 
+            relations: ['cortes'] 
+        });
     }
 });
