@@ -22,28 +22,7 @@ export class ServicioService {
         return await ServicioRepository.findOneBy({ idServicio: id });
     }
 
-    async findByIds(ids: number[]): Promise<Servicio[]> {
-        // 1. Validar que el array no esté vacío
-        if (!ids || ids.length === 0) {
-            return [];
-        }
     
-        // 2. Filtrar y asegurar que sean números válidos
-        const numericIds = ids
-            .map(id => Number(id))
-            .filter(id => !isNaN(id) && id > 0);
-    
-        // 3. Si no hay IDs válidos, retornar array vacío
-        if (numericIds.length === 0) {
-            return [];
-        }
-    
-        // 4. Usar query builder para mayor seguridad
-        return await ServicioRepository
-            .createQueryBuilder('servicio')
-            .where('servicio.idServicio IN (:...ids)', { ids: numericIds })
-            .getMany();
-    }
     async create(servicioData: CreateServicioDto): Promise<Servicio> {
         const queryRunner = ServicioRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();

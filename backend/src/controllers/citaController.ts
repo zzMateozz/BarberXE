@@ -4,6 +4,7 @@ import { CreateCitaDto } from "../dtos/Cita/CreateCita.dto";
 import { UpdateCitaDto } from "../dtos/Cita/UpdateCita.dto";
 import { ServicioService } from "../services/servicioService";
 import { Servicio } from "../entity/servicio";
+import { AppDataSource } from "../config/database";
 
 export class CitaController {
   private citaService: CitaService;
@@ -70,7 +71,7 @@ export class CitaController {
         throw new Error("El cuerpo de la solicitud no puede estar vacío");
       }
 
-      // Validar campos requeridos antes de procesar
+      // Validar campos requeridos
       const requiredFields = [
         "fecha",
         "clienteId",
@@ -94,11 +95,83 @@ export class CitaController {
         );
       }
 
-      const fecha = new Date(req.body.fecha);
-      if (isNaN(fecha.getTime())) {
-        throw new Error("Fecha no válida");
-      }
+      // Calcular duración total de los servicios
+      const servicioRepository = AppDataSource.getRepository(Servicio);
+        const servicios = await servicioRepository.findByIds(req.body.servicioIds);
+        
+        if (servicios.length !== req.body.servicioIds.length) {
+            throw new Error("Algunos servicios no fueron encontrados");
+        }
 
+        const duracionTotal = servicios.reduce(
+            (total, servicio) => total + Number(servicio.duracion || 30),
+            0
+        );
+
+        const fecha = new Date(req.body.fecha);
+        const fechaFin = new Date(fecha.getTime() + duracionTotal * 60000);
+
+        // Verificar disponibilidad del empleado (solo mismo día)
+        const inicioDia = new Date(fecha);
+        inicioDia.setHours(0, 0, 0, 0);
+        
+        const finDia = new Date(fecha);
+        finDia.setHours(23, 59, 59, 999);
+
+        const citasExistente = await this.citaService.findByEmpleadoAndFechaRange(
+            req.body.empleadoId,
+            inicioDia,
+            finDia
+        );
+
+        // Filtrar solo citas que realmente se solapan
+        const citasSolapadas = citasExistente.filter(citaExistente => {
+            const serviciosCita = citaExistente.servicios || [];
+            const duracionCita = serviciosCita.reduce(
+                (total, s) => total + Number(s.duracion || 30), 0
+            );
+            const inicioExistente = new Date(citaExistente.fecha);
+            const finExistente = new Date(inicioExistente.getTime() + duracionCita * 60000);
+
+            return (
+                (fecha >= inicioExistente && fecha < finExistente) ||
+                (fechaFin > inicioExistente && fechaFin <= finExistente) ||
+                (fecha <= inicioExistente && fechaFin >= finExistente)
+            );
+        });
+
+        if (citasSolapadas.length > 0) {
+            const mensajeError = citasSolapadas.map(cita => {
+                const inicio = new Date(cita.fecha);
+                const serviciosCita = cita.servicios || [];
+                const duracionCita = serviciosCita.reduce(
+                    (total, s) => total + Number(s.duracion || 30), 0
+                );
+                const fin = new Date(inicio.getTime() + duracionCita * 60000);
+                
+                return `El empleado ya tiene una cita de ${duracionCita} minutos programada de ${inicio.toLocaleTimeString()} a ${fin.toLocaleTimeString()}`;
+            }).join("\n");
+
+            throw new Error(`Conflicto de horario:\n${mensajeError}`);
+        }
+
+        if (citasSolapadas.length > 0) {
+            const mensajeError = citasSolapadas.map(cita => {
+                const inicio = new Date(cita.fecha);
+                const serviciosCita = cita.servicios || [];
+                const duracionCita = serviciosCita.reduce(
+                    (total, s) => total + Number(s.duracion || 30), 0
+                );
+                const fin = new Date(inicio.getTime() + duracionCita * 60000);
+                
+                const serviciosNombres = serviciosCita.map(s => s.nombre).join(', ');
+                
+                return `El empleado ${cita.empleado.nombre} ya tiene una cita para ${serviciosNombres} (${duracionCita} min) programada de ${inicio.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} a ${fin.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }).join('\n');
+        
+            throw new Error(`CONFLICTO_HORARIO:${mensajeError}`);
+        }
+        
       // Crear DTO y procesar
       const citaData = new CreateCitaDto(req.body);
       const cita = await this.citaService.create(citaData);
@@ -107,14 +180,18 @@ export class CitaController {
         success: true,
         data: cita,
         message: "Cita creada exitosamente",
+        duracionTotal: `${duracionTotal} minutos`,
+        horario: `${fecha.toLocaleTimeString()} - ${fechaFin.toLocaleTimeString()}`
       });
     } catch (error: any) {
-      const statusCode = error.message.includes("ya tiene una cita")
-        ? 409
-        : 400;
+      const statusCode = error.message.includes("ya tiene una cita") ||
+                        error.message.includes("Conflicto de horario")
+        ? 409 // Conflict
+        : 400; // Bad Request
+        
       res.status(statusCode).json({
         success: false,
-        message: "Error al crear cita",
+        message: "Empleado ocupado a esa hora",
         error: error.message,
         details: error instanceof Error ? error.stack : null,
       });
@@ -122,18 +199,109 @@ export class CitaController {
   };
 
   update = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const id = parseInt(req.params.id);
-      const citaData = new UpdateCitaDto(req.body);
-      const cita = await this.citaService.update(id, citaData);
-      res.status(200).json(cita);
-    } catch (error: any) {
-      if (error.message.includes("no encontrada")) {
-        res.status(404).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: "Error al actualizar cita", error });
+      try {
+          const id = parseInt(req.params.id);
+          
+          // Validación básica del cuerpo de la solicitud
+          if (!req.body || Object.keys(req.body).length === 0) {
+              throw new Error("El cuerpo de la solicitud no puede estar vacío");
+          }
+
+          // Obtener la cita existente
+          const citaExistente = await this.citaService.findById(id);
+          
+          // Calcular duración total de los servicios
+          const servicioRepository = AppDataSource.getRepository(Servicio);
+          const servicioIds = req.body.servicioIds || citaExistente.servicios.map(s => s.idServicio);
+          const servicios = await servicioRepository.findByIds(servicioIds);
+          
+          if (servicios.length !== servicioIds.length) {
+              throw new Error("Algunos servicios no fueron encontrados");
+          }
+
+          const duracionTotal = servicios.reduce(
+              (total, servicio) => total + Number(servicio.duracion || 30),
+              0
+          );
+
+          // Configurar fechas
+          const fecha = req.body.fecha ? new Date(req.body.fecha) : new Date(citaExistente.fecha);
+          const fechaFin = new Date(fecha.getTime() + duracionTotal * 60000);
+
+          // Verificar disponibilidad del empleado (excluyendo esta cita)
+          const empleadoId = req.body.empleadoId || citaExistente.empleado.idEmpleado;
+          
+          // Verificar solo citas del mismo día
+          const inicioDia = new Date(fecha);
+          inicioDia.setHours(0, 0, 0, 0);
+          
+          const finDia = new Date(fecha);
+          finDia.setHours(23, 59, 59, 999);
+
+          const citasDelDia = await this.citaService.findByEmpleadoAndFechaRange(
+              empleadoId,
+              inicioDia,
+              finDia
+          );
+
+          // Filtrar citas que realmente se solapan (excluyendo la actual)
+          const citasSolapadas = citasDelDia.filter(cita => {
+              if (cita.idCita === id) return false; // Excluir la cita actual
+              
+              const serviciosCita = cita.servicios || [];
+              const duracionCita = serviciosCita.reduce(
+                  (total, s) => total + Number(s.duracion || 30), 0
+              );
+              const inicioExistente = new Date(cita.fecha);
+              const finExistente = new Date(inicioExistente.getTime() + duracionCita * 60000);
+
+              return (
+                  (fecha >= inicioExistente && fecha < finExistente) ||
+                  (fechaFin > inicioExistente && fechaFin <= finExistente) ||
+                  (fecha <= inicioExistente && fechaFin >= finExistente)
+              );
+          });
+
+          if (citasSolapadas.length > 0) {
+              const mensajeError = citasSolapadas.map(cita => {
+                  const inicio = new Date(cita.fecha);
+                  const serviciosCita = cita.servicios || [];
+                  const duracionCita = serviciosCita.reduce(
+                      (total, s) => total + Number(s.duracion || 30), 0
+                  );
+                  const fin = new Date(inicio.getTime() + duracionCita * 60000);
+                  
+                  return `El empleado ya tiene una cita de ${duracionCita} minutos programada de ${inicio.toLocaleTimeString()} a ${fin.toLocaleTimeString()}`;
+              }).join("\n");
+
+              throw new Error(`Conflicto de horario:\n${mensajeError}`);
+          }
+
+          // Crear DTO y actualizar
+          const citaData = new UpdateCitaDto(req.body);
+          const cita = await this.citaService.update(id, citaData);
+
+          res.status(200).json({
+              success: true,
+              data: cita,
+              message: "Cita actualizada exitosamente",
+              duracionTotal: `${duracionTotal} minutos`,
+              horario: `${fecha.toLocaleTimeString()} - ${fechaFin.toLocaleTimeString()}`
+          });
+      } catch (error: any) {
+          const statusCode = error.message.includes("Conflicto de horario") 
+              ? 409 
+              : error.message.includes("no encontrada") 
+                  ? 404 
+                  : 400;
+          
+          res.status(statusCode).json({
+              success: false,
+              message: "Error al actualizar cita",
+              error: error.message,
+              details: error instanceof Error ? error.stack : null,
+          });
       }
-    }
   };
 
   delete = async (req: Request, res: Response): Promise<void> => {
@@ -179,94 +347,4 @@ export class CitaController {
       });
     }
   };
-
-  checkDisponibilidad = async (req: Request, res: Response): Promise<void> => {
-    try {
-        // 1. Validar que los servicios estén inicializados
-        if (!this.citaService || !this.servicioService) {
-             res.status(500).json({ 
-                success: false, 
-                message: "Servicios no inicializados" 
-            });
-        }
-
-        // 2. Extraer y validar datos del request
-        const { idEmpleado, fechaHora, servicios } = req.body;
-        
-        if (!idEmpleado || !fechaHora || !servicios) {
-             res.status(400).json({
-                success: false,
-                message: "Datos incompletos (se requieren idEmpleado, fechaHora y servicios)"
-            });
-        }
-
-        // 3. Normalizar y validar IDs de servicios
-        const idsServicios = Array.isArray(servicios) ? servicios : [servicios];
-        const idsValidos = idsServicios
-            .map(id => Number(id))
-            .filter(id => !isNaN(id) && id > 0);
-
-        if (idsValidos.length === 0) {
-             res.status(400).json({
-                success: false,
-                message: "No se proporcionaron IDs de servicios válidos"
-            });
-        }
-
-        // 4. Obtener servicios y verificar existencia
-        const serviciosEncontrados = await this.servicioService.findByIds(idsValidos);
-        
-        if (serviciosEncontrados.length !== idsValidos.length) {
-            const faltantes = idsValidos.filter(
-                id => !serviciosEncontrados.some((s: { idServicio: number; }) => s.idServicio === id)
-            );
-           res.status(404).json({
-                success: false,
-                message: "Algunos servicios no existen",
-                faltantes
-            });
-        }
-
-        // 5. Calcular duración total
-        const duracionTotal = serviciosEncontrados.reduce(
-            (total: any, servicio: { duracion: any; }) => total + (servicio.duracion || 0), 
-            0
-        );
-
-        if (duracionTotal <= 0) {
-             res.status(400).json({
-                success: false,
-                message: "La duración total de los servicios es inválida"
-            });
-        }
-
-        // 6. Verificar disponibilidad del empleado
-        const fechaInicio = new Date(fechaHora);
-        const fechaFin = new Date(fechaInicio.getTime() + duracionTotal * 60000);
-        
-        const disponible = await this.citaService.checkDisponibilidad(
-            idEmpleado,
-            fechaInicio,
-            fechaFin
-        );
-
-        // 7. Responder
-        res.status(200).json({
-            success: true,
-            disponible,
-            duracionTotal,
-            servicios: serviciosEncontrados // Opcional: enviar los servicios encontrados
-        });
-
-    } catch (error) {
-        console.error("Error en checkDisponibilidad:", error);
-        if (!res.headersSent) {
-            res.status(500).json({
-                success: false,
-                message: "Error interno del servidor",
-                error: error instanceof Error ? error.message : "Error desconocido"
-            });
-        }
-    }
-};
 }
