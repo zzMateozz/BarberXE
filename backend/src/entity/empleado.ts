@@ -37,6 +37,9 @@ export class Empleado {
     @OneToMany(() => Cita, (cita) => cita.empleado)
     citas!: Cita[];
 
-    @OneToMany(() => ArqueoCaja, (arqueo) => arqueo.empleado)
+    @OneToMany(() => ArqueoCaja, (arqueo) => arqueo.empleado, {
+        cascade: true, // Esto permite operaciones en cascada
+        onDelete: 'CASCADE' // Esto configura la eliminación en cascada a nivel de BD
+    })
     arqueos!: ArqueoCaja[];
 }

@@ -206,10 +206,10 @@ const TableEmployees = ({ isCollapsed }) => {
           apellido: employee.apellido,
           telefono: employee.telefono,
           estado: employee.estado,
-          cargo: employee.cargo || "Barbero",
-          usuario: employee.usuario || "",
-          contraseña: "********",
-          idUsuario: employee.idUsuario || null,
+          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
+          usuario: "", // No cargar usuario al editar
+          contraseña: "", // No cargar contraseña al editar
+          idUsuario: null // No es necesario para la edición
         });
       }
     } else {
@@ -300,7 +300,6 @@ const TableEmployees = ({ isCollapsed }) => {
           apellido: formData.apellido,
           telefono: formData.telefono,
           estado: formData.estado,
-          cargo: originalEmployee.cargo // Mantenemos el cargo original
         };
       
         // 3. Actualizar en el backend
@@ -310,8 +309,8 @@ const TableEmployees = ({ isCollapsed }) => {
         setEmployees(prev => 
           prev.map(emp => 
             emp.idEmpleado === editingEmployeeId ? { 
-              ...emp,          // Mantenemos todos los datos existentes
-              ...updateData     // Aplicamos solo los cambios permitidos
+              ...emp,
+              ...updateData
             } : emp
           )
         );
