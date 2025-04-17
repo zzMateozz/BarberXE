@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Pencil, Trash2, Calendar } from "lucide-react";
+import { Pencil, Trash2} from "lucide-react";
 import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
   fetchCitas,
@@ -57,7 +57,6 @@ const TableCitas = ({ isCollapsed }) => {
     cliente: null,
     empleado: null,
     servicios: [],
-    imagenUrl: "",
   });
 
   // Errores de validación
@@ -67,6 +66,7 @@ const TableCitas = ({ isCollapsed }) => {
   const [empleadoError, setEmpleadoError] = useState("");
   const [serviciosError, setServiciosError] = useState("");
   const [disponibilidadError, setDisponibilidadError] = useState("");
+  const [barberos, setBarberos] = useState([]);
 
   // Generar horas disponibles (8:00 AM - 10:00 PM cada 30 minutos)
   const horasDisponibles = Array.from({ length: 28 }, (_, i) => {
@@ -81,24 +81,30 @@ const TableCitas = ({ isCollapsed }) => {
       try {
         setLoading(true);
         const [citasData, clientesData, empleadosData, serviciosData] =
-          await Promise.all([
-            fetchCitas(),
-            fetchClientes(),
-            fetchEmpleados(),
-            fetchServicios(),
-          ]);
-
+        await Promise.all([
+          fetchCitas(),
+          fetchClientes(),
+          fetchEmpleados(),
+          fetchServicios().then(servicios => 
+            servicios.map(s => ({ 
+              ...s, 
+              duracion: parseInt(s.duracion) || 0 
+            }))
+          )
+        ]);
         setCitas(citasData);
         setClientes(clientesData);
         setEmpleados(empleadosData);
-        setServicios(serviciosData);
+        // Filtrar solo los barberos
+        setBarberos(empleadosData.filter((e) => e.cargo === "Barbero"));
+        setServicios(serviciosData); // Aquí ya vienen con duración como número
         setLoading(false);
       } catch (err) {
         setError(err.message);
         setLoading(false);
       }
     };
-
+  
     loadData();
   }, []);
 
@@ -114,7 +120,6 @@ const TableCitas = ({ isCollapsed }) => {
       );
       setCitas(filtered);
     } else {
-      // Si no hay término de búsqueda, recargar todas las citas
       const reloadCitas = async () => {
         try {
           const citasData = await fetchCitas();
@@ -134,7 +139,6 @@ const TableCitas = ({ isCollapsed }) => {
     if (citaId !== null) {
       const citaToEdit = citas.find((c) => c.idCita === citaId);
       if (citaToEdit) {
-        // Formatear fecha y hora para el input
         const fechaObj = new Date(citaToEdit.fecha);
         const fecha = fechaObj.toISOString().split("T")[0];
         const hora = fechaObj.toTimeString().substring(0, 5);
@@ -145,22 +149,18 @@ const TableCitas = ({ isCollapsed }) => {
           cliente: citaToEdit.cliente,
           empleado: citaToEdit.empleado,
           servicios: citaToEdit.servicios,
-          imagenUrl: citaToEdit.imagenUrl || "",
         });
       }
     } else {
-      // Resetear formulario para nueva cita
       setFormData({
         fecha: "",
         hora: "",
         cliente: null,
         empleado: null,
         servicios: [],
-        imagenUrl: "",
       });
     }
 
-    // Resetear errores
     setFechaError("");
     setHoraError("");
     setClienteError("");
@@ -180,97 +180,100 @@ const TableCitas = ({ isCollapsed }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Validar disponibilidad cuando se selecciona empleado o cambia fecha/hora
-    if (
-      (name === "empleado" || name === "fecha" || name === "hora") &&
-      formData.empleado &&
-      formData.fecha &&
-      formData.hora
-    ) {
-      validateDisponibilidad();
-    }
-  };
-
   const handleServiciosChange = (serviciosSeleccionados) => {
-    setFormData((prev) => ({ ...prev, servicios: serviciosSeleccionados }));
-
-    // Calcular duración total de servicios seleccionados
-    const duracionTotal = serviciosSeleccionados.reduce(
-      (total, servicio) => total + (servicio.duracion || 0),
-      0
-    );
-
-    if (duracionTotal > 240) {
-      setServiciosError("La duración total no puede exceder 4 horas");
-    } else {
-      setServiciosError("");
-    }
+    setFormData(prev => ({ 
+      ...prev, 
+      servicios: serviciosSeleccionados.map(item => 
+        servicios.find(s => s.idServicio === item.value)
+      ) 
+    }));
   };
+  const handleSelectChange = async (name, value) => {
+    // Actualización CORRECTA del estado para arrays
+    setFormData(prev => {
+        const newState = { ...prev, [name]: value };
+        
+        // Debug: Verificar servicios actuales
+        console.log('Servicios actuales:', newState.servicios);
+        return newState;
+    });
 
-  const validateDisponibilidad = async () => {
-    if (!formData.empleado || !formData.fecha || !formData.hora) return;
+    if ((name === "empleado" || name === "fecha" || name === "hora" || name === "servicios") && 
+        formData.empleado && formData.fecha && formData.hora && formData.servicios?.length > 0) {
+        
+        try {
+            setDisponibilidadError("Verificando disponibilidad...");
+            
+            const fechaInicio = new Date(`${formData.fecha}T${formData.hora}`);
+            
+            // Debug: Verificar estructura completa
+            console.log('Datos completos:', {
+                servicios: formData.servicios,
+                duraciones: formData.servicios.map(s => s.duracion)
+            });
 
-    try {
-      const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
-      const duracionTotal = formData.servicios.reduce(
-        (total, servicio) => total + (servicio.duracion || 0),
-        0
-      );
+            // Cálculo ROBUSTO de duración
+            const duracionTotal = formData.servicios.reduce((total, servicio) => {
+                const duracion = Number(servicio?.duracion || 0);
+                if (isNaN(duracion)) {
+                    console.error('Duración inválida en servicio:', servicio);
+                    return total;
+                }
+                return total + duracion;
+            }, 0);
 
-      const disponible = await checkDisponibilidadEmpleado(
-        formData.empleado.idEmpleado,
-        fechaHora,
-        duracionTotal,
-        editingCitaId // Pasar ID si es edición para no chequear contra sí misma
-      );
+            console.log('Duración TOTAL calculada:', duracionTotal, 'minutos');
+            
+            const fechaFin = new Date(fechaInicio.getTime() + duracionTotal * 60000);
 
-      if (!disponible) {
-        setDisponibilidadError("El empleado no está disponible en ese horario");
-      } else {
-        setDisponibilidadError("");
-      }
-    } catch (err) {
-      setDisponibilidadError("Error al verificar disponibilidad");
+            // Verificación EXTRA
+            if (formData.servicios.length > 0 && duracionTotal <= 0) {
+                throw new Error('La duración total no puede ser 0 con servicios seleccionados');
+            }
+
+            const disponible = await checkDisponibilidadEmpleado(
+                formData.empleado.idEmpleado,
+                fechaInicio,
+                fechaFin,
+                formData.servicios.map(s => s.idServicio),
+                editingCitaId
+            );
+
+            setDisponibilidadError(
+                disponible ? "" : `No disponible para ${formData.servicios.length} servicios (${duracionTotal} min)`
+            );
+            
+        } catch (error) {
+            console.error("Error completo:", {
+                error,
+                servicios: formData.servicios,
+                duraciones: formData.servicios?.map(s => s.duracion)
+            });
+            setDisponibilidadError("Error en cálculo de disponibilidad");
+            toast.error(error.message);
+        }
     }
-  };
+};
 
   const validateForm = () => {
     let isValid = true;
-
-    // Validar fecha (no puede ser en el pasado)
+  
+    // Validar fecha
     if (!formData.fecha) {
       setFechaError("La fecha es requerida");
       isValid = false;
     } else {
-      const fechaSeleccionada = new Date(formData.fecha);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-
-      if (fechaSeleccionada < hoy) {
-        setFechaError("No se pueden agendar citas en fechas pasadas");
-        isValid = false;
-      } else {
-        setFechaError("");
-      }
+      setFechaError("");
     }
-
-    // Validar hora (8:00 - 22:00)
+  
+    // Validar hora
     if (!formData.hora) {
       setHoraError("La hora es requerida");
       isValid = false;
     } else {
-      const [horas] = formData.hora.split(":").map(Number);
-      if (horas < 8 || horas >= 22) {
-        setHoraError("Horario laboral: 8:00 - 22:00");
-        isValid = false;
-      } else {
-        setHoraError("");
-      }
+      setHoraError("");
     }
-
+  
     // Validar cliente
     if (!formData.cliente) {
       setClienteError("Seleccione un cliente");
@@ -278,7 +281,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setClienteError("");
     }
-
+  
     // Validar empleado
     if (!formData.empleado) {
       setEmpleadoError("Seleccione un empleado");
@@ -286,7 +289,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setEmpleadoError("");
     }
-
+  
     // Validar servicios
     if (formData.servicios.length === 0) {
       setServiciosError("Seleccione al menos un servicio");
@@ -294,55 +297,93 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setServiciosError("");
     }
-
+  
+    // Validar fecha y hora juntas (solo si ambos están presentes)
+    if (formData.fecha && formData.hora) {
+      const fechaSeleccionada = new Date(`${formData.fecha}T${formData.hora}`);
+      const ahora = new Date();
+      
+      // Permitir citas con al menos 2 horas de anticipación
+      const margenAnticipacion = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
+      const fechaMinima = new Date(ahora.getTime() + margenAnticipacion);
+  
+      // Comprobar si la fecha seleccionada es hoy
+      const esMismoDia = fechaSeleccionada.toDateString() === ahora.toDateString();
+  
+      if (esMismoDia && fechaSeleccionada < fechaMinima) {
+        setFechaError("Para citas hoy, debe agendar con al menos 2 horas de anticipación");
+        isValid = false;
+      } else if (fechaSeleccionada < ahora) {
+        setFechaError("No puede agendar citas en el pasado");
+        isValid = false;
+      } else {
+        setFechaError("");
+      }
+  
+      // Validar horario laboral (8:00 - 22:00)
+      const [horas, minutos] = formData.hora.split(":").map(Number);
+      if (horas < 8 || horas >= 22 || (horas === 21 && minutos > 0)) {
+        setHoraError("Horario laboral: 8:00 - 22:00");
+        isValid = false;
+      } else {
+        setHoraError("");
+      }
+    }
+  
     return isValid;
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error("Por favor complete todos los campos correctamente");
-      return;
-    }
-
-    if (disponibilidadError) {
-      toast.error("El empleado no está disponible en ese horario");
+      toast.error("Por favor complete todos los campos requeridos");
       return;
     }
 
     try {
-      // Crear objeto fecha-hora combinado
       const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
+      const duracionTotal = formData.servicios.reduce(
+        (total, servicio) => total + (servicio?.duracion || 0), 
+        0
+      );
+
+      // Verificar disponibilidad
+      const disponible = await checkDisponibilidadEmpleado(
+        formData.empleado.idEmpleado,
+        fechaHora,
+        duracionTotal,
+        editingCitaId
+      );
+
+      if (!disponible) {
+        toast.error("El empleado no está disponible en ese horario");
+        return;
+      }
 
       // Preparar datos para enviar
       const citaData = {
         fecha: fechaHora,
-        cliente: { idCliente: formData.cliente.idCliente },
-        empleado: { idEmpleado: formData.empleado.idEmpleado },
-        servicios: formData.servicios.map((s) => ({
-          idServicio: s.idServicio,
-        })),
-        imagenUrl: formData.imagenUrl,
+        clienteId: formData.cliente.idCliente,
+        empleadoId: formData.empleado.idEmpleado,
+        servicioIds: formData.servicios.map(s => s.idServicio),
       };
 
-      if (editingCitaId !== null) {
-        // Actualizar cita existente
-        const updatedCita = await updateCita(editingCitaId, citaData);
-        setCitas((prev) =>
-          prev.map((c) => (c.idCita === editingCitaId ? updatedCita : c))
-        );
-        toast.success("Cita actualizada con éxito");
+      // Guardar cita
+      if (editingCitaId) {
+        await updateCita(editingCitaId, citaData);
+        toast.success("Cita actualizada correctamente");
       } else {
-        // Crear nueva cita
-        const newCita = await createCita(citaData);
-        setCitas((prev) => [...prev, newCita]);
-        toast.success("Cita creada con éxito");
+        await createCita(citaData);
+        toast.success("Cita creada correctamente");
       }
 
+      // Recargar citas
+      const citasActualizadas = await fetchCitas();
+      setCitas(citasActualizadas);
       closeModal();
-    } catch (err) {
-      toast.error(err.message || "Error al guardar la cita");
+    } catch (error) {
+      console.error("Error al guardar cita:", error);
+      toast.error(error.message || "Error al guardar la cita");
     }
   };
 
@@ -403,11 +444,7 @@ const TableCitas = ({ isCollapsed }) => {
           />
         </div>
 
-        <div
-          className={`${styles.tableContainer} ${
-            isCollapsed ? "mx-4" : "mx-0"
-          }`}
-        >
+        <div className={`${styles.tableContainer} ${isCollapsed ? "mx-4" : "mx-0"}`}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -423,7 +460,7 @@ const TableCitas = ({ isCollapsed }) => {
                 <tr key={cita.idCita} className="bg-neutral-100">
                   <td className={styles.td}>{formatFechaHora(cita.fecha)}</td>
                   <td className={styles.td}>
-                    {cita.cliente.nombre} {cita.cliente.apellido}
+                    {cita.cliente ? `${cita.cliente.nombre} ${cita.cliente.apellido}` : 'Cliente no asignado'}
                   </td>
                   <td className={styles.td}>
                     {cita.empleado.nombre} {cita.empleado.apellido}
@@ -480,12 +517,7 @@ const TableCitas = ({ isCollapsed }) => {
                           fechaError ? "border-red-500" : "border-gray-300"
                         }`}
                         required
-                        style={{
-                          backgroundImage: "none",
-                          appearance: "none",
-                        }}
                       />
-                      <Calendar className="absolute right-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
                     </div>
                     <ValidationMessage message={fechaError} isValid={false} />
                   </div>
@@ -550,7 +582,7 @@ const TableCitas = ({ isCollapsed }) => {
                     Empleado <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    options={empleados.map((e) => ({
+                    options={barberos.map((e) => ({
                       value: e.idEmpleado,
                       label: `${e.nombre} ${e.apellido}`,
                     }))}
@@ -594,13 +626,7 @@ const TableCitas = ({ isCollapsed }) => {
                       value: s.idServicio,
                       label: s.nombre,
                     }))}
-                    onChange={(selected) =>
-                      handleServiciosChange(
-                        selected.map((item) =>
-                          servicios.find((s) => s.idServicio === item.value)
-                        )
-                      )
-                    }
+                    onChange={handleServiciosChange}
                     placeholder="Seleccione servicios"
                     className="mt-1"
                   />
@@ -609,26 +635,12 @@ const TableCitas = ({ isCollapsed }) => {
                     <div className="mt-2 text-sm text-gray-600">
                       Duración total:{" "}
                       {formData.servicios.reduce(
-                        (total, s) => total + (s.duracion || 0),
+                        (total, s) => total + (parseInt(s.duracion || 0)),
                         0
                       )}{" "}
                       minutos
                     </div>
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    URL de Imagen (Opcional)
-                  </label>
-                  <input
-                    type="url"
-                    name="imagenUrl"
-                    value={formData.imagenUrl}
-                    onChange={handleChange}
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                    className="mt-1 w-full border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                  />
                 </div>
 
                 <div className="flex gap-4 justify-end">
@@ -642,14 +654,6 @@ const TableCitas = ({ isCollapsed }) => {
                   <button
                     type="submit"
                     className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                    disabled={
-                      !!fechaError ||
-                      !!horaError ||
-                      !!clienteError ||
-                      !!empleadoError ||
-                      !!serviciosError ||
-                      !!disponibilidadError
-                    }
                   >
                     {editingCitaId !== null ? "Actualizar" : "Guardar"}
                   </button>
@@ -659,21 +663,6 @@ const TableCitas = ({ isCollapsed }) => {
           </div>
         )}
       </div>
-
-      {/* Estilos inline para mejorar el datepicker */}
-      <style jsx>{`
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          opacity: 0;
-          position: absolute;
-          right: 0;
-          width: 100%;
-          height: 100%;
-          cursor: pointer;
-        }
-        input[type="date"] {
-          position: relative;
-        }
-      `}</style>
     </section>
   );
 };

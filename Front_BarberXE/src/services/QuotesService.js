@@ -1,4 +1,3 @@
-
 const API_BASE_URL = 'http://localhost:3000/api'; 
 
 const handleResponse = async (response) => {
@@ -10,114 +9,122 @@ const handleResponse = async (response) => {
   return response.json();
 };
 
-
 const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
   };
-  
-  // Si tenemos token de autenticación, lo añadimos
   const token = localStorage.getItem('authToken');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
   return headers;
 };
 
+// ------------------ Citas ------------------
 export const fetchCitas = async () => {
-  const response = await fetch(`${API_BASE_URL}/citas`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al obtener citas');
-  }
-  return await response.json();
+  const response = await fetch(`${API_BASE_URL}/citas`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
 };
 
 export const createCita = async (citaData) => {
   const response = await fetch(`${API_BASE_URL}/citas`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
     body: JSON.stringify(citaData),
   });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al crear cita');
-  }
-  return await response.json();
+  return handleResponse(response);
 };
 
 export const updateCita = async (id, citaData) => {
   const response = await fetch(`${API_BASE_URL}/citas/${id}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
     body: JSON.stringify(citaData),
   });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al actualizar cita');
-  }
-  return await response.json();
+  return handleResponse(response);
 };
 
 export const deleteCita = async (id) => {
   const response = await fetch(`${API_BASE_URL}/citas/${id}`, {
     method: 'DELETE',
+    headers: getHeaders(),
   });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al eliminar cita');
+  
+  if (response.status === 204) {
+    return {};
   }
-  return await response.json();
+
+  return handleResponse(response);
 };
 
+// ------------------ Clientes ------------------
 export const fetchClientes = async () => {
-  const response = await fetch(`${API_BASE_URL}/clientes`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al obtener clientes');
-  }
-  return await response.json();
+  const response = await fetch(`${API_BASE_URL}/clientes`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
 };
 
+// ------------------ Empleados ------------------
 export const fetchEmpleados = async () => {
-  const response = await fetch(`${API_BASE_URL}/empleados`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al obtener empleados');
-  }
-  return await response.json();
+  const response = await fetch(`${API_BASE_URL}/empleados`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
 };
 
+// ------------------ Servicios ------------------
 export const fetchServicios = async () => {
-  const response = await fetch(`${API_BASE_URL}/servicios`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al obtener servicios');
-  }
-  return await response.json();
+  const response = await fetch(`${API_BASE_URL}/servicios`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
 };
 
 export const checkDisponibilidadEmpleado = async (idEmpleado, fechaHora, duracion, excludeCitaId = null) => {
-  const response = await fetch(`${API_BASE_URL}/citas/disponibilidad`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ 
-      idEmpleado, 
-      fechaHora: fechaHora.toISOString(), 
-      duracion, 
-      excludeCitaId 
-    }),
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Error al verificar disponibilidad');
+  try {
+      // Validación de parámetros
+      if (!idEmpleado || !fechaHora || isNaN(new Date(fechaHora).getTime())) {
+          throw new Error('Parámetros inválidos para verificar disponibilidad');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/citas/disponibilidad`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+          },
+          body: JSON.stringify({ 
+              idEmpleado: Number(idEmpleado),
+              fechaHora: new Date(fechaHora).toISOString(),
+              duracion: Number(duracion) || 30,
+              excludeCitaId: excludeCitaId ? Number(excludeCitaId) : null
+          }),
+      });
+
+      // Verificar estado de la respuesta
+      if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Validar estructura de la respuesta
+      const data = await response.json();
+      if (typeof data.disponible !== 'boolean') {
+          throw new Error('Formato de respuesta inválido desde el servidor');
+      }
+
+      return data.disponible;
+  } catch (error) {
+      console.error('Error en checkDisponibilidadEmpleado:', {
+          error: error.message,
+          idEmpleado,
+          fechaHora,
+          duracion,
+          excludeCitaId
+      });
+      throw new Error(error.message || 'No se pudo verificar la disponibilidad. Por favor intente nuevamente.');
   }
-  return await response.json();
 };

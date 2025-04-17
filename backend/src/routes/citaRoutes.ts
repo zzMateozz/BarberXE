@@ -12,5 +12,6 @@ router.get('/reportes/por-fecha', citaController.getCitasPorFecha);
 router.post('/', citaController.create);
 router.put('/:id', citaController.update);
 router.delete('/:id', citaController.delete);
+router.post('/disponibilidad', citaController.checkDisponibilidad);
 
 export default router;
