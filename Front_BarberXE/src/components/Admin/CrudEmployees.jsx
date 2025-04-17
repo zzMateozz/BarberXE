@@ -210,6 +210,10 @@ const TableEmployees = ({ isCollapsed }) => {
           usuario: "", // No cargar usuario al editar
           contraseña: "", // No cargar contraseña al editar
           idUsuario: null // No es necesario para la edición
+          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
+          usuario: "", // No cargar usuario al editar
+          contraseña: "", // No cargar contraseña al editar
+          idUsuario: null // No es necesario para la edición
         });
       }
     } else {
