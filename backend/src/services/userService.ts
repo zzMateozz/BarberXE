@@ -87,7 +87,8 @@ export class UserService {
             // Crear el usuario
             const user = new User();
             user.usuario = userData.usuario;
-            user.contraseña = await bcrypt.hash(userData.contraseña, 10); // Encriptar contraseña
+            user.contraseña = userData.contraseña;
+            //user.contraseña = await bcrypt.hash(userData.contraseña, 10); // Encriptar contraseña
             if (cliente) user.cliente = cliente;
             if (empleado) user.empleado = empleado;
     
