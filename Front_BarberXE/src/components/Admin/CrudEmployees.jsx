@@ -206,10 +206,14 @@ const TableEmployees = ({ isCollapsed }) => {
           apellido: employee.apellido,
           telefono: employee.telefono,
           estado: employee.estado,
-          cargo: employee.cargo || "Barbero",
-          usuario: employee.usuario || "",
-          contraseña: "********",
-          idUsuario: employee.idUsuario || null,
+          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
+          usuario: "", // No cargar usuario al editar
+          contraseña: "", // No cargar contraseña al editar
+          idUsuario: null, // No es necesario para la edición
+          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
+          usuario: "", // No cargar usuario al editar
+          contraseña: "", // No cargar contraseña al editar
+          idUsuario: null // No es necesario para la edición
         });
       }
     } else {
@@ -291,8 +295,32 @@ const TableEmployees = ({ isCollapsed }) => {
   
     try {
       if (editingEmployeeId !== null) {
-        // Lógica de edición (igual que antes)
-        // ...
+        // 1. Buscar el empleado original para obtener su cargo actual
+        const originalEmployee = employees.find(emp => emp.idEmpleado === editingEmployeeId);
+        
+        // 2. Preparar datos para actualización (sin incluir el cargo)
+        const updateData = {
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          telefono: formData.telefono,
+          estado: formData.estado,
+          cargo: originalEmployee.cargo // Mantenemos el cargo original
+        };
+      
+        // 3. Actualizar en el backend
+        await updateEmployee(editingEmployeeId, updateData);
+      
+        // 4. Actualizar el estado local
+        setEmployees(prev => 
+          prev.map(emp => 
+            emp.idEmpleado === editingEmployeeId ? { 
+              ...emp,          // Mantenemos todos los datos existentes
+              ...updateData     // Aplicamos solo los cambios permitidos
+            } : emp
+          )
+        );
+        
+        toast.success("Empleado actualizado con éxito");
       } 
       else {
         // Creación de nuevo empleado

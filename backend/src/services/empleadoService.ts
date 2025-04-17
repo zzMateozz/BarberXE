@@ -1,5 +1,6 @@
 import { CreateEmpleadoDto } from '../dtos/Empleado/CreateEmpleado.dto';
 import { UpdateEmpleadoDto } from '../dtos/Empleado/UpdateEmpleado.dto';
+import { ArqueoCaja } from '../entity/arqueoCaja';
 import { Empleado } from '../entity/empleado';
 import { EmpleadoRepository } from '../repository/EmpleadoReporitory';
 
@@ -18,10 +19,11 @@ export class EmpleadoService {
         empleado.apellido = empleadoData.apellido;
         empleado.telefono = empleadoData.telefono;
         empleado.estado = empleadoData.estado || 'activo';
-        empleado.cargo = empleadoData.cargo || 'Barbero';
+        empleado.cargo = empleadoData.cargo === 'Cajero' ? 'Cajero' : 'Barbero';
     
         return await EmpleadoRepository.save(empleado);
     }
+    
 
     async update(id: number, empleadoData: UpdateEmpleadoDto): Promise<Empleado> {
         const queryRunner = EmpleadoRepository.manager.connection.createQueryRunner();
@@ -29,20 +31,22 @@ export class EmpleadoService {
         await queryRunner.startTransaction();
     
         try {
-            const empleado = await this.findById(id);
+            const empleado = await EmpleadoRepository.findOneBy({ idEmpleado: id });
             if (!empleado) {
                 throw new Error(`Empleado con ID ${id} no encontrado`);
             }
-            // Actualizar campos básicos
+    
+            // Actualizar campos permitidos
             if (empleadoData.nombre !== undefined) empleado.nombre = empleadoData.nombre;
             if (empleadoData.apellido !== undefined) empleado.apellido = empleadoData.apellido;
             if (empleadoData.telefono !== undefined) empleado.telefono = empleadoData.telefono;
-            // Actualizar nuevos campos
             if (empleadoData.estado !== undefined) empleado.estado = empleadoData.estado;
             if (empleadoData.cargo !== undefined) empleado.cargo = empleadoData.cargo;
-            await queryRunner.manager.save(empleado);
+    
+            const empleadoActualizado = await queryRunner.manager.save(empleado);
             await queryRunner.commitTransaction();
-            return empleado;
+            
+            return empleadoActualizado;
         } catch (error) {
             await queryRunner.rollbackTransaction();
             throw error;
@@ -52,7 +56,20 @@ export class EmpleadoService {
     }
 
     async delete(id: number): Promise<void> {
-        await EmpleadoRepository.delete(id);
+        const queryRunner = EmpleadoRepository.manager.connection.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+    
+        try {
+            await queryRunner.manager.delete(ArqueoCaja, { empleado: { idEmpleado: id } });
+            await queryRunner.manager.delete(Empleado, id);
+            await queryRunner.commitTransaction();
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
     async findByName(nombre: string): Promise<Empleado[]> {

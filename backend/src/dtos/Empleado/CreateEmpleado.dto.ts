@@ -14,6 +14,6 @@ export class CreateEmpleadoDto {
         this.apellido = data.apellido;
         this.telefono = data.telefono;
         this.estado = data.estado || 'activo';
-        this.cargo = data.cargo || 'Barbero';
+        this.cargo = data.cargo === 'Cajero' ? 'Cajero' : 'Barbero';
     }
 }

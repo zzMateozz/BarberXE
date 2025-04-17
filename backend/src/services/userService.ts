@@ -1,4 +1,5 @@
 import { User } from '../entity/user';
+import { DataSource, Repository } from 'typeorm';
 import { UserRepository } from '../repository/UserRepository';
 import { CreateUserDto } from '../dtos/User/CreateUser.dto';
 import { UserFactory } from '../factories/UserFactory';
@@ -8,8 +9,17 @@ import { Empleado } from '../entity/empleado';
 import { Cliente } from '../entity/cliente';
 import { Cita } from '../entity/cita';
 import { ArqueoCaja } from '../entity/arqueoCaja';
+import * as bcrypt from 'bcryptjs';
 
 export class UserService {
+    private userRepository: Repository<User>;
+    private empleadoRepository: Repository<Empleado>;
+
+    constructor(private dataSource: DataSource) {
+        this.userRepository = dataSource.getRepository(User);
+        this.empleadoRepository = dataSource.getRepository(Empleado);
+    }
+
     async findAll(): Promise<User[]> {
         return await UserRepository.find({
             relations: ['empleado', 'cliente']
@@ -35,44 +45,67 @@ export class UserService {
     }
 
     async create(userData: CreateUserDto): Promise<User> {
-        const queryRunner = UserRepository.manager.connection.createQueryRunner();
+        const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
     
         try {
             // Verificar usuario existente
-            if (await this.findByUsername(userData.usuario)) {
+            const existingUser = await queryRunner.manager.findOne(User, {
+                where: { usuario: userData.usuario }
+            });
+            
+            if (existingUser) {
                 throw new Error('El nombre de usuario ya está en uso');
             }
     
-            const user = new User();
-            user.usuario = userData.usuario;
-            user.contraseña = userData.contraseña;
+            // Crear instancias según los datos recibidos
+            let cliente: Cliente | null = null;
+            let empleado: Empleado | null = null;
     
-            // Manejar Cliente
+            // Procesar cliente si existe en los datos
             if (userData.cliente) {
-                const cliente = new Cliente();
+                cliente = new Cliente();
                 Object.assign(cliente, userData.cliente);
-                user.cliente = cliente;
+                await queryRunner.manager.save(cliente);
             }
     
-            // Manejar Empleado
+            // Procesar empleado si existe en los datos
             if (userData.empleado) {
-                const empleado = new Empleado();
+                empleado = new Empleado();
                 Object.assign(empleado, userData.empleado);
-                user.empleado = empleado;
+                empleado.estado = empleado.estado || 'activo'; // Valor por defecto
+                empleado.cargo = empleado.cargo || 'Cajero'; // Valor por defecto
+                await queryRunner.manager.save(empleado);
             }
     
             // Validar que tenga al menos cliente o empleado
-            if (!user.cliente && !user.empleado) {
+            if (!cliente && !empleado) {
                 throw new Error('El usuario debe tener asociado un cliente o un empleado');
             }
     
-            // Guardar todo
+            // Crear el usuario
+            const user = new User();
+            user.usuario = userData.usuario;
+            user.contraseña = userData.contraseña;
+            //user.contraseña = await bcrypt.hash(userData.contraseña, 10); // Encriptar contraseña
+            if (cliente) user.cliente = cliente;
+            if (empleado) user.empleado = empleado;
+    
             await queryRunner.manager.save(user);
             await queryRunner.commitTransaction();
     
-            return await this.findById(user.idUser); // Retornar con relaciones cargadas
+            // Recargar el usuario con sus relaciones para devolverlo completo
+            const createdUser = await queryRunner.manager.findOne(User, {
+                where: { idUser: user.idUser },
+                relations: ['cliente', 'empleado']
+            });
+    
+            if (!createdUser) {
+                throw new Error('Error al recuperar el usuario creado');
+            }
+    
+            return createdUser;
         } catch (error) {
             await queryRunner.rollbackTransaction();
             throw error;
