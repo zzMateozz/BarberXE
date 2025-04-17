@@ -180,80 +180,12 @@ const TableCitas = ({ isCollapsed }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleServiciosChange = (serviciosSeleccionados) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      servicios: serviciosSeleccionados.map(item => 
-        servicios.find(s => s.idServicio === item.value)
-      ) 
+  const handleSelectChange = (name, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
     }));
   };
-  const handleSelectChange = async (name, value) => {
-    // Actualización CORRECTA del estado para arrays
-    setFormData(prev => {
-        const newState = { ...prev, [name]: value };
-        
-        // Debug: Verificar servicios actuales
-        console.log('Servicios actuales:', newState.servicios);
-        return newState;
-    });
-
-    if ((name === "empleado" || name === "fecha" || name === "hora" || name === "servicios") && 
-        formData.empleado && formData.fecha && formData.hora && formData.servicios?.length > 0) {
-        
-        try {
-            setDisponibilidadError("Verificando disponibilidad...");
-            
-            const fechaInicio = new Date(`${formData.fecha}T${formData.hora}`);
-            
-            // Debug: Verificar estructura completa
-            console.log('Datos completos:', {
-                servicios: formData.servicios,
-                duraciones: formData.servicios.map(s => s.duracion)
-            });
-
-            // Cálculo ROBUSTO de duración
-            const duracionTotal = formData.servicios.reduce((total, servicio) => {
-                const duracion = Number(servicio?.duracion || 0);
-                if (isNaN(duracion)) {
-                    console.error('Duración inválida en servicio:', servicio);
-                    return total;
-                }
-                return total + duracion;
-            }, 0);
-
-            console.log('Duración TOTAL calculada:', duracionTotal, 'minutos');
-            
-            const fechaFin = new Date(fechaInicio.getTime() + duracionTotal * 60000);
-
-            // Verificación EXTRA
-            if (formData.servicios.length > 0 && duracionTotal <= 0) {
-                throw new Error('La duración total no puede ser 0 con servicios seleccionados');
-            }
-
-            const disponible = await checkDisponibilidadEmpleado(
-                formData.empleado.idEmpleado,
-                fechaInicio,
-                fechaFin,
-                formData.servicios.map(s => s.idServicio),
-                editingCitaId
-            );
-
-            setDisponibilidadError(
-                disponible ? "" : `No disponible para ${formData.servicios.length} servicios (${duracionTotal} min)`
-            );
-            
-        } catch (error) {
-            console.error("Error completo:", {
-                error,
-                servicios: formData.servicios,
-                duraciones: formData.servicios?.map(s => s.duracion)
-            });
-            setDisponibilidadError("Error en cálculo de disponibilidad");
-            toast.error(error.message);
-        }
-    }
-};
 
   const validateForm = () => {
     let isValid = true;
@@ -332,58 +264,111 @@ const TableCitas = ({ isCollapsed }) => {
   
     return isValid;
   };
-  const handleSubmit = async (e) => {
-    e.preventDefault();
 
-    if (!validateForm()) {
-      toast.error("Por favor complete todos los campos requeridos");
-      return;
-    }
+  const handleServiciosChange = (selectedOptions) => {
+      const serviciosSeleccionados = selectedOptions.map(option => 
+          servicios.find(servicio => servicio.idServicio === option.value)
+      );
+      
+      setFormData(prev => ({
+          ...prev,
+          servicios: serviciosSeleccionados
+      }));
+      const duracionTotal = serviciosSeleccionados.reduce(
+          (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
+          0
+      );
+      
+      console.log('Servicios seleccionados:', serviciosSeleccionados);
+      console.log('Duración total:', duracionTotal, 'minutos');
+  };
 
-    try {
-      const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
-      const duracionTotal = formData.servicios.reduce(
-        (total, servicio) => total + (servicio?.duracion || 0), 
+  const calculateEndTime = (startTime, servicios) => {
+    if (!startTime || !servicios || servicios.length === 0) return '';
+    
+    const totalMinutes = servicios.reduce(
+        (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
         0
-      );
+    );
+    
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+    
+    const endDate = new Date(startDate.getTime() + totalMinutes * 60000);
+    
+    return endDate.toTimeString().substring(0, 5);
+  };  
 
-      // Verificar disponibilidad
-      const disponible = await checkDisponibilidadEmpleado(
-        formData.empleado.idEmpleado,
-        fechaHora,
-        duracionTotal,
-        editingCitaId
-      );
+  
 
-      if (!disponible) {
-        toast.error("El empleado no está disponible en ese horario");
-        return;
+  const handleSubmit = async (e) => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+          toast.error("Por favor complete todos los campos requeridos");
+          return;
       }
 
-      // Preparar datos para enviar
-      const citaData = {
-        fecha: fechaHora,
-        clienteId: formData.cliente.idCliente,
-        empleadoId: formData.empleado.idEmpleado,
-        servicioIds: formData.servicios.map(s => s.idServicio),
-      };
+      try {
+          const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
+          const duracionTotal = formData.servicios.reduce(
+              (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
+              0
+          );
+          // Preparar datos para enviar
+          const citaData = {
+              fecha: fechaHora.toISOString(),
+              clienteId: formData.cliente.idCliente,
+              empleadoId: formData.empleado.idEmpleado,
+              servicioIds: formData.servicios.map(s => s.idServicio),
+          };
 
-      // Guardar cita
-      if (editingCitaId) {
-        await updateCita(editingCitaId, citaData);
-        toast.success("Cita actualizada correctamente");
-      } else {
-        await createCita(citaData);
-        toast.success("Cita creada correctamente");
-      }
+          // Guardar cita
+          if (editingCitaId) {
+            await updateCita(editingCitaId, citaData);
+            toast.success(
+                <div>
+                    <p>Cita actualizada correctamente</p>
+                    <p>Duración: {duracionTotal} minutos</p>
+                    <p>Horario: {formData.hora} - {calculateEndTime(formData.hora, formData.servicios)}</p>
+                </div>
+            );
+          } else {
+            await createCita(citaData);
+            toast.success(
+                <div>
+                    <p>Cita creada correctamente</p>
+                    <p>Duración: {duracionTotal} minutos</p>
+                    <p>Horario: {formData.hora} - {calculateEndTime(formData.hora, formData.servicios)}</p>
+                </div>
+            );
+          }
 
-      // Recargar citas
-      const citasActualizadas = await fetchCitas();
-      setCitas(citasActualizadas);
-      closeModal();
-    } catch (error) {
-      console.error("Error al guardar cita:", error);
-      toast.error(error.message || "Error al guardar la cita");
+          // Recargar citas
+          const citasActualizadas = await fetchCitas();
+          setCitas(citasActualizadas);
+          closeModal();
+      } catch (error) {
+        console.error("Error al guardar cita:", error);
+        if (error.message.includes("Conflicto de horario")) {
+            toast.error(
+                <div>
+                    <strong>No se puede agendar la cita:</strong>
+                    <p>El empleado ya tiene citas programadas en ese horario</p>
+                    <pre>{error.message.split("Conflicto de horario:")[1]}</pre>
+                </div>,
+                { autoClose: 7000 }
+            );
+        } else {
+            toast.error(
+                <div>
+                    <strong>Error al guardar la cita:</strong>
+                    <p>{error.message}</p>
+                </div>,
+                { autoClose: 5000 }
+            );
+        }
     }
   };
 
