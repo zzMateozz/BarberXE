@@ -209,6 +209,10 @@ const TableEmployees = ({ isCollapsed }) => {
           cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
           usuario: "", // No cargar usuario al editar
           contraseña: "", // No cargar contraseña al editar
+          idUsuario: null, // No es necesario para la edición
+          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
+          usuario: "", // No cargar usuario al editar
+          contraseña: "", // No cargar contraseña al editar
           idUsuario: null // No es necesario para la edición
         });
       }
@@ -300,6 +304,7 @@ const TableEmployees = ({ isCollapsed }) => {
           apellido: formData.apellido,
           telefono: formData.telefono,
           estado: formData.estado,
+          cargo: originalEmployee.cargo // Mantenemos el cargo original
         };
       
         // 3. Actualizar en el backend
@@ -309,52 +314,59 @@ const TableEmployees = ({ isCollapsed }) => {
         setEmployees(prev => 
           prev.map(emp => 
             emp.idEmpleado === editingEmployeeId ? { 
-              ...emp,
-              ...updateData
+              ...emp,          // Mantenemos todos los datos existentes
+              ...updateData     // Aplicamos solo los cambios permitidos
             } : emp
           )
         );
         
         toast.success("Empleado actualizado con éxito");
       } 
-       else {
+      else {
         // Creación de nuevo empleado
-        if (formData.cargo === "Cajero") {
-          const response = await createUser({
+        const cargoSeleccionado = formData.cargo; // Asegúrate de que esto tenga el valor correcto
+        
+        if (cargoSeleccionado === "Cajero") {
+          const cajeroData = {
             usuario: formData.usuario,
             contraseña: formData.contraseña,
             empleado: {
               nombre: formData.nombre,
               apellido: formData.apellido,
               telefono: formData.telefono,
-              cargo: formData.cargo,
-              estado: formData.estado,
-            },
-          });
+              cargo: "Cajero", // Forzar el valor por si acaso
+              estado: formData.estado || "Activo"
+            }
+          };
+
+          const response = await createUser(cajeroData);
   
           setEmployees(prev => [
             ...prev,
             {
               ...response.empleado,
               usuario: response.usuario,
-              idUsuario: response.idUsuario
+              idUsuario: response.idUsuario,
+              cargo: "Cajero" // Asegurar que se guarde como Cajero
             }
           ]);
           toast.success("Cajero creado con éxito");
         } else {
-          const newEmployee = await createEmployee({
+          const barberoData = {
             nombre: formData.nombre,
             apellido: formData.apellido,
             telefono: formData.telefono,
-            estado: formData.estado,
-            cargo: formData.cargo,
-          });
+            estado: formData.estado || "Activo",
+            cargo: "Barbero" // Forzar el valor
+          };
+
+          const newEmployee = await createEmployee(barberoData);
           
           setEmployees(prev => [
             ...prev,
             {
               ...newEmployee,
-              cargo: formData.cargo,
+              cargo: "Barbero" // Asegurar que se guarde como Barbero
             }
           ]);
           toast.success("Barbero creado con éxito");
@@ -366,6 +378,7 @@ const TableEmployees = ({ isCollapsed }) => {
       toast.error(err.response?.data?.message || err.message || "Error al guardar empleado");
     }
   };
+
 
   const handleDelete = async (employeeId) => {
     try {

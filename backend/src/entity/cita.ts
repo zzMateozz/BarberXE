@@ -10,9 +10,6 @@ export class Cita {
 
     @Column({ type: 'timestamp' }) // Cambiado a timestamp para fecha y hora
     fecha!: Date;
-    
-    @Column({ nullable: true })
-    imagenUrl?: string;
 
     @ManyToOne(() => Cliente, (cliente) => cliente.citas)
     cliente!: Cliente;
