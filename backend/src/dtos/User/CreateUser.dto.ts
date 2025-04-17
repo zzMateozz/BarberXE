@@ -1,4 +1,3 @@
-
 export class CreateUserDto {
     readonly usuario: string;
     readonly contraseña: string;
@@ -6,6 +5,7 @@ export class CreateUserDto {
         nombre: string;
         apellido: string;
         telefono: string;
+        cargo?: 'Barbero' | 'Cajero';
     };
     readonly cliente?: {
         nombre: string;
@@ -25,7 +25,8 @@ export class CreateUserDto {
             this.empleado = {
                 nombre: data.empleado.nombre,
                 apellido: data.empleado.apellido,
-                telefono: data.empleado.telefono
+                telefono: data.empleado.telefono,
+                cargo: data.empleado.cargo || 'Cajero' 
             };
         }
         

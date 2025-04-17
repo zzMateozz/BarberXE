@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AppDataSource } from '../config/database';
 import { UserService } from '../services/userService';
 import { CreateUserDto } from '../dtos/User/CreateUser.dto';
 import { LoginUserDto } from '../dtos/User/LoginUser.dto';
@@ -8,8 +9,7 @@ export class UserController {
     private userService: UserService;
 
     constructor() {
-        console.log('UserController está siendo instanciado');
-        this.userService = new UserService();
+        this.userService = new UserService(AppDataSource);
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {

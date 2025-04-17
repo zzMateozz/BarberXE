@@ -1,4 +1,5 @@
 import { User } from '../entity/user';
+import { DataSource, Repository } from 'typeorm';
 import { UserRepository } from '../repository/UserRepository';
 import { CreateUserDto } from '../dtos/User/CreateUser.dto';
 import { UserFactory } from '../factories/UserFactory';
@@ -8,8 +9,17 @@ import { Empleado } from '../entity/empleado';
 import { Cliente } from '../entity/cliente';
 import { Cita } from '../entity/cita';
 import { ArqueoCaja } from '../entity/arqueoCaja';
+import * as bcrypt from 'bcryptjs';
 
 export class UserService {
+    private userRepository: Repository<User>;
+    private empleadoRepository: Repository<Empleado>;
+
+    constructor(private dataSource: DataSource) {
+        this.userRepository = dataSource.getRepository(User);
+        this.empleadoRepository = dataSource.getRepository(Empleado);
+    }
+
     async findAll(): Promise<User[]> {
         return await UserRepository.find({
             relations: ['empleado', 'cliente']
@@ -34,45 +44,40 @@ export class UserService {
         });
     }
 
-    async create(userData: CreateUserDto): Promise<User> {
-        const queryRunner = UserRepository.manager.connection.createQueryRunner();
+    async create(userData: CreateUserDto): Promise<any> {
+        const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
-    
+
         try {
-            // Verificar usuario existente
-            if (await this.findByUsername(userData.usuario)) {
-                throw new Error('El nombre de usuario ya está en uso');
+            let empleado;
+            
+            if (userData.empleado) {
+                // Crear empleado primero
+                empleado = new Empleado();
+                empleado.nombre = userData.empleado.nombre;
+                empleado.apellido = userData.empleado.apellido;
+                empleado.telefono = userData.empleado.telefono;
+                empleado.estado = 'activo';
+                empleado.cargo = userData.empleado.cargo || 'Cajero';
+                
+                await queryRunner.manager.save(empleado);
             }
-    
+
+            // Crear usuario
             const user = new User();
             user.usuario = userData.usuario;
             user.contraseña = userData.contraseña;
-    
-            // Manejar Cliente
-            if (userData.cliente) {
-                const cliente = new Cliente();
-                Object.assign(cliente, userData.cliente);
-                user.cliente = cliente;
-            }
-    
-            // Manejar Empleado
-            if (userData.empleado) {
-                const empleado = new Empleado();
-                Object.assign(empleado, userData.empleado);
-                user.empleado = empleado;
-            }
-    
-            // Validar que tenga al menos cliente o empleado
-            if (!user.cliente && !user.empleado) {
-                throw new Error('El usuario debe tener asociado un cliente o un empleado');
-            }
-    
-            // Guardar todo
+            //user.contraseña = await bcrypt.hash(userData.contraseña, 10);
+            if (empleado) user.empleado = empleado;
+            
             await queryRunner.manager.save(user);
             await queryRunner.commitTransaction();
-    
-            return await this.findById(user.idUser); // Retornar con relaciones cargadas
+            
+            return {
+                usuario: user,
+                empleado: empleado
+            };
         } catch (error) {
             await queryRunner.rollbackTransaction();
             throw error;
