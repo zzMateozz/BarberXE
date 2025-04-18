@@ -4,8 +4,12 @@ export const handleResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const error = new Error(data.error || data.message || 'Error en la respuesta del servidor');
-    error.response = data;
+    const error = new Error(data.message || data.error || 'Error en la respuesta del servidor');
+    // Estructura manualmente el response para simular axios-like handling
+    error.response = {
+      status: response.status,
+      data: data
+    };
     throw error;
   }
 

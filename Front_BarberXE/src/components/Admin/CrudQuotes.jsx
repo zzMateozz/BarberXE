@@ -286,15 +286,6 @@ const TableCitas = ({ isCollapsed }) => {
     console.log("Duración total:", duracionTotal, "minutos");
   };
 
-  const calculateEndTime = (startTime, durationMinutes) => {
-    const [hours, minutes] = startTime.split(":").map(Number);
-    const startDate = new Date();
-    startDate.setHours(hours, minutes, 0, 0);
-
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
-    return endDate.toTimeString().substring(0, 5);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -315,13 +306,11 @@ const TableCitas = ({ isCollapsed }) => {
         clienteId: formData.cliente.idCliente,
         empleadoId: formData.empleado.idEmpleado,
         servicioIds: formData.servicios.map((s) => s.idServicio),
-        duracionTotal, // Añadir la duración al payload
+        duracionTotal,
       };
 
-      // Operación de guardado/actualización
       if (editingCitaId) {
         await updateCita(editingCitaId, citaData);
-        // Mensaje detallado para actualización
         toast.success(
           <div>
             <p>Cita actualizada correctamente</p>
@@ -349,13 +338,11 @@ const TableCitas = ({ isCollapsed }) => {
               Horario: {formData.hora} -{" "}
               {calculateEndTime(formData.hora, duracionTotal)}
             </p>
-            {nuevaCita?.id && <p>ID de cita: {nuevaCita.id}</p>}
           </div>,
           { autoClose: 8000 }
         );
       }
 
-      // Actualizar estado y cerrar modal
       const citasActualizadas = await fetchCitas();
       setCitas(citasActualizadas);
       closeModal();
@@ -371,32 +358,35 @@ const TableCitas = ({ isCollapsed }) => {
         0
       );
 
-      // Manejo mejorado de errores
+      // Manejo mejorado de conflictos
       if (
         error.response?.status === 409 ||
         error.message.includes("Conflicto")
       ) {
+        const rawMessage = error.response?.data?.error || error.message;
+
+        const horarioOcupado =
+          extractTimeRange(rawMessage) || "Horario no disponible";
+        const duracionOcupada =
+          extractDuration(rawMessage) || "No especificada";
+
         toast.error(
           <div>
-            <strong>
-              No se puede {editingCitaId ? "actualizar" : "crear"} la cita:
-            </strong>
+            <strong>No se puede agendar:</strong>
             <p>
               El empleado {formData.empleado.nombre}{" "}
-              {formData.empleado.apellido} ya tiene citas programadas
+              {formData.empleado.apellido} ya tiene:
             </p>
-            <p>Duración solicitada: {duracionTotal} minutos</p>
+            <p>• Cita programada: {horarioOcupado}</p>
             <p>
-              Horario: {formData.hora} -{" "}
+              • Duración ocupada: {duracionOcupada || "No especificada"} minutos
+            </p>
+            <p>
+              • Intento de reserva: {formData.hora} -{" "}
               {calculateEndTime(formData.hora, duracionTotal)}
             </p>
-            {error.response?.data?.conflictDetails && (
-              <pre style={{ fontSize: "12px" }}>
-                {JSON.stringify(error.response.data.conflictDetails, null, 2)}
-              </pre>
-            )}
           </div>,
-          { autoClose: 3000 }
+          { autoClose: 10000 }
         );
       } else {
         toast.error(
@@ -405,23 +395,65 @@ const TableCitas = ({ isCollapsed }) => {
               Error al {editingCitaId ? "actualizar" : "crear"} la cita:
             </strong>
             <p>{error.response?.data?.message || error.message}</p>
-            {process.env.NODE_ENV === "development" && (
-              <pre style={{ fontSize: "12px" }}>
-                {JSON.stringify(
-                  {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            )}
           </div>,
-          { autoClose: 3000 }
+          { autoClose: 5000 }
         );
       }
     }
+  };
+
+  const extractTimeRange = (message) => {
+    const timeRegex =
+      /(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?\s*[-a]\s*(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?/i;
+    const match = message.match(timeRegex);
+    if (!match) return null;
+  
+    const start = match[1]; // Hora de inicio (hora: minutos)
+    const end = match[4]; // Hora de fin (hora: minutos)
+    
+    // Verificar y devolver el rango con formato militar (hora de 24 horas)
+    return `${cleanTime(start, match[3])} - ${cleanTime(end, match[6])}`; 
+  };
+  
+  // Función para convertir la hora a formato de 24 horas (militar) y asegurar que no pase de las 22:00
+  const cleanTime = (timeStr, ampm) => {
+    const [hour, minute] = timeStr.split(":").map(Number);
+  
+    let adjustedHour = hour;
+  
+    // Ajuste de hora según AM/PM
+    if (ampm) {
+      if (ampm.toLowerCase().includes("a\. m\.") && hour === 12) {
+        adjustedHour = 0; // Convertir 12 AM a 00
+      } else if (ampm.toLowerCase().includes("p\. m\.") && hour !== 12) {
+        adjustedHour += 12; // Convertir PM (excepto 12 PM)
+      }
+    }
+  
+    // Asegurarse de que la hora no sea mayor que 22 (10:00 PM)
+    if (adjustedHour >= 22) {
+      adjustedHour = 22;
+    }
+  
+    // Regresar la hora en formato militar (24 horas)
+    return `${adjustedHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  };
+  
+
+  const extractDuration = (message) => {
+    const durationRegex = /una cita de (\d+) minutos/i;
+    const match = message.match(durationRegex);
+    return match ? match[1] : null;
+  };
+
+  // Función para calcular hora final
+  const calculateEndTime = (startTime, durationMinutes) => {
+    const [hours, minutes] = startTime.split(":").map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+    return endDate.toTimeString().substring(0, 5);
   };
 
   const handleDelete = async (citaId) => {
@@ -433,7 +465,7 @@ const TableCitas = ({ isCollapsed }) => {
       toast.error(err.message || "Error al eliminar la cita");
     }
   };
-  
+
   const formatFechaHora = (fechaString) => {
     const fecha = new Date(fechaString);
     return fecha.toLocaleDateString("es-ES", {
