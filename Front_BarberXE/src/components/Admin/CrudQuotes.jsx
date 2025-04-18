@@ -433,6 +433,7 @@ const TableCitas = ({ isCollapsed }) => {
       toast.error(err.message || "Error al eliminar la cita");
     }
   };
+  
   const formatFechaHora = (fechaString) => {
     const fecha = new Date(fechaString);
     return fecha.toLocaleDateString("es-ES", {
