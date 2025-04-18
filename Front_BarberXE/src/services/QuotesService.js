@@ -1,12 +1,15 @@
 const API_BASE_URL = 'http://localhost:3000/api'; 
 
-const handleResponse = async (response) => {
+export const handleResponse = async (response) => {
+  const data = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.message || 'Error en la solicitud';
-    throw new Error(errorMessage);
+    const error = new Error(data.error || data.message || 'Error en la respuesta del servidor');
+    error.response = data;
+    throw error;
   }
-  return response.json();
+
+  return data;
 };
 
 const getHeaders = () => {

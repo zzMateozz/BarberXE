@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Pencil, Trash2} from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
   fetchCitas,
@@ -81,17 +81,17 @@ const TableCitas = ({ isCollapsed }) => {
       try {
         setLoading(true);
         const [citasData, clientesData, empleadosData, serviciosData] =
-        await Promise.all([
-          fetchCitas(),
-          fetchClientes(),
-          fetchEmpleados(),
-          fetchServicios().then(servicios => 
-            servicios.map(s => ({ 
-              ...s, 
-              duracion: parseInt(s.duracion) || 0 
-            }))
-          )
-        ]);
+          await Promise.all([
+            fetchCitas(),
+            fetchClientes(),
+            fetchEmpleados(),
+            fetchServicios().then((servicios) =>
+              servicios.map((s) => ({
+                ...s,
+                duracion: parseInt(s.duracion) || 0,
+              }))
+            ),
+          ]);
         setCitas(citasData);
         setClientes(clientesData);
         setEmpleados(empleadosData);
@@ -104,7 +104,7 @@ const TableCitas = ({ isCollapsed }) => {
         setLoading(false);
       }
     };
-  
+
     loadData();
   }, []);
 
@@ -181,15 +181,15 @@ const TableCitas = ({ isCollapsed }) => {
   };
 
   const handleSelectChange = (name, value) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const validateForm = () => {
     let isValid = true;
-  
+
     // Validar fecha
     if (!formData.fecha) {
       setFechaError("La fecha es requerida");
@@ -197,7 +197,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setFechaError("");
     }
-  
+
     // Validar hora
     if (!formData.hora) {
       setHoraError("La hora es requerida");
@@ -205,7 +205,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setHoraError("");
     }
-  
+
     // Validar cliente
     if (!formData.cliente) {
       setClienteError("Seleccione un cliente");
@@ -213,7 +213,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setClienteError("");
     }
-  
+
     // Validar empleado
     if (!formData.empleado) {
       setEmpleadoError("Seleccione un empleado");
@@ -221,7 +221,7 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setEmpleadoError("");
     }
-  
+
     // Validar servicios
     if (formData.servicios.length === 0) {
       setServiciosError("Seleccione al menos un servicio");
@@ -229,21 +229,24 @@ const TableCitas = ({ isCollapsed }) => {
     } else {
       setServiciosError("");
     }
-  
+
     // Validar fecha y hora juntas (solo si ambos están presentes)
     if (formData.fecha && formData.hora) {
       const fechaSeleccionada = new Date(`${formData.fecha}T${formData.hora}`);
       const ahora = new Date();
-      
+
       // Permitir citas con al menos 2 horas de anticipación
       const margenAnticipacion = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
       const fechaMinima = new Date(ahora.getTime() + margenAnticipacion);
-  
+
       // Comprobar si la fecha seleccionada es hoy
-      const esMismoDia = fechaSeleccionada.toDateString() === ahora.toDateString();
-  
+      const esMismoDia =
+        fechaSeleccionada.toDateString() === ahora.toDateString();
+
       if (esMismoDia && fechaSeleccionada < fechaMinima) {
-        setFechaError("Para citas hoy, debe agendar con al menos 2 horas de anticipación");
+        setFechaError(
+          "Para citas hoy, debe agendar con al menos 2 horas de anticipación"
+        );
         isValid = false;
       } else if (fechaSeleccionada < ahora) {
         setFechaError("No puede agendar citas en el pasado");
@@ -251,7 +254,7 @@ const TableCitas = ({ isCollapsed }) => {
       } else {
         setFechaError("");
       }
-  
+
       // Validar horario laboral (8:00 - 22:00)
       const [horas, minutos] = formData.hora.split(":").map(Number);
       if (horas < 8 || horas >= 22 || (horas === 21 && minutos > 0)) {
@@ -261,114 +264,163 @@ const TableCitas = ({ isCollapsed }) => {
         setHoraError("");
       }
     }
-  
+
     return isValid;
   };
 
   const handleServiciosChange = (selectedOptions) => {
-      const serviciosSeleccionados = selectedOptions.map(option => 
-          servicios.find(servicio => servicio.idServicio === option.value)
-      );
-      
-      setFormData(prev => ({
-          ...prev,
-          servicios: serviciosSeleccionados
-      }));
-      const duracionTotal = serviciosSeleccionados.reduce(
-          (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
-          0
-      );
-      
-      console.log('Servicios seleccionados:', serviciosSeleccionados);
-      console.log('Duración total:', duracionTotal, 'minutos');
+    const serviciosSeleccionados = selectedOptions.map((option) =>
+      servicios.find((servicio) => servicio.idServicio === option.value)
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      servicios: serviciosSeleccionados,
+    }));
+    const duracionTotal = serviciosSeleccionados.reduce(
+      (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+      0
+    );
+
+    console.log("Servicios seleccionados:", serviciosSeleccionados);
+    console.log("Duración total:", duracionTotal, "minutos");
   };
 
-  const calculateEndTime = (startTime, servicios) => {
-    if (!startTime || !servicios || servicios.length === 0) return '';
-    
-    const totalMinutes = servicios.reduce(
-        (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
-        0
-    );
-    
-    const [hours, minutes] = startTime.split(':').map(Number);
+  const calculateEndTime = (startTime, durationMinutes) => {
+    const [hours, minutes] = startTime.split(":").map(Number);
     const startDate = new Date();
     startDate.setHours(hours, minutes, 0, 0);
-    
-    const endDate = new Date(startDate.getTime() + totalMinutes * 60000);
-    
-    return endDate.toTimeString().substring(0, 5);
-  };  
 
-  
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+    return endDate.toTimeString().substring(0, 5);
+  };
 
   const handleSubmit = async (e) => {
-      e.preventDefault();
+    e.preventDefault();
 
-      if (!validateForm()) {
-          toast.error("Por favor complete todos los campos requeridos");
-          return;
+    if (!validateForm()) {
+      toast.error("Por favor complete todos los campos requeridos");
+      return;
+    }
+
+    try {
+      const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
+      const duracionTotal = formData.servicios.reduce(
+        (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+        0
+      );
+
+      const citaData = {
+        fecha: fechaHora.toISOString(),
+        clienteId: formData.cliente.idCliente,
+        empleadoId: formData.empleado.idEmpleado,
+        servicioIds: formData.servicios.map((s) => s.idServicio),
+        duracionTotal, // Añadir la duración al payload
+      };
+
+      // Operación de guardado/actualización
+      if (editingCitaId) {
+        await updateCita(editingCitaId, citaData);
+        // Mensaje detallado para actualización
+        toast.success(
+          <div>
+            <p>Cita actualizada correctamente</p>
+            <p>
+              Empleado: {formData.empleado.nombre} {formData.empleado.apellido}
+            </p>
+            <p>Duración: {duracionTotal} minutos</p>
+            <p>
+              Horario: {formData.hora} -{" "}
+              {calculateEndTime(formData.hora, duracionTotal)}
+            </p>
+          </div>,
+          { autoClose: 8000 }
+        );
+      } else {
+        const nuevaCita = await createCita(citaData);
+        toast.success(
+          <div>
+            <p>Cita creada correctamente</p>
+            <p>
+              Empleado: {formData.empleado.nombre} {formData.empleado.apellido}
+            </p>
+            <p>Duración: {duracionTotal} minutos</p>
+            <p>
+              Horario: {formData.hora} -{" "}
+              {calculateEndTime(formData.hora, duracionTotal)}
+            </p>
+            {nuevaCita?.id && <p>ID de cita: {nuevaCita.id}</p>}
+          </div>,
+          { autoClose: 8000 }
+        );
       }
 
-      try {
-          const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
-          const duracionTotal = formData.servicios.reduce(
-              (total, servicio) => total + (parseInt(servicio?.duracion) || 30), 
-              0
-          );
-          // Preparar datos para enviar
-          const citaData = {
-              fecha: fechaHora.toISOString(),
-              clienteId: formData.cliente.idCliente,
-              empleadoId: formData.empleado.idEmpleado,
-              servicioIds: formData.servicios.map(s => s.idServicio),
-          };
+      // Actualizar estado y cerrar modal
+      const citasActualizadas = await fetchCitas();
+      setCitas(citasActualizadas);
+      closeModal();
+    } catch (error) {
+      console.error("Error completo:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+      });
 
-          // Guardar cita
-          if (editingCitaId) {
-            await updateCita(editingCitaId, citaData);
-            toast.success(
-                <div>
-                    <p>Cita actualizada correctamente</p>
-                    <p>Duración: {duracionTotal} minutos</p>
-                    <p>Horario: {formData.hora} - {calculateEndTime(formData.hora, formData.servicios)}</p>
-                </div>
-            );
-          } else {
-            await createCita(citaData);
-            toast.success(
-                <div>
-                    <p>Cita creada correctamente</p>
-                    <p>Duración: {duracionTotal} minutos</p>
-                    <p>Horario: {formData.hora} - {calculateEndTime(formData.hora, formData.servicios)}</p>
-                </div>
-            );
-          }
+      const duracionTotal = formData.servicios.reduce(
+        (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+        0
+      );
 
-          // Recargar citas
-          const citasActualizadas = await fetchCitas();
-          setCitas(citasActualizadas);
-          closeModal();
-      } catch (error) {
-        console.error("Error al guardar cita:", error);
-        if (error.message.includes("Conflicto de horario")) {
-            toast.error(
-                <div>
-                    <strong>No se puede agendar la cita:</strong>
-                    <p>El empleado ya tiene citas programadas en ese horario</p>
-                    <pre>{error.message.split("Conflicto de horario:")[1]}</pre>
-                </div>,
-                { autoClose: 7000 }
-            );
-        } else {
-            toast.error(
-                <div>
-                    <strong>Error al guardar la cita:</strong>
-                    <p>{error.message}</p>
-                </div>,
-                { autoClose: 5000 }
-            );
-        }
+      // Manejo mejorado de errores
+      if (
+        error.response?.status === 409 ||
+        error.message.includes("Conflicto")
+      ) {
+        toast.error(
+          <div>
+            <strong>
+              No se puede {editingCitaId ? "actualizar" : "crear"} la cita:
+            </strong>
+            <p>
+              El empleado {formData.empleado.nombre}{" "}
+              {formData.empleado.apellido} ya tiene citas programadas
+            </p>
+            <p>Duración solicitada: {duracionTotal} minutos</p>
+            <p>
+              Horario: {formData.hora} -{" "}
+              {calculateEndTime(formData.hora, duracionTotal)}
+            </p>
+            {error.response?.data?.conflictDetails && (
+              <pre style={{ fontSize: "12px" }}>
+                {JSON.stringify(error.response.data.conflictDetails, null, 2)}
+              </pre>
+            )}
+          </div>,
+          { autoClose: 3000 }
+        );
+      } else {
+        toast.error(
+          <div>
+            <strong>
+              Error al {editingCitaId ? "actualizar" : "crear"} la cita:
+            </strong>
+            <p>{error.response?.data?.message || error.message}</p>
+            {process.env.NODE_ENV === "development" && (
+              <pre style={{ fontSize: "12px" }}>
+                {JSON.stringify(
+                  {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                  },
+                  null,
+                  2
+                )}
+              </pre>
+            )}
+          </div>,
+          { autoClose: 3000 }
+        );
+      }
     }
   };
 
@@ -381,7 +433,7 @@ const TableCitas = ({ isCollapsed }) => {
       toast.error(err.message || "Error al eliminar la cita");
     }
   };
-
+  
   const formatFechaHora = (fechaString) => {
     const fecha = new Date(fechaString);
     return fecha.toLocaleDateString("es-ES", {
@@ -429,7 +481,11 @@ const TableCitas = ({ isCollapsed }) => {
           />
         </div>
 
-        <div className={`${styles.tableContainer} ${isCollapsed ? "mx-4" : "mx-0"}`}>
+        <div
+          className={`${styles.tableContainer} ${
+            isCollapsed ? "mx-4" : "mx-0"
+          }`}
+        >
           <table className={styles.table}>
             <thead>
               <tr>
@@ -445,7 +501,9 @@ const TableCitas = ({ isCollapsed }) => {
                 <tr key={cita.idCita} className="bg-neutral-100">
                   <td className={styles.td}>{formatFechaHora(cita.fecha)}</td>
                   <td className={styles.td}>
-                    {cita.cliente ? `${cita.cliente.nombre} ${cita.cliente.apellido}` : 'Cliente no asignado'}
+                    {cita.cliente
+                      ? `${cita.cliente.nombre} ${cita.cliente.apellido}`
+                      : "Cliente no asignado"}
                   </td>
                   <td className={styles.td}>
                     {cita.empleado.nombre} {cita.empleado.apellido}
@@ -620,7 +678,7 @@ const TableCitas = ({ isCollapsed }) => {
                     <div className="mt-2 text-sm text-gray-600">
                       Duración total:{" "}
                       {formData.servicios.reduce(
-                        (total, s) => total + (parseInt(s.duracion || 0)),
+                        (total, s) => total + parseInt(s.duracion || 0),
                         0
                       )}{" "}
                       minutos

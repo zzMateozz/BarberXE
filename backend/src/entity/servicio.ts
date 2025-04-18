@@ -26,10 +26,14 @@ export class Servicio {
     })
     estado!: 'activo' | 'inactivo';
 
-    @ManyToMany(() => Cita, (cita) => cita.servicios)
+    @ManyToMany(() => Cita, (cita) => cita.servicios, {
+    })
     citas!: Cita[];
 
-    @ManyToMany(() => Corte)
+    @ManyToMany(() => Corte, {
+        cascade: true,
+        onDelete: 'CASCADE' 
+    })
     @JoinTable()
     cortes!: Corte[];
 }

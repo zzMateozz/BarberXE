@@ -462,9 +462,9 @@ const TableServices = () => {
                   )}
                 </div>
 
-                <label className="border p-4 rounded-md flex flex-col items-center cursor-pointer">
+                <label className="border p-1 rounded-md flex flex-col items-center cursor-pointer">
                   <Upload size={32} className="text-gray-500" />
-                  <span className="text-gray-500">Subir imagen</span>
+                  <span className="text-gray-500"></span>
                   <input
                     type="file"
                     accept="image/*"
@@ -476,7 +476,7 @@ const TableServices = () => {
                   <img
                     src={previewImage}
                     alt="Vista previa"
-                    className="w-full h-40 object-cover mt-2 rounded-lg"
+                    className="w-full h-30 object-cover mt-2 rounded-lg"
                   />
                 )}
                 <div className="flex gap-4 justify-end">
