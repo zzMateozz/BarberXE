@@ -10,6 +10,7 @@ import TableEgresos from "../components/Admin/CrudEgress.jsx";
 import LineChart1 from "../components/Admin/Grafic.jsx";
 import TableCortes from "../components/Admin/CrudCortes.jsx";
 import TableCitas from "../components/Admin/CrudQuotes.jsx";
+import ArqueoDeCaja from "../components/Admin/CrudArqueo.jsx";
 
 const AdminPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -33,6 +34,7 @@ const AdminPage = () => {
             <Route path="/Citas" element={<TableCitas isCollapsed={isCollapsed} />} />
             <Route path="/Caja/Ingreso" element={<TableIngresos isCollapsed={isCollapsed} />} />
             <Route path="/Caja/Egreso" element={<TableEgresos isCollapsed={isCollapsed} />} />
+            <Route path="/Caja/Arqueo" element={<ArqueoDeCaja isCollapsed={isCollapsed} />} />
           </Routes>
         </div>
       </div>
