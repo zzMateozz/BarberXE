@@ -1,6 +1,12 @@
-import React, { useState } from "react";
-import { Pencil, Trash2} from "lucide-react";
-import {PlusCircleIcon } from "@heroicons/react/24/outline"
+import React, { useState, useEffect } from "react";
+import { Pencil, Trash2 } from "lucide-react";
+import { PlusCircleIcon } from "@heroicons/react/24/outline";
+import {
+  fetchEgresosByArqueo,
+  addEgreso,
+  deleteEgreso,
+  getOpenArqueo
+} from "../../services/ArqueoService";
 
 const styles = {
   tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
@@ -13,113 +19,137 @@ const styles = {
   deleteButton: "text-red-500 hover:bg-red-100",
 };
 
-const TableEgresos = ({ isCollapsed }) => {
-  const [egresos, setEgresos] = useState([
-    {
-      id_egreso: "1",
-      descripcion: "Compra de materiales",
-      fecha: "2025-04-01",
-      valor: 500,
-    },
-    {
-      id_egreso: "2",
-      descripcion: "Pago de alquiler",
-      fecha: "2025-03-28",
-      valor: 1000,
-    },
-    // Agregar más egresos según sea necesario
-  ]);
-
+const TableEgresos = ({ isCollapsed, arqueoActual }) => {
+  const [egresos, setEgresos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
-    id_egreso: "",
     descripcion: "",
-    fecha: "",
-    valor: "",
+    fecha: new Date().toISOString().split("T")[0],
+    monto: "",
   });
   const [editIndex, setEditIndex] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
 
+  // Agrega este efecto para verificar el estado del arqueo
+  useEffect(() => {
+    const verificarArqueo = async () => {
+      try {
+        if (arqueoActual?.id) {
+          const { exists, data } = await getOpenArqueo();
+
+          if (!exists || data.id !== arqueoActual.id) {
+            setError("El arqueo no está activo o ha sido cerrado");
+            // Deshabilitar funcionalidades si es necesario
+          }
+        }
+      } catch (error) {
+        console.error("Error verificando arqueo:", error);
+      }
+    };
+
+    verificarArqueo();
+  }, [arqueoActual]);
+
+  const fetchEgresos = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchEgresosByArqueo();
+      setEgresos(response.data || response);
+    } catch (error) {
+      setError(`Error al obtener egresos: ${error.message}`);
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Métodos para manejo de modal
   const openModal = (index = null) => {
     setShowModal(true);
     if (index !== null) {
       setFormData(egresos[index]);
       setEditIndex(index);
     } else {
-      setFormData({
-        id_egreso: "",
-        descripcion: "",
-        fecha: "",
-        valor: "",
-      });
-      setEditIndex(null);
+      resetFormData();
     }
   };
 
   const closeModal = () => {
     setShowModal(false);
+    resetFormData();
+  };
+
+  const resetFormData = () => {
     setFormData({
-      id_egreso: "",
       descripcion: "",
-      fecha: "",
-      valor: "",
+      fecha: new Date().toISOString().split("T")[0],
+      monto: "",
     });
     setEditIndex(null);
   };
 
+  // Métodos para manejo de formulario
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editIndex !== null) {
-      setEgresos((prev) =>
-        prev.map((egreso, i) => (i === editIndex ? formData : egreso))
-      );
-    } else {
-      setEgresos((prev) => [...prev, formData]);
+    try {
+      // Verificación adicional
+      const { exists, data } = await getOpenArqueo();
+
+      if (!exists || data.id !== arqueoActual.id) {
+        throw new Error(
+          "No se pueden agregar movimientos. El arqueo no está activo."
+        );
+      }
+
+      if (!arqueoActual?.id) {
+        throw new Error("No hay un arqueo abierto para agregar egresos");
+      }
+
+      const egresoData = {
+        descripcion: formData.descripcion,
+        fecha: formData.fecha,
+        monto: Number(formData.monto),
+        arqueoId: arqueoActual.id,
+      };
+
+      await addEgreso(arqueoActual.id, egresoData);
+      closeModal();
+      await fetchEgresos();
+    } catch (error) {
+      setError(`Error al ${"agregar"} egreso: ${error.message}`);
+      console.error(error);
     }
-    closeModal();
   };
 
-  const handleDelete = (index) => {
-    setEgresos((prev) => prev.filter((_, i) => i !== index));
+  const handleDelete = async (index) => {
+    try {
+      const egresoId = egresos[index].id;
+      await deleteEgreso(egresoId);
+      await fetchEgresos();
+    } catch (error) {
+      setError(`Error al eliminar egreso: ${error.message}`);
+      console.error(error);
+    }
   };
 
-  // Método de búsqueda
+  // Métodos de búsqueda y paginación
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
   };
 
-  // Filtrado de egresos según el término de búsqueda
-  const filteredEgresos = egresos.filter((egreso) =>
-    Object.values(egreso)
-      .filter((val) => val !== egreso.id_egreso) // Excluye el id_egreso del filtro
-      .some((val) => val.toString().toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredEgresos = egresos.filter((egr) =>
+    Object.values(egr).some((val) =>
+      val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
-
-  // Paginación - Obtener egresos de la página actual
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentEgresos = filteredEgresos.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
-
-  // Total de páginas
-  const totalPages = Math.ceil(filteredEgresos.length / itemsPerPage);
-
-  // Cambiar de página
-  const changePage = (page) => {
-    if (page > 0 && page <= totalPages) {
-      setCurrentPage(page); // Actualiza la página actual
-    }
-  };
 
   return (
     <section className="py-16 lg:py-20">
@@ -127,82 +157,97 @@ const TableEgresos = ({ isCollapsed }) => {
         <div className="flex justify-between mb-4">
           <button
             onClick={() => openModal()}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
+            className={`bg-red-500 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl ${
+              !arqueoActual?.id || arqueoActual?.fechaCierre
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-red-600"
+            }`}
+            disabled={!arqueoActual?.id || arqueoActual?.fechaCierre}
+            title={
+              !arqueoActual?.id
+                ? "No hay arqueo seleccionado"
+                : arqueoActual?.fechaCierre
+                ? "El arqueo está cerrado"
+                : "Agregar ingreso"
+            }
           >
-            <PlusCircleIcon className="w-6 h-6" /> Agregar
+            <PlusCircleIcon className="w-6 h-6" />
+            Agregar Egreso
           </button>
           <input
             type="text"
-            placeholder="Buscar..."
+            placeholder="Buscar egresos..."
             value={searchTerm}
             onChange={handleSearchChange}
             className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        <div
-          className={`${styles.tableContainer} ${isCollapsed ? "mx-4" : "mx-0"}`}
-        >
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>#</th>
-                <th className={styles.th}>Descripción</th>
-                <th className={styles.th}>Fecha</th>
-                <th className={styles.th}>Valor</th>
-                <th className={styles.th}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentEgresos.map((egreso, i) => (
-                <tr key={i} className="bg-neutral-100">
-                  <td className={styles.td}>{indexOfFirstItem + i + 1}</td>
-                  <td className={styles.td}>{egreso.descripcion}</td>
-                  <td className={styles.td}>{egreso.fecha}</td>
-                  <td className={styles.td}>${egreso.valor}</td>
-                  <td className={styles.td}>
-                    <button
-                      onClick={() => openModal(i)}
-                      className={`${styles.button} ${styles.editButton} mr-2`}
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(i)}
-                      className={`${styles.button} ${styles.deleteButton}`}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+            {error}
+          </div>
+        )}
 
-        <div className="mt-6">
-          <nav className="flex justify-center">
-            <ul className="flex space-x-2">
-              {[...Array(totalPages)].map((_, index) => {
-                const page = index + 1;
-                return (
-                  <li key={page}>
-                    <button
-                      onClick={() => changePage(page)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        page === currentPage
-                          ? "bg-red-500 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </div>
+        {loading ? (
+          <div className="text-center py-8">Cargando egresos...</div>
+        ) : (
+          <>
+            <div
+              className={`${styles.tableContainer} ${
+                isCollapsed ? "mx-4" : "mx-0"
+              }`}
+            >
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.th}>#</th>
+                    <th className={styles.th}>Descripción</th>
+                    <th className={styles.th}>Fecha</th>
+                    <th className={styles.th}>Monto</th>
+                    <th className={styles.th}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEgresos.map((egr, i) => (
+                    <tr key={egr.id || i} className="bg-neutral-100">
+                      <td className={styles.td}>{indexOfFirstItem + i + 1}</td>
+                      <td className={styles.td}>{egr.descripcion}</td>
+                      <td className={styles.td}>{egr.fecha}</td>
+                      <td className={styles.td}>
+                        ${egr.monto.toLocaleString()}
+                      </td>
+                      <td className={styles.td}>
+                        <button
+                          onClick={() => openModal(i)}
+                          className={`${styles.button} ${styles.editButton} mr-2`}
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(i)}
+                          className={`${styles.button} ${styles.deleteButton}`}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredEgresos.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan="5"
+                        className="py-4 text-center text-gray-500"
+                      >
+                        No hay egresos registrados
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
@@ -212,22 +257,49 @@ const TableEgresos = ({ isCollapsed }) => {
                 {editIndex !== null ? "Editar Egreso" : "Añadir Egreso"}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {["descripcion", "fecha", "valor"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {field.charAt(0).toUpperCase() + field.slice(1)}
-                    </label>
-                    <input
-                      type={field === "fecha" ? "date" : "text"}
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      placeholder={`Ingrese ${field}`}
-                      className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Descripción
+                  </label>
+                  <input
+                    type="text"
+                    name="descripcion"
+                    value={formData.descripcion}
+                    onChange={handleChange}
+                    placeholder="Ingrese descripción"
+                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    name="fecha"
+                    value={formData.fecha}
+                    onChange={handleChange}
+                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Monto
+                  </label>
+                  <input
+                    type="number"
+                    name="monto"
+                    value={formData.monto}
+                    onChange={handleChange}
+                    placeholder="Ingrese monto"
+                    step="0.01"
+                    min="0"
+                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
                 <div className="flex gap-4 justify-end">
                   <button
                     type="button"
