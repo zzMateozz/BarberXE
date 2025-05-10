@@ -95,9 +95,18 @@ const TableCitas = ({ isCollapsed }) => {
         setCitas(citasData);
         setClientes(clientesData);
         setEmpleados(empleadosData);
-        // Filtrar solo los barberos
-        setBarberos(empleadosData.filter((e) => e.cargo === "Barbero"));
-        setServicios(serviciosData); // Aquí ya vienen con duración como número
+        setBarberos(
+          empleadosData.filter(
+            (e) =>
+              e.cargo.trim().toLowerCase() === "barbero" &&
+              e.estado?.trim().toLowerCase() === "activo"
+          )
+        );             
+        setServicios(
+          serviciosData.filter(
+            (s) => s.estado?.trim().toLowerCase() === "activo"
+          )
+        );        
         setLoading(false);
       } catch (err) {
         setError(err.message);
