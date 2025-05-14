@@ -1,13 +1,17 @@
 export class CreateArqueoCajaDto {
-    readonly fechaInicio: Date;
     readonly empleadoId: number;
+    readonly saldoInicial: number;
 
     constructor(data: any) {
-        if (!data.fechaInicio || !data.empleadoId) {
-            throw new Error('Fecha de inicio y ID de empleado son requeridos');
+        if (!data.empleadoId || data.saldoInicial === undefined) {
+            throw new Error('ID de empleado y saldo inicial son requeridos');
         }
 
-        this.fechaInicio = new Date(data.fechaInicio);
+        if (data.saldoInicial < 0) {
+            throw new Error('El saldo inicial no puede ser negativo');
+        }
+
         this.empleadoId = data.empleadoId;
+        this.saldoInicial = parseFloat(data.saldoInicial);
     }
 }
