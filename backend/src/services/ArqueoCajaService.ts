@@ -1,39 +1,61 @@
+import { IsNull } from 'typeorm';
 import { CloseArqueoCajaDto } from '../dtos/ArqueoCaja/CloseArqueoCaja.dto';
 import { CreateArqueoCajaDto } from '../dtos/ArqueoCaja/CreateArqueoCaja.dto';
 import { ArqueoCaja } from '../entity/arqueoCaja';
-import { Corte } from '../entity/corte';
-import { Egreso } from '../entity/egreso';
 import { Empleado } from '../entity/empleado';
-import { Ingreso } from '../entity/ingreso';
 import { ArqueoCajaRepository } from '../repository/ArqueoCajaRepository';
 
 export class ArqueoCajaService {
     async findAll(): Promise<ArqueoCaja[]> {
         return await ArqueoCajaRepository.find({
-            relations: ['empleado', 'ingreso', 'egreso', 'cortes']
+            relations: ['empleado', 'ingresos', 'egresos', 'cortes'], // CAMBIOS AQUÍ
+            order: { fechaInicio: 'DESC' }
         });
     }
 
     async findById(id: number): Promise<ArqueoCaja> {
-        // Validación del ID
-        if (isNaN(id) || id <= 0) {
-            throw new Error('ID de arqueo no válido');
-        }
-
-        const arqueo = await ArqueoCajaRepository.findOne({
-            where: { idArqueo: id },
-            relations: ['empleado', 'ingreso', 'egreso', 'cortes']
-        });
-
+        const arqueo = await ArqueoCajaRepository.findWithDetails(id);
+        
         if (!arqueo) {
             throw new Error(`Arqueo con ID ${id} no encontrado`);
         }
-
+        
         return arqueo;
     }
 
-    async findByEmpleado(empleadoId: number): Promise<ArqueoCaja[]> {
-        return await ArqueoCajaRepository.findByEmpleado(empleadoId);
+    async getByEmpleado(empleadoId: number, options?: { withRelations?: boolean }): Promise<ArqueoCaja[]> {
+        const relations = options?.withRelations 
+            ? ['ingresos', 'egresos', 'empleado'] 
+            : [];
+        
+        return await ArqueoCajaRepository.find({
+            where: { empleado: { idEmpleado: empleadoId } },
+            relations,
+            order: { fechaInicio: 'DESC' }
+        });
+    }
+
+    async findOpenByEmpleado(empleadoId: number): Promise<ArqueoCaja | null> {
+        return await ArqueoCajaRepository.findOne({
+            where: { 
+                empleado: { idEmpleado: empleadoId },
+                fechaCierre: IsNull()
+            },
+            relations: ['ingresos', 'egresos', 'empleado']
+        });
+    }
+    
+    async findByArqueoId(arqueoId: number): Promise<ArqueoCaja> {
+        const arqueo = await ArqueoCajaRepository.findOne({
+            where: { idArqueo: arqueoId },
+            relations: ['ingresos', 'egresos']
+        });
+        
+        if (!arqueo) {
+            throw new Error('Arqueo no encontrado');
+        }
+        
+        return arqueo;
     }
 
     async create(arqueoData: CreateArqueoCajaDto): Promise<ArqueoCaja> {
@@ -42,14 +64,24 @@ export class ArqueoCajaService {
         await queryRunner.startTransaction();
     
         try {
+            // Verificar si el empleado ya tiene un arqueo abierto
+            const arqueoExistente = await ArqueoCajaRepository.findOpenByEmpleado(arqueoData.empleadoId);
+            if (arqueoExistente) {
+                throw new Error('El empleado ya tiene un arqueo de caja abierto');
+            }
+    
             const arqueo = new ArqueoCaja();
-            arqueo.fechaInicio = arqueoData.fechaInicio;
+            arqueo.fechaInicio = new Date();
+            arqueo.saldoInicial = arqueoData.saldoInicial;
     
             const empleado = await queryRunner.manager.findOne(Empleado, {
                 where: { idEmpleado: arqueoData.empleadoId }
             });
-            if (!empleado) throw new Error('Empleado no encontrado');
             
+            if (!empleado) {
+                throw new Error('Empleado no encontrado');
+            }
+    
             arqueo.empleado = empleado;
             await queryRunner.manager.save(arqueo);
             await queryRunner.commitTransaction();
@@ -57,22 +89,19 @@ export class ArqueoCajaService {
             return arqueo;
         } catch (error) {
             await queryRunner.rollbackTransaction();
-            throw error instanceof Error ? error : new Error('Error desconocido');
+            throw error;
         } finally {
             await queryRunner.release();
         }
     }
-
+    
     async close(id: number, closeData: CloseArqueoCajaDto): Promise<ArqueoCaja> {
         const queryRunner = ArqueoCajaRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
     
         try {
-            const arqueo = await ArqueoCajaRepository.findOne({
-                where: { idArqueo: id },
-                relations: ['empleado']
-            });
+            const arqueo = await ArqueoCajaRepository.findWithDetails(id);
     
             if (!arqueo) {
                 throw new Error('Arqueo de caja no encontrado');
@@ -82,21 +111,20 @@ export class ArqueoCajaService {
                 throw new Error('El arqueo de caja ya está cerrado');
             }
     
-            arqueo.fechaCierre = closeData.fechaCierre;
+            // Calcular totales
+            const totalIngresos = arqueo.ingresos.reduce((sum, ing) => sum + ing.monto, 0);
+            const totalEgresos = arqueo.egresos.reduce((sum, eg) => sum + eg.monto, 0);
+            const saldoCalculado = arqueo.saldoInicial + totalIngresos - totalEgresos;
     
-            // Crear y asociar ingreso
-            if (closeData.ingreso) {
-                const ingreso = new Ingreso();
-                ingreso.monto = closeData.ingreso.monto;
-                arqueo.ingreso = ingreso; // La relación cascade se encargará del save
+            // Validar saldo final
+            if (Math.abs(saldoCalculado - closeData.saldoFinal) > 0.01) {
+                throw new Error(`Discrepancia encontrada. Saldo calculado: ${saldoCalculado}, Saldo reportado: ${closeData.saldoFinal}`);
             }
+            
     
-            // Crear y asociar egreso
-            if (closeData.egreso) {
-                const egreso = new Egreso();
-                egreso.monto = closeData.egreso.monto;
-                arqueo.egreso = egreso; // La relación cascade se encargará del save
-            }
+            arqueo.fechaCierre = new Date();
+            arqueo.saldoFinal = closeData.saldoFinal;
+            arqueo.observaciones = closeData.observaciones || null;
     
             await queryRunner.manager.save(arqueo);
             await queryRunner.commitTransaction();
@@ -104,63 +132,15 @@ export class ArqueoCajaService {
             return arqueo;
         } catch (error) {
             await queryRunner.rollbackTransaction();
-            console.error('Error al cerrar arqueo:', error);
             throw error;
         } finally {
             await queryRunner.release();
         }
     }
 
-    async update(id: number, arqueoData: Partial<ArqueoCaja>): Promise<ArqueoCaja | null> {
-        await ArqueoCajaRepository.update(id, arqueoData);
+    async update(id: number, partialData: { observaciones?: string }): Promise<ArqueoCaja> {
+        await ArqueoCajaRepository.update(id, partialData);
         return this.findById(id);
     }
 
-    async delete(id: number): Promise<void> {
-        const queryRunner = ArqueoCajaRepository.manager.connection.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-    
-        try {
-            // Buscar el arqueo con sus relaciones
-            const arqueo = await queryRunner.manager.findOne(ArqueoCaja, {
-                where: { idArqueo: id },
-                relations: ['ingreso', 'egreso', 'cortes']
-            });
-    
-            if (!arqueo) {
-                throw new Error('Arqueo de caja no encontrado');
-            }
-    
-            // Eliminar relaciones primero (si es necesario)
-            if (arqueo.ingreso) {
-                await queryRunner.manager.delete(Ingreso, arqueo.ingreso.idIngreso);
-            }
-    
-            if (arqueo.egreso) {
-                await queryRunner.manager.delete(Egreso, arqueo.egreso.idEgreso);
-            }
-    
-            // Eliminar cortes asociados (dependiendo de tus requisitos de negocio)
-            if (arqueo.cortes && arqueo.cortes.length > 0) {
-                await queryRunner.manager.delete(Corte, arqueo.cortes.map(c => c.idCorte));
-            }
-    
-            // Finalmente eliminar el arqueo
-            await queryRunner.manager.delete(ArqueoCaja, id);
-            
-            await queryRunner.commitTransaction();
-        } catch (error) {
-            await queryRunner.rollbackTransaction();
-            console.error('Error al eliminar arqueo:', error);
-            
-            // Relanzar el error con un mensaje adecuado
-            if (error instanceof Error) {
-                throw error;
-            }
-            throw new Error('Error desconocido al eliminar arqueo de caja');
-        } finally {
-            await queryRunner.release();
-        }
-    }
 }

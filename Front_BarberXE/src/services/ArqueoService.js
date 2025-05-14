@@ -1,304 +1,297 @@
 const API_BASE_URL = 'http://localhost:3000/api';
 
 const handleResponse = async (response) => {
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Error en la solicitud');
-    }
-    return response.json();
-  };
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.message || 'Error en la solicitud';
+    throw new Error(errorMessage);
+  }
+  return response.json();
+};
 
-export const getHeaders = () => {
-    const headers = {
-        'Content-Type': 'application/json',
-    };
-    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
+const getHeaders = () => {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Si tenemos token de autenticación, lo añadimos
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
 };
 
 // Funciones para arqueos
 export const fetchArqueos = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/arqueos`);
-      return await handleResponse(response);
-    } catch (error) {
-      console.error('Error fetching arqueos:', error);
-      throw new Error('Error al obtener los arqueos');
-    }
-  };
-
-  
-  export const getOpenArqueo = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/arqueos/open`);
-      
-      if (response.status === 404) {
-        return { exists: false, data: null }; // No hay arqueo abierto
-      }
-      
-      if (!response.ok) {
-        throw new Error('Error al verificar arqueo abierto');
-      }
-      
-      const data = await response.json();
-      return { exists: true, data };
-      
-    } catch (error) {
-      console.error('Error:', error);
-      throw error;
-    }
-  };
-
-  export const createArqueo = async (arqueoData) => {
-    try {
-      // Validación robusta de los datos de entrada
-      if (!arqueoData) {
-        throw new Error('Datos de arqueo no proporcionados');
-      }
-  
-      // Convertir empleadoId a número y validar
-      const empleadoId = Number(arqueoData.empleadoId);
-      if (isNaN(empleadoId)) {
-        throw new Error('El ID del empleado debe ser un número válido');
-      }
-  
-      // Convertir saldoBase a número y validar
-      const saldoBase = Number(arqueoData.saldoBase);
-      if (isNaN(saldoBase)) {
-        throw new Error('El saldo base debe ser un número válido');
-      }
-  
-      // Validar que saldoBase sea positivo
-      if (saldoBase < 0) {
-        throw new Error('El saldo base no puede ser negativo');
-      }
-  
-      const payload = {
-        empleadoId: empleadoId,
-        saldoBase: saldoBase,
-        fechaInicio: arqueoData.fechaInicio || new Date().toISOString()
-      };
-  
-      const response = await fetch(`${API_BASE_URL}/arqueos/open`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Asumiendo autenticación
-        },
-        body: JSON.stringify(payload)
-      });
-  
-      // Manejo detallado de la respuesta
-      if (!response.ok) {
-        let errorMessage = `Error ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          const text = await response.text();
-          errorMessage = text || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-  
-      return await response.json();
-    } catch (error) {
-      console.error('Error en createArqueo:', error);
-      throw error; // Re-lanzamos el error para manejo en el componente
-    }
-  };
-  
-  
-export const getHistorial = fetchArqueos;
-
-
-export const fetchArqueoById = async (id) => {
-    if (!id || isNaN(Number(id))) throw new Error('ID de arqueo inválido');
-    const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
-        headers: getHeaders(),
-    });
-    return await handleResponse(response);
-};
-
-export const closeArqueo = async (id, { saldoFinal, observacion, fechaCierre }) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/arqueos/${id}/close`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
-        saldoFinal: Number(saldoFinal),
-        observacion, // Asegúrate que se envíe
-        fechaCierre
-      })
+    const response = await fetch(`${API_BASE_URL}/arqueos`, {
+      headers: getHeaders()
     });
-
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Error al cerrar arqueo");
+      const error = await response.json();
+      throw new Error(error.message || 'Error al obtener arqueos');
     }
-
-    return await response.json();
+    
+    const data = await response.json();
+    return data.data || []; // Asegurar array
   } catch (error) {
-    console.error("Error en closeArqueo:", {
-      idArqueo,
-      saldoFinal,
-      observacion, // Verifica este valor
-      error: error.message
-    });
+    console.error('Error en fetchArqueos:', error);
     throw error;
   }
-};
-
-export const updateArqueo = async (id, arqueoData) => {
-    if (!id || isNaN(Number(id))) throw new Error('ID de arqueo inválido');
-    const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify(arqueoData),
-    });
-    return await handleResponse(response);
-};
-
-export const deleteArqueo = async (id) => {
-    if (!id || isNaN(Number(id))) throw new Error('ID de arqueo inválido');
-    const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
-        method: 'DELETE',
-        headers: getHeaders(),
-    });
-    if (response.status === 204) return {};
-    return await handleResponse(response);
-};
-
-// Funciones de empleados
-export const fetchEmpleados = async () => {
-    const response = await fetch(`${API_BASE_URL}/empleados`, {
-        headers: getHeaders(),
-    });
-    const empleados = await handleResponse(response);
-    return empleados.filter(empleado => empleado.cargo === 'Cajero');
-};
-
-
-// Agregar nuevo ingreso
-export const addIngreso = async (ingresoData) => {
-  try {
-      const response = await fetch(`${API_BASE_URL}/ingresos`, {
-          method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify(ingresoData)
-      });
-      return await handleResponse(response);
-  } catch (error) {
-      console.error('Error adding ingreso:', error);
-      throw error;
-  }
-};
-
-
-// Agregar nuevo Egreso
-export const addEgreso = async (ingresoData) => {
-  try {
-      const response = await fetch(`${API_BASE_URL}/egresos`, {
-          method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify(ingresoData)
-      });
-      return await handleResponse(response);
-  } catch (error) {
-      console.error('Error adding ingreso:', error);
-      throw error;
-  }
-};
-
-export const fetchIngresosByArqueo = async (arqueoId) => {
-  try {
-      const response = await fetch(`${API_BASE_URL}/ingresos/arqueo/${arqueoId}`, {
-          headers: getHeaders()
-      });
-
-      if (!response.ok) {
-          // Intentar obtener el mensaje de error del backend
-          let errorMessage = `Error ${response.status}`;
-          try {
-              const errorData = await response.json();
-              errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-              console.error('Error parsing error response:', e);
-          }
-          throw new Error(errorMessage);
-      }
-
-      return await response.json();
-  } catch (error) {
-      console.error('Error en fetchIngresosByArqueo:', {
-          arqueoId,
-          error: error.message
-      });
-      throw new Error(error.message || 'Error al obtener ingresos');
-  }
-};
-
-export const fetchEgresosByArqueo = async (arqueoId) => {
-  try {
-      const response = await fetch(`${API_BASE_URL}/egresos/arqueo/${arqueoId}`, {
-          headers: getHeaders()
-      });
-
-      if (!response.ok) {
-          let errorMessage = `Error ${response.status}`;
-          try {
-              const errorData = await response.json();
-              errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-              console.error('Error parsing error response:', e);
-          }
-          throw new Error(errorMessage);
-      }
-
-      return await response.json();
-  } catch (error) {
-      console.error('Error en fetchEgresosByArqueo:', {
-          arqueoId,
-          error: error.message
-      });
-      throw new Error(error.message || 'Error al obtener egresos');
-  }
-};
-
-export const deleteIngreso = async (ingresoId) => {
-    const response = await fetch(`${API_BASE_URL}/ingresos/${ingresoId}`, {
-        method: 'DELETE',
-        headers: getHeaders(),
-    });
-    return await handleResponse(response);
 };
 
 export const getArqueoById = async (id) => {
   try {
     const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      headers: getHeaders()
     });
     
-    if (!response.ok) throw new Error('Error al obtener arqueo');
-    return await response.json();
+    if (!response.ok) {
+      throw new Error('Arqueo no encontrado');
+    }
+    
+    const data = await response.json();
+    return data.data; // Asegúrate de retornar data.data
   } catch (error) {
     console.error('Error en getArqueoById:', error);
     throw error;
   }
 };
 
-export const deleteEgreso = async (egresoId) => {
-    const response = await fetch(`${API_BASE_URL}/egresos/${egresoId}`, {
-        method: 'DELETE',
-        headers: getHeaders(),
+export const getHistorial = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/arqueos`, {
+      headers: getHeaders()
+    });
+    
+    const data = await response.json();
+    return data.data.map(arqueo => ({
+      ...arqueo,
+      ingresos: arqueo.ingresos || [],
+      egresos: arqueo.egresos || []
+    }));
+  } catch (error) {
+    console.error("Error:", error);
+    throw error;
+  }
+};
+
+
+
+export const getOpenArqueo = async (empleadoId) => {
+  if (!empleadoId || isNaN(empleadoId)) {
+      console.error("ID de empleado inválido:", empleadoId);
+      throw new Error("ID de empleado inválido");
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/arqueos/empleados/${empleadoId}/abierto`, {
+      headers: getHeaders()
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { exists: false, data: null };
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Error ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const arqueoData = data.data || data; // Manejar respuesta con/sin data wrapper
+    
+    if (arqueoData && (arqueoData.idArqueo || arqueoData.id)) {
+      return { 
+        exists: true, 
+        data: {
+          ...arqueoData,
+          idArqueo: arqueoData.idArqueo || arqueoData.id
+        }
+      };
+    }
+      
+      return { exists: false, data: null };
+  } catch (error) {
+      console.error("Error checking open arqueo:", error);
+      throw error;
+  }
+};
+
+export const createArqueo = async (arqueoData) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/arqueos`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                empleadoId: Number(arqueoData.empleadoId),
+                saldoInicial: Number(arqueoData.saldoInicial)
+            })
+        });
+        return await handleResponse(response);
+    } catch (error) {
+        console.error('Error en createArqueo:', error);
+        throw error;
+    }
+};
+
+export const closeArqueo = async (id, { saldoFinal, observacion }) => {
+  try {
+      const response = await fetch(`${API_BASE_URL}/arqueos/${id}/close`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+              saldoFinal: Number(saldoFinal),
+              observaciones: observacion || "Sin observaciones"
+          })
+      });
+      
+      // Better error handling
+      if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `Error al cerrar arqueo: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.data;
+  } catch (error) {
+      console.error("Error en closeArqueo:", error);
+      throw error;
+  }
+};
+// Funciones para ingresos
+export const addIngreso = async (ingresoData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/arqueos/${ingresoData.arqueoId}/ingresos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        monto: ingresoData.monto,
+        descripcion: ingresoData.descripcion,
+        medioPago: ingresoData.medioPago,
+        arqueoId: ingresoData.arqueoId // Asegurar que se envía
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Error al crear ingreso');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error adding ingreso:', error);
+    throw new Error(error.message || "Error de conexión");
+  }
+};
+
+
+export const fetchIngresosByArqueo = async (arqueoId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/arqueos/${arqueoId}/ingresos`, {
+      headers: getHeaders()
+    });
+    
+    if (!response.ok) throw new Error('Error al obtener ingresos');
+    
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.items || data.data?.items || [];
+  } catch (error) {
+    console.error('Error en fetchIngresosByArqueo:', error);
+    return [];
+  }
+};
+
+export const fetchAllIngresos = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/ingresos`, {
+      headers: getHeaders() // Usando la función definida
+    });
+    
+    if (!response.ok) throw new Error('Error al obtener ingresos');
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error en fetchAllIngresos:', error);
+    throw error;
+  }
+};
+
+
+// Funciones para egresos
+export const addEgreso = async (egresoData) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/egresos`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                monto: Number(egresoData.monto),
+                descripcion: egresoData.descripcion,
+                arqueoId: Number(egresoData.arqueoId),
+                categoria: egresoData.categoria, // Añadir categoría
+                justificacion: egresoData.justificacion // Añadir justificación
+            })
+        });
+        return await handleResponse(response);
+    } catch (error) {
+        console.error('Error adding egreso:', error);
+        throw error;
+    }
+};
+
+export const fetchEgresosByArqueo = async (arqueoId) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/arqueos/${arqueoId}/egresos`, {
+            headers: getHeaders()
+        });
+        const data = await handleResponse(response);
+        
+        // Asegurar estructura correcta
+        return data.data?.items || data.items || data || []; 
+    } catch (error) {
+        console.error('Error en fetchEgresosByArqueo:', error);
+        return []; // Siempre retornar array
+    }
+};
+
+// En ArqueoService.js
+export const fetchEmpleados = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/empleados`, {
+      headers: getHeaders() // Usando la función definida
+    });
+    
+    if (!response.ok) throw new Error('Error al obtener empleados');
+    
+    const empleados = await response.json();
+    return empleados.filter(e => e.cargo === 'Cajero');
+  } catch (error) {
+    console.error('Error en fetchEmpleados:', error);
+    throw new Error('Error al obtener empleados');
+  }
+  
+};
+
+export const updateEgreso = async (id, egresoData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/egresos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        monto: egresoData.monto,
+        descripcion: egresoData.descripcion,
+        categoria: egresoData.categoria, // Asegurar que está incluido
+        justificacion: egresoData.justificacion // Asegurar que está incluido
+      })
     });
     return await handleResponse(response);
+  } catch (error) {
+    console.error('Error updating egreso:', error);
+    throw error;
+  }
 };
+
+

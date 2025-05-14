@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { IngresoController } from '../controllers/ingresoController';
 
 const router = Router();
-const ingresoController = new IngresoController();
+const controller = new IngresoController();
 
-router.get('/', ingresoController.getAll);
-router.get('/:id', ingresoController.getById);
-router.post('/', ingresoController.create);
-router.put('/:id', ingresoController.update);
-router.delete('/:id', ingresoController.delete);
+// Rutas básicas
+router.get('/', controller.getAll);
+router.post('/', controller.create);
+router.get('/:id', controller.getById);
+router.put('/:id', controller.update);
+router.get('/arqueo/:arqueoId', controller.getByArqueoId);
+
 
 export default router;
