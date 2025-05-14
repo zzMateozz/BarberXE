@@ -2,14 +2,23 @@ import { Router } from 'express';
 import { ArqueoCajaController } from '../controllers/arqueoCajaController';
 
 const router = Router();
-const arqueoCajaController = new ArqueoCajaController();
+const controller = new ArqueoCajaController();
 
-router.get('/', arqueoCajaController.getAll);
-router.get('/:id', arqueoCajaController.getById);
-router.get('/empleado/:empleadoId', arqueoCajaController.getByEmpleado);
-router.post('/', arqueoCajaController.create);
-router.post('/:id/close', arqueoCajaController.close);
-router.put('/:id', arqueoCajaController.update);
-router.delete('/:id', arqueoCajaController.delete);
+// CRUD básico
+router.get('/', controller.getAll);
+router.post('/', controller.create);
+router.get('/:id', controller.getById);
+router.put('/:id', controller.update);
+
+// Operaciones específicas
+router.post('/:id/close', controller.close);
+router.get('/empleados/:empleadoId', controller.getByEmpleado);
+router.get('/empleados/:empleadoId/abierto', controller.getOpenByEmpleado);
+
+// Gestión de movimientos
+router.post('/:id/ingresos', controller.addIncome);
+router.post('/:id/egresos', controller.addExpense);
+router.get('/:id/ingresos', controller.getIncomesByArqueo);
+router.get('/:id/egresos', controller.getExpensesByArqueo);
 
 export default router;

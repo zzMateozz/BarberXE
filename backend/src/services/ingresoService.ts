@@ -4,9 +4,15 @@ import { Ingreso } from '../entity/ingreso';
 import { IngresoRepository } from '../repository/IngresoRepository';
 
 export class IngresoService {
+    /*async findAll(): Promise<Ingreso[]> {
+        return await IngresoRepository.find({ relations: ['arqueo'] });
+    }*/
+
     async findAll(): Promise<Ingreso[]> {
         return await IngresoRepository.find({ relations: ['arqueo'] });
     }
+
+    
 
     async findById(id: number): Promise<Ingreso> {
         const ingreso = await IngresoRepository.findOne({
@@ -19,6 +25,8 @@ export class IngresoService {
         return ingreso;
     }
 
+    
+
     async create(ingresoData: CreateIngresoDto): Promise<Ingreso> {
         const queryRunner = IngresoRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();
@@ -27,16 +35,25 @@ export class IngresoService {
         try {
             const ingreso = new Ingreso();
             ingreso.monto = ingresoData.monto;
+            ingreso.descripcion = ingresoData.descripcion;
+            ingreso.fecha = new Date(); // Fecha actual
+            ingreso.tipo = ingresoData.tipo || 'General'; // Valor por defecto
 
-            // Obtener arqueo
+            // Validación robusta del arqueo
             const arqueo = await queryRunner.manager.findOne(ArqueoCaja, {
-                where: { idArqueo: ingresoData.arqueoId }
+                where: { idArqueo: ingresoData.arqueoId },
+                relations: ['ingresos', 'egresos']
             });
+            
             if (!arqueo) {
                 throw new Error('Arqueo de caja no encontrado');
             }
-            ingreso.arqueo = arqueo;
+            
+            if (arqueo.fechaCierre) {
+                throw new Error('No se pueden agregar ingresos a un arqueo cerrado');
+            }
 
+            ingreso.arqueo = arqueo;
             await queryRunner.manager.save(ingreso);
             await queryRunner.commitTransaction();
 
@@ -57,5 +74,12 @@ export class IngresoService {
     async delete(id: number): Promise<void> {
         const ingreso = await this.findById(id);
         await IngresoRepository.remove(ingreso);
+    }
+
+    async findByArqueoId(arqueoId: number): Promise<Ingreso[]> {
+        return await IngresoRepository.find({
+            where: { arqueo: { idArqueo: arqueoId } },
+            relations: ['arqueo'],
+        });
     }
 }

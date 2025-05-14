@@ -1,264 +1,292 @@
-import React, { useState, useEffect } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import { PlusCircleIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useCallback } from 'react';
+import { PlusCircle, Trash2, Edit, Check, X, ArrowDownCircle } from 'lucide-react'; // ArrowDownCircle como ejemplo para egresos
 import {
-  fetchEgresosByArqueo,
   addEgreso,
-  deleteEgreso,
-  getOpenArqueo
-} from "../../services/ArqueoService";
+  fetchEgresosByArqueo,
+  getOpenArqueo,
+  // Asumimos que tienes o crearás estas funciones en ArqueoService:
+  updateEgreso, // Necesaria para actualizar
+} from '../../services/ArqueoService';
 
-const styles = {
-  tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
-  table: "w-full table-auto border-collapse",
-  th: "min-w-[80px] py-2 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
-  td: "py-2 px-2 md:py-4 md:px-3 text-center text-xs md:text-base border-b border-gray-200",
-  button:
-    "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
-  editButton: "text-blue-500 hover:bg-blue-100",
-  deleteButton: "text-red-500 hover:bg-red-100",
+// Función para formatear moneda (similar a CrudIncome)
+const formatCurrency = (value) => {
+  const numericValue = Number(value) || 0;
+  return numericValue.toLocaleString('es-ES', { // Ajusta 'es-ES' y 'COP' si es necesario
+    style: 'currency',
+    currency: 'COP', // Cambia a la moneda que uses, ej: 'USD', 'EUR'
+    minimumFractionDigits: 2
+  });
 };
 
-const TableEgresos = ({ isCollapsed, arqueoActual }) => {
+function CrudEgresos() {
+  // Estados
   const [egresos, setEgresos] = useState([]);
+  const [arqueoActual, setArqueoActual] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [arqueoCajaId, setArqueoCajaId] = useState(null); // Mantener por consistencia si se usa
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [success, setSuccess] = useState(null);
+
+  // Estados para el formulario de nuevo egreso
   const [formData, setFormData] = useState({
-    descripcion: "",
-    fecha: new Date().toISOString().split("T")[0],
-    monto: "",
+    monto: '',
+    descripcion: '',
+    categoria: 'Gastos Operativos', // Valor por defecto
+    justificacion: ''
   });
-  const [editIndex, setEditIndex] = useState(null);
 
-  // Agrega este efecto para verificar el estado del arqueo
-  useEffect(() => {
-    const verificarArqueo = async () => {
-      try {
-        if (arqueoActual?.id) {
-          const { exists, data } = await getOpenArqueo();
+  const categorias = [
+  "Gastos Operativos",
+  "Compra de Insumos",
+  "Pago de Servicios",
+  "Sueldos y comisiones",
+  "Publicidad ",
+  "Mantenimiento",
+  "Otros"
+];
 
-          if (!exists || data.id !== arqueoActual.id) {
-            setError("El arqueo no está activo o ha sido cerrado");
-            // Deshabilitar funcionalidades si es necesario
-          }
-        }
-      } catch (error) {
-        console.error("Error verificando arqueo:", error);
-      }
-    };
+  // Estado para edición
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    idEgreso: null,
+    monto: '',
+    descripcion: '',
+    categoria: '',
+    justificacion: ''
+  });
 
-    verificarArqueo();
-  }, [arqueoActual]);
-
-  const fetchEgresos = async () => {
-    setLoading(true);
-    setError(null);
+  // Cargar datos iniciales (arqueo y egresos)
+  const cargarDatosIniciales = useCallback(async () => {
     try {
-      const response = await fetchEgresosByArqueo();
-      setEgresos(response.data || response);
-    } catch (error) {
-      setError(`Error al obtener egresos: ${error.message}`);
-      console.error(error);
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      const empleadoIdActual = localStorage.getItem('currentEmpleadoIdForArqueo');
+      if (!empleadoIdActual) {
+        setError("No se encontró un empleado asociado al arqueo.");
+        setLoading(false);
+        return;
+      }
+
+      const { exists, data: arqueo } = await getOpenArqueo(empleadoIdActual);
+
+      if (exists && arqueo) {
+        setArqueoActual(arqueo);
+        setArqueoCajaId(arqueo.idArqueo);
+
+        const egresosData = await fetchEgresosByArqueo(arqueo.idArqueo);
+        setEgresos(Array.isArray(egresosData) ? egresosData : []);
+      } else {
+        setError("Debe abrir un arqueo de caja primero para gestionar egresos.");
+        setArqueoActual(null); // Asegurarse que no hay arqueo actual
+        setEgresos([]); // Limpiar egresos si no hay arqueo
+      }
+    } catch (err) {
+      setError(err.message || "Error al cargar datos de egresos");
+    } finally {
+      setLoading(false);
+    }
+  }, []); // useCallback para evitar re-creaciones innecesarias
+
+  useEffect(() => {
+    cargarDatosIniciales();
+  }, [cargarDatosIniciales]);
+
+  // Manejar cambios en el formulario principal
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  // Manejar cambios en el formulario de edición
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm({
+      ...editForm,
+      [name]: value
+    });
+  };
+
+  // Agregar nuevo egreso
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!arqueoActual?.idArqueo) {
+      setError("Debe existir un arqueo abierto para registrar un egreso.");
+      return;
+    }
+
+    if (!formData.monto || !formData.descripcion || !formData.categoria) {
+      setError("Monto, descripción y categoría son requeridos para el egreso.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const nuevoEgresoData = {
+        monto: Number(formData.monto),
+        descripcion: formData.descripcion.trim(),
+        categoria: formData.categoria,
+        justificacion: formData.justificacion.trim(),
+        arqueoId: arqueoActual.idArqueo
+      };
+
+      const egresoAgregado = await addEgreso(nuevoEgresoData);
+      // Asumimos que addEgreso devuelve el objeto egreso completo con su ID
+      setEgresos([...egresos, egresoAgregado]);
+      setFormData({ monto: "", descripcion: "", categoria: "Gastos Operativos", justificacion: "" });
+      setSuccess("Egreso registrado exitosamente.");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error("Error al registrar egreso:", err);
+      setError(err.message || "Error al registrar el egreso");
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  // Métodos para manejo de modal
-  const openModal = (index = null) => {
-    setShowModal(true);
-    if (index !== null) {
-      setFormData(egresos[index]);
-      setEditIndex(index);
-    } else {
-      resetFormData();
-    }
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    resetFormData();
-  };
-
-  const resetFormData = () => {
-    setFormData({
-      descripcion: "",
-      fecha: new Date().toISOString().split("T")[0],
-      monto: "",
+  // Iniciar edición de un egreso
+  const handleStartEdit = (egreso) => {
+    setEditingId(egreso.idEgreso);
+    setEditForm({
+      idEgreso: egreso.idEgreso,
+      monto: egreso.monto,
+      descripcion: egreso.descripcion || '',
+      categoria: egreso.categoria || 'Gastos Operativos',
+      justificacion: egreso.justificacion || ''
     });
-    setEditIndex(null);
+    setError(null); // Limpiar errores al iniciar edición
+    setSuccess(null); // Limpiar mensajes de éxito
   };
 
-  // Métodos para manejo de formulario
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  // Cancelar edición
+  const handleCancelEdit = () => {
+    setEditingId(null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Guardar cambios de edición
+  const handleSaveEdit = async (id) => {
+    setError(null);
+    setSuccess(null);
+
+    if (!editForm.monto || !editForm.descripcion || !editForm.categoria) {
+        setError("Monto, descripción y categoría son requeridos para actualizar el egreso.");
+        return;
+    }
+
     try {
-      // Verificación adicional
-      const { exists, data } = await getOpenArqueo();
+      setLoading(true);
+      // Asegúrate de que updateEgreso existe y funciona como se espera en ArqueoService
+      const egresoActualizado = await updateEgreso(id, {
+        monto: Number(editForm.monto),
+        descripcion: editForm.descripcion.trim(),
+        categoria: editForm.categoria,
+        justificacion: editForm.justificacion.trim(),
+        // No es necesario enviar arqueoId si el backend no lo requiere para actualizar
+      });
 
-      if (!exists || data.id !== arqueoActual.id) {
-        throw new Error(
-          "No se pueden agregar movimientos. El arqueo no está activo."
-        );
-      }
-
-      if (!arqueoActual?.id) {
-        throw new Error("No hay un arqueo abierto para agregar egresos");
-      }
-
-      const egresoData = {
-        descripcion: formData.descripcion,
-        fecha: formData.fecha,
-        monto: Number(formData.monto),
-        arqueoId: arqueoActual.id,
-      };
-
-      await addEgreso(arqueoActual.id, egresoData);
-      closeModal();
-      await fetchEgresos();
-    } catch (error) {
-      setError(`Error al ${"agregar"} egreso: ${error.message}`);
-      console.error(error);
+      // Actualizar el estado local de egresos
+      setEgresos(egresos.map(egr => egr.idEgreso === id ? egresoActualizado : egr));
+      setEditingId(null);
+      setSuccess("Egreso actualizado correctamente.");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error("Error actualizando egreso:", err);
+      setError(err.message || "Error al actualizar el egreso");
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (index) => {
+  // Eliminar un egreso
+  const handleDelete = async (id) => {
+    if (!confirm("¿Está seguro de eliminar este egreso?")) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+
     try {
-      const egresoId = egresos[index].id;
-      await deleteEgreso(egresoId);
-      await fetchEgresos();
-    } catch (error) {
-      setError(`Error al eliminar egreso: ${error.message}`);
-      console.error(error);
+      setLoading(true);
+      // Actualizar el estado local de egresos
+      setEgresos(egresos.filter(egr => egr.idEgreso !== id));
+      setSuccess("Egreso eliminado correctamente.");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error("Error eliminando egreso:", err);
+      setError(err.message || "Error al eliminar el egreso");
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Métodos de búsqueda y paginación
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
+  // Calcular total de egresos
+  const calcularTotalEgresos = () => {
+    if (!Array.isArray(egresos)) return 0;
+    return egresos.reduce((total, egr) => total + (Number(egr.monto) || 0), 0);
   };
-
-  const filteredEgresos = egresos.filter((egr) =>
-    Object.values(egr).some((val) =>
-      val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
 
   return (
-    <section className="py-16 lg:py-20">
-      <div className="container mx-auto px-4">
-        <div className="flex justify-between mb-4">
-          <button
-            onClick={() => openModal()}
-            className={`bg-red-500 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl ${
-              !arqueoActual?.id || arqueoActual?.fechaCierre
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-red-600"
-            }`}
-            disabled={!arqueoActual?.id || arqueoActual?.fechaCierre}
-            title={
-              !arqueoActual?.id
-                ? "No hay arqueo seleccionado"
-                : arqueoActual?.fechaCierre
-                ? "El arqueo está cerrado"
-                : "Agregar ingreso"
-            }
-          >
-            <PlusCircleIcon className="w-6 h-6" />
-            Agregar Egreso
-          </button>
-          <input
-            type="text"
-            placeholder="Buscar egresos..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+    <div className="min-h-[70vh] bg-gray-50 p-3">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6 flex items-center">
+          <ArrowDownCircle className="mr-2 text-red-600" /> {/* Icono para Egresos */}
+          Gestión de Egresos
+        </h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
 
-        {loading ? (
-          <div className="text-center py-8">Cargando egresos...</div>
-        ) : (
-          <>
-            <div
-              className={`${styles.tableContainer} ${
-                isCollapsed ? "mx-4" : "mx-0"
-              }`}
-            >
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.th}>#</th>
-                    <th className={styles.th}>Descripción</th>
-                    <th className={styles.th}>Fecha</th>
-                    <th className={styles.th}>Monto</th>
-                    <th className={styles.th}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEgresos.map((egr, i) => (
-                    <tr key={egr.id || i} className="bg-neutral-100">
-                      <td className={styles.td}>{indexOfFirstItem + i + 1}</td>
-                      <td className={styles.td}>{egr.descripcion}</td>
-                      <td className={styles.td}>{egr.fecha}</td>
-                      <td className={styles.td}>
-                        ${egr.monto.toLocaleString()}
-                      </td>
-                      <td className={styles.td}>
-                        <button
-                          onClick={() => openModal(i)}
-                          className={`${styles.button} ${styles.editButton} mr-2`}
-                        >
-                          <Pencil size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(i)}
-                          className={`${styles.button} ${styles.deleteButton}`}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredEgresos.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="py-4 text-center text-gray-500"
-                      >
-                        No hay egresos registrados
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
+        {success && (
+          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
+            {success}
+          </div>
         )}
 
-        {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[70vh] overflow-y-auto">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircleIcon className="w-6 h-6 text-red-500" />
-                {editIndex !== null ? "Editar Egreso" : "Añadir Egreso"}
-              </h2>
+        {!arqueoActual ? (
+          <div className="bg-yellow-50 border border-yellow-300 p-4 rounded-md text-yellow-700">
+            <p className="font-medium">No hay un arqueo abierto actualmente.</p>
+            <p className="text-sm mt-1">Debe abrir un arqueo de caja para registrar egresos.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Formulario de nuevo egreso */}
+            <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold mb-4">Nuevo Egreso</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Monto ($)
+                  </label>
+                  <input
+                    type="number"
+                    name="monto"
+                    value={formData.monto}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Descripción
                   </label>
                   <input
@@ -266,62 +294,202 @@ const TableEgresos = ({ isCollapsed, arqueoActual }) => {
                     name="descripcion"
                     value={formData.descripcion}
                     onChange={handleChange}
-                    placeholder="Ingrese descripción"
-                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Descripción del egreso"
                     required
+                    disabled={loading}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Fecha
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Categoría
                   </label>
-                  <input
-                    type="date"
-                    name="fecha"
-                    value={formData.fecha}
+                  <select
+                    name="categoria"
+                    value={formData.categoria}
                     onChange={handleChange}
-                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2 border rounded-md"
+                    disabled={loading}
                     required
-                  />
+                  >
+                    <option value="">Selecciona una categoría</option>
+                    {categorias.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Monto
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Justificación (Opcional)
                   </label>
-                  <input
-                    type="number"
-                    name="monto"
-                    value={formData.monto}
+                  <textarea
+                    name="justificacion"
+                    value={formData.justificacion}
                     onChange={handleChange}
-                    placeholder="Ingrese monto"
-                    step="0.01"
-                    min="0"
-                    className="mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                    required
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Justificación del egreso"
+                    rows="3"
+                    disabled={loading}
                   />
                 </div>
-                <div className="flex gap-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded-md"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                  >
-                    {editIndex !== null ? "Actualizar" : "Guardar"}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={loading || !arqueoActual}
+                  className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 flex items-center justify-center"
+                >
+                  <PlusCircle className="w-5 h-5 mr-2" />
+                  {loading ? "Procesando..." : "Registrar Egreso"}
+                </button>
               </form>
+            </div>
+
+            {/* Listado de egresos */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Egresos Registrados</h2>
+                <div className="text-xl font-bold text-red-600">
+                  Total: {formatCurrency(calcularTotalEgresos())}
+                </div>
+              </div>
+
+              {loading && egresos.length === 0 ? (
+                <div className="text-center py-8">Cargando egresos...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Justificación</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {egresos.map((egreso, index) => (
+                        <tr key={egreso.idEgreso || `egreso-${index}`}>
+                          {editingId === egreso.idEgreso ? (
+                            // Modo edición
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  name="monto"
+                                  value={editForm.monto}
+                                  onChange={handleEditChange}
+                                  className="w-full p-1 border rounded-sm text-sm"
+                                  step="0.01" min="0.01" required
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="descripcion"
+                                  value={editForm.descripcion}
+                                  onChange={handleEditChange}
+                                  className="w-full p-1 border rounded-sm text-sm"
+                                  required
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <select
+                                  name="categoria"
+                                  value={editForm.categoria}
+                                  onChange={handleEditChange}
+                                  className="w-full p-1 border rounded-sm text-sm"
+                                  required
+                                >
+                                  <option value="Gastos Operativos">Gastos Operativos</option>
+                                  <option value="Compras Proveedores">Compras Proveedores</option>
+                                  <option value="Servicios">Servicios</option>
+                                  <option value="Otro">Otro</option>
+                                </select>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="justificacion"
+                                  value={editForm.justificacion}
+                                  onChange={handleEditChange}
+                                  className="w-full p-1 border rounded-sm text-sm"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleSaveEdit(egreso.idEgreso)}
+                                    className="text-green-600 hover:text-green-900"
+                                    disabled={loading}
+                                  >
+                                    <Check className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="text-red-600 hover:text-red-900"
+                                    disabled={loading}
+                                  >
+                                    <X className="w-5 h-5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            // Modo vista
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap font-medium text-red-600">
+                                {formatCurrency(Number(egreso.monto))}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                                {egreso.descripcion || "-"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {egreso.categoria || "-"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {egreso.justificacion || "-"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleStartEdit(egreso)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    disabled={loading}
+                                  >
+                                    <Edit className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(egreso.idEgreso)}
+                                    className="text-red-600 hover:text-red-900"
+                                    disabled={loading}
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                      {egresos.length === 0 && !loading && (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                            No hay egresos registrados para este arqueo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
-};
+}
 
-export default TableEgresos;
+export default CrudEgresos;

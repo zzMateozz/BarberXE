@@ -19,28 +19,47 @@ export class EgresoService {
         return egreso;
     }
 
+    async findByArqueoId(arqueoId: number): Promise<Egreso[]> {
+        return await EgresoRepository.find({
+            where: { arqueo: { idArqueo: arqueoId } },
+            relations: ['arqueo']
+        });
+    }
+
     async create(egresoData: CreateEgresoDto): Promise<Egreso> {
         const queryRunner = EgresoRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
         try {
-            const egreso = new Egreso();
-            egreso.monto = egresoData.monto;
-
-            // Obtener arqueo
+            // Obtener arqueo primero para validar
             const arqueo = await queryRunner.manager.findOne(ArqueoCaja, {
                 where: { idArqueo: egresoData.arqueoId }
             });
+            
             if (!arqueo) {
                 throw new Error('Arqueo de caja no encontrado');
             }
+            
+            if (arqueo.fechaCierre) {
+                throw new Error('No se pueden agregar egresos a un arqueo cerrado');
+            }
+
+            // Crear el nuevo egreso con todos los campos requeridos
+            const egreso = new Egreso();
+            egreso.monto = egresoData.monto;
+            egreso.descripcion = egresoData.descripcion;
+            egreso.fecha = new Date(); // Fecha actual
+            egreso.categoria = egresoData.categoria || null;
+            egreso.justificacion = egresoData.justificacion || null;
             egreso.arqueo = arqueo;
 
-            await queryRunner.manager.save(egreso);
+            // Guardar el egreso
+            const savedEgreso = await queryRunner.manager.save(egreso);
             await queryRunner.commitTransaction();
 
-            return await this.findById(egreso.idEgreso);
+            // Retornar el egreso guardado con sus relaciones
+            return await this.findById(savedEgreso.idEgreso);
         } catch (error) {
             await queryRunner.rollbackTransaction();
             throw error;

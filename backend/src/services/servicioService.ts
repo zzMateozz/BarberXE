@@ -22,6 +22,15 @@ export class ServicioService {
         return await ServicioRepository.findOneBy({ idServicio: id });
     }
 
+    async findByNombre(nombre: string): Promise<Servicio[]> {
+        try {
+            return await ServicioRepository.findByNombre(nombre);
+        } catch (error) {
+            console.error('Error en findByNombre:', error);
+            throw new Error('Error al buscar servicios por nombre');
+        }
+    }
+
     
     async create(servicioData: CreateServicioDto): Promise<Servicio> {
         const queryRunner = ServicioRepository.manager.connection.createQueryRunner();
