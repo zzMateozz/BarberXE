@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import iconoAdmin from "../../assets/barberia1.png";
 import { 
@@ -9,6 +9,7 @@ import {
 
 const Sidebar = ({ isCollapsed }) => {
   const [showCajaOptions, setShowCajaOptions] = useState(false);
+  const location = useLocation();
 
   return (
     <div
@@ -29,50 +30,66 @@ const Sidebar = ({ isCollapsed }) => {
       </div>
 
       <ul className="mt-3 text-white font-bold space-y-2">
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname === "/admin" ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin" className="flex items-center gap-2">
             <HomeIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Home</span>}
           </Link>
         </li>
 
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/Empleados" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname.includes("/admin/Empleados") ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin/Empleados" className="flex items-center gap-2">
             <UserGroupIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Empleados</span>}
           </Link>
         </li>
 
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/Clientes" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname.includes("/admin/Clientes") ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin/Clientes" className="flex items-center gap-2">
             <UsersIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Clientes</span>}
           </Link>
         </li>
 
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/Servicios" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname.includes("/admin/Servicios") ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin/Servicios" className="flex items-center gap-2">
             <DocumentPlusIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Servicios</span>}
           </Link>
         </li>
         
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/Cortes" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname.includes("/admin/Cortes") ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin/Cortes" className="flex items-center gap-2">
             <DocumentPlusIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Cortes</span>}
           </Link>
         </li>
 
-        <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/Citas" className="flex items-center gap-2">
+        <li className={`rounded-xl hover:shadow hover:bg-gray-700 py-3 ${
+          location.pathname.includes("/admin/Citas") ? "bg-gray-700" : ""
+        }`}>
+          <Link to="/admin/Citas" className="flex items-center gap-2">
             <CalendarIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Citas</span>}
           </Link>
         </li>
 
         {/* Ítem: Caja con submenú */}
-        <li className={`rounded-xl hover:shadow py-3 ${!isCollapsed && !showCajaOptions ? "hover:bg-gray-700" : ""}`}>
+        <li className={`rounded-xl hover:shadow py-3 ${
+          (!isCollapsed && !showCajaOptions) ? "hover:bg-gray-700" : ""
+        } ${
+          location.pathname.includes("/admin/Caja") ? "bg-gray-700" : ""
+        }`}>
           <button
             onClick={() => setShowCajaOptions(!showCajaOptions)}
             className="flex items-center gap-2 w-full text-left"
@@ -87,20 +104,26 @@ const Sidebar = ({ isCollapsed }) => {
           </button>
           {!isCollapsed && (
             <ul className={`ml-6 mt-4 space-y-2 overflow-hidden transition-all duration-300 ease-in-out ${showCajaOptions ? "opacity-100 max-h-[500px]" : "opacity-0 max-h-0"}`}>
-              <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Ingreso" className="flex items-center space-x-2">
+              <li className={`rounded-xl hover:bg-gray-700 py-2 px-2 ${
+                location.pathname.includes("/admin/Caja/Ingreso") ? "bg-gray-700" : ""
+              }`}>
+                <Link to="/admin/Caja/Ingreso" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Ingreso</span>
                 </Link>
               </li>
-              <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Egreso" className="flex items-center space-x-2">
+              <li className={`rounded-xl hover:bg-gray-700 py-2 px-2 ${
+                location.pathname.includes("/admin/Caja/Egreso") ? "bg-gray-700" : ""
+              }`}>
+                <Link to="/admin/Caja/Egreso" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Egreso</span>
                 </Link>
               </li>
-              <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Arqueo" className="flex items-center space-x-2">
+              <li className={`rounded-xl hover:bg-gray-700 py-2 px-2 ${
+                location.pathname.includes("/admin/Caja/Arqueo") ? "bg-gray-700" : ""
+              }`}>
+                <Link to="/admin/Caja/Arqueo" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Arqueo de Caja</span>
                 </Link>

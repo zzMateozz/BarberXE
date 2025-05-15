@@ -10,7 +10,9 @@ import {
   FaExclamationCircle,
   FaCheckCircle,
 } from "react-icons/fa";
-import { loginUser, createUser } from "../services/ClientService";
+import {createUser } from "../services/ClientService";
+// Actualiza las importaciones
+import { LoginService } from "../services/LoginService";
 import { toast } from "react-toastify";
 
 function Login() {
@@ -177,46 +179,43 @@ function Login() {
         setConfirmPassword("");
         setShowRegister(false);
       } else {
-        // Validaciones de login
-        if (emailError || passwordError) {
-          toast.error("Por favor corrige los errores en el formulario");
-          return;
-        }
-
         const credentials = {
-          usuario: email,
-          contraseña: password,
-        };
+        usuario: email,  // Make sure this matches your backend expectation
+        contraseña: password  // Make sure this matches your backend expectation
+      };
 
-        const response = await loginUser(credentials);
-        console.log("Respuesta del login:", response);
+        const response = await LoginService.login(credentials);
 
-        // Manejo de la respuesta del login
-        if (response.error) {
-          throw new Error(response.error);
-        }
-        // Dentro de tu función handleSubmit donde procesas la respuesta del login
-        if (response.usuario) {
-          // Normaliza el rol a minúsculas antes de guardarlo
-          const role = (response.usuario.role || "cliente").toLowerCase();
-
+        if (response) {
           localStorage.setItem(
             "authData",
             JSON.stringify({
               isAuthenticated: true,
-              user: response.usuario,
-              role: role, // Guardamos el rol en minúsculas
+              user: response,
+              role: response.role
             })
           );
 
-          toast.success(`¡Bienvenido ${response.usuario.nombre || email}!`);
+          toast.success(`¡Bienvenido ${response.user}!`);
 
-          // Redirige usando window.location para forzar recarga completa
-          window.location.href = `/${role}`;
+          // Redirigir según el rol
+          let redirectPath = '/';
+          switch (response.role) {
+            case 'admin':
+              redirectPath = '/admin';
+              break;
+            case 'empleado':
+              // Puedes verificar el cargo si necesitas diferenciar barberos/cajeros
+              redirectPath = '/empleado';
+              break;
+            case 'cliente':
+              redirectPath = '/cliente';
+              break;
+          }
+
+          window.location.href = redirectPath;
           return;
         }
-
-        throw new Error("Respuesta inesperada del servidor");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -242,9 +241,8 @@ function Login() {
 
     return (
       <div
-        className={`text-sm mt-1 flex items-center ${
-          isValid ? "text-green-600" : "text-red-600"
-        }`}
+        className={`text-sm mt-1 flex items-center ${isValid ? "text-green-600" : "text-red-600"
+          }`}
       >
         {isValid ? (
           <FaCheckCircle className="mr-1" />
@@ -274,21 +272,19 @@ function Login() {
         {/* Pestañas de navegación */}
         <div className="flex mb-6 border-b border-gray-200">
           <button
-            className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${
-              !showRegister
+            className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${!showRegister
                 ? "text-white bg-blue-600 rounded-t-lg"
                 : "text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
             onClick={() => setShowRegister(false)}
           >
             Iniciar sesión
           </button>
           <button
-            className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${
-              showRegister
+            className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${showRegister
                 ? "text-white bg-blue-600 rounded-t-lg"
                 : "text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
             onClick={handleRegister}
           >
             Registrarse

@@ -1,12 +1,28 @@
 import React, { useState } from "react";
 import { FaBars } from "react-icons/fa";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 const Navbar = ({ toggleSidebar, isCollapsed }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const navigate = useNavigate();
 
   const toggleUserDropdown = () => {
     setShowUserDropdown(!showUserDropdown);
+  };
+
+  const handleLogout = () => {
+
+    localStorage.removeItem("authData");
+    
+    toast.success("Sesión cerrada correctamente");
+  
+    navigate("/login");
+
+    setShowUserDropdown(false);
+  
+    window.location.reload();
   };
 
   return (
@@ -30,12 +46,12 @@ const Navbar = ({ toggleSidebar, isCollapsed }) => {
         </button>
         {showUserDropdown && (
           <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg py-2 z-50">
-            <a 
-              href="#"
-              className="block px-4 py-2 text-gray-800 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 hover:text-gray-900 transition-colors"
             >
               Cerrar sesión
-            </a>
+            </button>
           </div>
         )}
       </div>

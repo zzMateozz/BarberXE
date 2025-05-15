@@ -261,18 +261,22 @@ export const fetchEgresosByArqueo = async (arqueoId) => {
 export const fetchEmpleados = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/empleados`, {
-      headers: getHeaders() // Usando la función definida
+      headers: getHeaders()
     });
     
     if (!response.ok) throw new Error('Error al obtener empleados');
     
     const empleados = await response.json();
-    return empleados.filter(e => e.cargo === 'Cajero');
+    
+    // Filtrar solo cajeros activos (case insensitive)
+    return empleados.filter(e => 
+      e.cargo.toLowerCase() === 'cajero' && 
+      e.estado.toLowerCase() === 'activo'
+    );
   } catch (error) {
-    console.error('Error en fetchEmpleados:', error);
-    throw new Error('Error al obtener empleados');
+    console.error('Error en fetchCajerosActivos:', error);
+    throw new Error('Error al obtener cajeros activos');
   }
-  
 };
 
 export const updateEgreso = async (id, egresoData) => {
