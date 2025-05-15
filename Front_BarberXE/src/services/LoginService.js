@@ -18,8 +18,6 @@ export const LoginService = {
       }
 
       const data = await response.json();
-      
-         
       // Determinar el rol basado en las relaciones
       let role = 'cliente'; // Por defecto
       
