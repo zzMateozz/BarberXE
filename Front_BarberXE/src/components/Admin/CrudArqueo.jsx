@@ -19,7 +19,13 @@ const fetchEmpleados = async () => {
       }
     });
     if (!response.ok) throw new Error('Error al obtener empleados');
-    return await response.json();
+    const empleados = await response.json();
+    
+    // Filtrar solo cajeros activos (case insensitive)
+    return empleados.filter(e => 
+      e.cargo.toLowerCase() === 'cajero' && 
+      e.estado.toLowerCase() === 'activo'
+    );
   } catch (error) {
     console.error("Error fetching empleados:", error);
     return [];
