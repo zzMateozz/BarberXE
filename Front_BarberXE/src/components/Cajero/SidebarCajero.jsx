@@ -30,7 +30,7 @@ const SidebarCajero = ({ isCollapsed }) => {
 
       <ul className="mt-3 text-white font-bold space-y-2">
         <li className="rounded-xl hover:shadow hover:bg-gray-700 py-3">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/cajero" className="flex items-center gap-2">
             <HomeIcon className="h-6 w-6 text-white" />
             {!isCollapsed && <span>Home</span>}
           </Link>
@@ -52,19 +52,19 @@ const SidebarCajero = ({ isCollapsed }) => {
           {!isCollapsed && (
             <ul className={`ml-6 mt-4 space-y-2 overflow-hidden transition-all duration-300 ease-in-out ${showCajaOptions ? "opacity-100 max-h-[500px]" : "opacity-0 max-h-0"}`}>
               <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Ingreso" className="flex items-center space-x-2">
+                <Link to="/cajero/Caja/Ingreso" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Ingreso</span>
                 </Link>
               </li>
               <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Egreso" className="flex items-center space-x-2">
+                <Link to="/cajero/Caja/Egreso" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Egreso</span>
                 </Link>
               </li>
               <li className="rounded-xl hover:bg-gray-700 py-2 px-2">
-                <Link to="/Caja/Arqueo" className="flex items-center space-x-2">
+                <Link to="/cajero/Caja/Arqueo" className="flex items-center space-x-2">
                   <DocumentCurrencyDollarIcon className="h-6 w-6 text-white" />
                   <span>Arqueo de Caja</span>
                 </Link>

@@ -37,7 +37,7 @@ function App() {
                 
                 {/* Ruta protegida para empleado */}
                 <Route 
-                    path="/empleado/*" 
+                    path="/cajero/*" 
                     element={ 
                             <EmpleadoPage />
                     } 

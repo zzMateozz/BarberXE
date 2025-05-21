@@ -205,8 +205,7 @@ function Login() {
               redirectPath = '/admin';
               break;
             case 'empleado':
-              // Puedes verificar el cargo si necesitas diferenciar barberos/cajeros
-              redirectPath = '/empleado';
+              redirectPath = '/cajero';
               break;
             case 'cliente':
               redirectPath = '/cliente';
