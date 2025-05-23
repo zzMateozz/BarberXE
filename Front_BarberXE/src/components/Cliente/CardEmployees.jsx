@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { fetchEmployees, searchEmployeesByName } from "../../services/EmployeeService.js";
-import { toast } from "react-toastify";
 
 const styles = {
   searchContainer: "mb-6 flex justify-center",

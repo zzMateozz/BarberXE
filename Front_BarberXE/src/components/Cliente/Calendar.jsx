@@ -40,7 +40,7 @@ export function DatePicker({ value, onChange, error }) {
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {dateValue ? format(dateValue, "dd/MM/yyyy", { locale: es }) : "Selecciona fecha"}
+          {dateValue ? format(dateValue, "PPP", { locale: es }) : "Selecciona fecha"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">

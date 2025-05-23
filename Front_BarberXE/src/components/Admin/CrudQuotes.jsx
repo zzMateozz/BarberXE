@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import { PlusCircleIcon } from "@heroicons/react/24/outline";
+"use client"
+import React, { useState, useEffect } from "react"
+import { Pencil, Trash2, Search, Plus, Calendar, Clock, User, Users, Scissors, Check, X, Loader2 } from "lucide-react"
 import {
   fetchCitas,
   createCita,
@@ -9,46 +9,45 @@ import {
   fetchClientes,
   fetchEmpleados,
   fetchServicios,
-  checkDisponibilidadEmpleado,
-} from "../../services/QuotesService.js";
-import { toast } from "react-toastify";
-import Select from "react-select";
+} from "../../services/QuotesService.js"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-const styles = {
-  tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
-  table: "w-full table-auto border-collapse",
-  th: "min-w-[80px] py-2 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
-  td: "py-2 px-2 md:py-4 md:px-3 text-center text-xs md:text-base border-b border-gray-200",
-  button:
-    "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
-  editButton: "text-blue-500 hover:bg-blue-100",
-  deleteButton: "text-red-500 hover:bg-red-100",
-};
+import { toast } from "react-toastify"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { DatePicker } from "../Cliente/Calendar.jsx"
+import { getDate } from "date-fns"
 
 const ValidationMessage = ({ message, isValid }) => {
-  if (!message) return null;
+  if (!message) return null
 
   return (
-    <div
-      className={`text-sm mt-1 ${isValid ? "text-green-600" : "text-red-600"}`}
-    >
-      {message}
+    <div className={`flex items-center gap-1.5 text-xs mt-1 ${isValid ? "text-green-600" : "text-red-500"}`}>
+      {isValid ? <Check size={12} /> : <X size={12} />}
+      <span>{message}</span>
     </div>
-  );
-};
+  )
+}
 
 const TableCitas = ({ isCollapsed }) => {
-  const [citas, setCitas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [editingCitaId, setEditingCitaId] = useState(null);
+  const [citas, setCitas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showModal, setShowModal] = useState(false)
+  const [editingCitaId, setEditingCitaId] = useState(null)
 
   // Datos para combobox
-  const [clientes, setClientes] = useState([]);
-  const [empleados, setEmpleados] = useState([]);
-  const [servicios, setServicios] = useState([]);
+  const [clientes, setClientes] = useState([])
+  const [empleados, setEmpleados] = useState([])
+  const [servicios, setServicios] = useState([])
+  const [barberos, setBarberos] = useState([])
 
   // Formulario
   const [formData, setFormData] = useState({
@@ -57,29 +56,31 @@ const TableCitas = ({ isCollapsed }) => {
     cliente: null,
     empleado: null,
     servicios: [],
-  });
+  })
 
   // Errores de validación
-  const [fechaError, setFechaError] = useState("");
-  const [horaError, setHoraError] = useState("");
-  const [clienteError, setClienteError] = useState("");
-  const [empleadoError, setEmpleadoError] = useState("");
-  const [serviciosError, setServiciosError] = useState("");
-  const [disponibilidadError, setDisponibilidadError] = useState("");
-  const [barberos, setBarberos] = useState([]);
+  const [fechaError, setFechaError] = useState("")
+  const [horaError, setHoraError] = useState("")
+  const [clienteError, setClienteError] = useState("")
+  const [empleadoError, setEmpleadoError] = useState("")
+  const [serviciosError, setServiciosError] = useState("")
+  const [setDisponibilidadError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+
 
   // Generar horas disponibles (8:00 AM - 10:00 PM cada 30 minutos)
   const horasDisponibles = Array.from({ length: 28 }, (_, i) => {
-    const hour = 8 + Math.floor(i / 2);
-    const minute = i % 2 === 0 ? "00" : "30";
-    return `${hour.toString().padStart(2, "0")}:${minute}`;
-  });
+    const hour = 8 + Math.floor(i / 2)
+    const minute = i % 2 === 0 ? "00" : "30"
+    return `${hour.toString().padStart(2, "0")}:${minute}`
+  })
 
   // Cargar datos iniciales
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true);
+        setLoading(true)
         const [citasData, clientesData, empleadosData, serviciosData] =
           await Promise.all([
             fetchCitas(),
@@ -91,31 +92,32 @@ const TableCitas = ({ isCollapsed }) => {
                 duracion: parseInt(s.duracion) || 0,
               }))
             ),
-          ]);
-        setCitas(citasData);
-        setClientes(clientesData);
-        setEmpleados(empleadosData);
+          ])
+
+        setCitas(citasData)
+        setClientes(clientesData)
+        setEmpleados(empleadosData)
         setBarberos(
           empleadosData.filter(
             (e) =>
               e.cargo.trim().toLowerCase() === "barbero" &&
               e.estado?.trim().toLowerCase() === "activo"
           )
-        );             
+        )
         setServicios(
           serviciosData.filter(
             (s) => s.estado?.trim().toLowerCase() === "activo"
           )
-        );        
-        setLoading(false);
+        )
+        setLoading(false)
       } catch (err) {
-        setError(err.message);
-        setLoading(false);
+        setError(err.message)
+        setLoading(false)
       }
-    };
+    }
 
-    loadData();
-  }, []);
+    loadData()
+  }, [])
 
   // Buscar citas por cliente
   useEffect(() => {
@@ -126,31 +128,31 @@ const TableCitas = ({ isCollapsed }) => {
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
           cita.cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setCitas(filtered);
+      )
+      setCitas(filtered)
     } else {
       const reloadCitas = async () => {
         try {
-          const citasData = await fetchCitas();
-          setCitas(citasData);
+          const citasData = await fetchCitas()
+          setCitas(citasData)
         } catch (err) {
-          setError(err.message);
+          setError(err.message)
         }
-      };
-      reloadCitas();
+      }
+      reloadCitas()
     }
-  }, [searchTerm]);
+  }, [searchTerm])
 
   const openModal = (citaId = null) => {
-    setShowModal(true);
-    setEditingCitaId(citaId);
+    setShowModal(true)
+    setEditingCitaId(citaId)
 
     if (citaId !== null) {
-      const citaToEdit = citas.find((c) => c.idCita === citaId);
+      const citaToEdit = citas.find((c) => c.idCita === citaId)
       if (citaToEdit) {
-        const fechaObj = new Date(citaToEdit.fecha);
-        const fecha = fechaObj.toISOString().split("T")[0];
-        const hora = fechaObj.toTimeString().substring(0, 5);
+        const fechaObj = new Date(citaToEdit.fecha)
+        const fecha = fechaObj.toISOString().split("T")[0]
+        const hora = fechaObj.toTimeString().substring(0, 5)
 
         setFormData({
           fecha,
@@ -158,7 +160,7 @@ const TableCitas = ({ isCollapsed }) => {
           cliente: citaToEdit.cliente,
           empleado: citaToEdit.empleado,
           servicios: citaToEdit.servicios,
-        });
+        })
       }
     } else {
       setFormData({
@@ -167,148 +169,138 @@ const TableCitas = ({ isCollapsed }) => {
         cliente: null,
         empleado: null,
         servicios: [],
-      });
+      })
     }
 
-    setFechaError("");
-    setHoraError("");
-    setClienteError("");
-    setEmpleadoError("");
-    setServiciosError("");
-    setDisponibilidadError("");
-  };
+    setFechaError("")
+    setHoraError("")
+    setClienteError("")
+    setEmpleadoError("")
+    setServiciosError("")
+    setDisponibilidadError("")
+  }
+
 
   const closeModal = () => {
-    setShowModal(false);
-    setEditingCitaId(null);
-    setError(null);
-  };
+    setShowModal(false)
+    setEditingCitaId(null)
+    setError(null)
+  }
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
   const handleSelectChange = (name, value) => {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }));
-  };
+    }))
+  }
 
   const validateForm = () => {
-    let isValid = true;
+    let isValid = true
 
-    // Validar fecha
     if (!formData.fecha) {
-      setFechaError("La fecha es requerida");
-      isValid = false;
+      setFechaError("La fecha es requerida")
+      isValid = false
     } else {
-      setFechaError("");
+      setFechaError("")
     }
 
-    // Validar hora
     if (!formData.hora) {
-      setHoraError("La hora es requerida");
-      isValid = false;
+      setHoraError("La hora es requerida")
+      isValid = false
     } else {
-      setHoraError("");
+      setHoraError("")
     }
 
-    // Validar cliente
     if (!formData.cliente) {
-      setClienteError("Seleccione un cliente");
-      isValid = false;
+      setClienteError("Seleccione un cliente")
+      isValid = false
     } else {
-      setClienteError("");
+      setClienteError("")
     }
 
-    // Validar empleado
     if (!formData.empleado) {
-      setEmpleadoError("Seleccione un empleado");
-      isValid = false;
+      setEmpleadoError("Seleccione un empleado")
+      isValid = false
     } else {
-      setEmpleadoError("");
+      setEmpleadoError("")
     }
 
-    // Validar servicios
     if (formData.servicios.length === 0) {
-      setServiciosError("Seleccione al menos un servicio");
-      isValid = false;
+      setServiciosError("Seleccione al menos un servicio")
+      isValid = false
     } else {
-      setServiciosError("");
+      setServiciosError("")
     }
 
-    // Validar fecha y hora juntas (solo si ambos están presentes)
     if (formData.fecha && formData.hora) {
-      const fechaSeleccionada = new Date(`${formData.fecha}T${formData.hora}`);
-      const ahora = new Date();
+      const fechaSeleccionada = new Date(`${formData.fecha}T${formData.hora}`)
+      const ahora = new Date()
 
-      // Permitir citas con al menos 2 horas de anticipación
-      const margenAnticipacion = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
-      const fechaMinima = new Date(ahora.getTime() + margenAnticipacion);
+      const margenAnticipacion = 2 * 60 * 60 * 1000
+      const fechaMinima = new Date(ahora.getTime() + margenAnticipacion)
 
-      // Comprobar si la fecha seleccionada es hoy
       const esMismoDia =
-        fechaSeleccionada.toDateString() === ahora.toDateString();
+        fechaSeleccionada.toDateString() === ahora.toDateString()
 
       if (esMismoDia && fechaSeleccionada < fechaMinima) {
         setFechaError(
           "Para citas hoy, debe agendar con al menos 2 horas de anticipación"
-        );
-        isValid = false;
+        )
+        isValid = false
       } else if (fechaSeleccionada < ahora) {
-        setFechaError("No puede agendar citas en el pasado");
-        isValid = false;
+        setFechaError("No puede agendar citas en el pasado")
+        isValid = false
       } else {
-        setFechaError("");
+        setFechaError("")
       }
 
-      // Validar horario laboral (8:00 - 22:00)
-      const [horas, minutos] = formData.hora.split(":").map(Number);
+      const [horas, minutos] = formData.hora.split(":").map(Number)
       if (horas < 8 || horas >= 22 || (horas === 21 && minutos > 0)) {
-        setHoraError("Horario laboral: 8:00 - 22:00");
-        isValid = false;
+        setHoraError("Horario laboral: 8:00 - 22:00")
+        isValid = false
       } else {
-        setHoraError("");
+        setHoraError("")
       }
     }
 
-    return isValid;
-  };
-
-  const handleServiciosChange = (selectedOptions) => {
-    const serviciosSeleccionados = selectedOptions.map((option) =>
-      servicios.find((servicio) => servicio.idServicio === option.value)
-    );
-
-    setFormData((prev) => ({
-      ...prev,
-      servicios: serviciosSeleccionados,
-    }));
-    const duracionTotal = serviciosSeleccionados.reduce(
-      (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
-      0
-    );
-
-    console.log("Servicios seleccionados:", serviciosSeleccionados);
-    console.log("Duración total:", duracionTotal, "minutos");
-  };
+    return isValid
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
+    setSubmitting(true)
 
     if (!validateForm()) {
-      toast.error("Por favor complete todos los campos requeridos");
-      return;
+      toast.error("Por favor complete todos los campos requeridos")
+      setSubmitting(false)
+      return
     }
 
     try {
-      const fechaHora = new Date(`${formData.fecha}T${formData.hora}`);
+      const fechaSolo = formData.fecha?.split("T")[0]; // obtiene solo "YYYY-MM-DD"
+      const hora = formData.hora; // "HH:mm"
+
+      if (!fechaSolo || !hora) throw new Error("Fecha u hora incompleta");
+
+      const [year, month, day] = fechaSolo.split("-").map(Number);
+      const [hour, minute] = hora.split(":").map(Number);
+
+      const fechaHora = new Date(year, month - 1, day, hour, minute);
+
+      if (isNaN(fechaHora.getTime())) {
+        throw new Error("Fecha y hora inválidas");
+      }
+
+
       const duracionTotal = formData.servicios.reduce(
         (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
         0
-      );
+      )
 
       const citaData = {
         fecha: fechaHora.toISOString(),
@@ -316,10 +308,10 @@ const TableCitas = ({ isCollapsed }) => {
         empleadoId: formData.empleado.idEmpleado,
         servicioIds: formData.servicios.map((s) => s.idServicio),
         duracionTotal,
-      };
+      }
 
       if (editingCitaId) {
-        await updateCita(editingCitaId, citaData);
+        await updateCita(editingCitaId, citaData)
         toast.success(
           <div>
             <p>Cita actualizada correctamente</p>
@@ -333,9 +325,9 @@ const TableCitas = ({ isCollapsed }) => {
             </p>
           </div>,
           { autoClose: 8000 }
-        );
+        )
       } else {
-        const nuevaCita = await createCita(citaData);
+        const nuevaCita = await createCita(citaData)
         toast.success(
           <div>
             <p>Cita creada correctamente</p>
@@ -349,35 +341,24 @@ const TableCitas = ({ isCollapsed }) => {
             </p>
           </div>,
           { autoClose: 8000 }
-        );
+        )
       }
 
-      const citasActualizadas = await fetchCitas();
-      setCitas(citasActualizadas);
-      closeModal();
+      const citasActualizadas = await fetchCitas()
+      setCitas(citasActualizadas)
+      closeModal()
     } catch (error) {
-      console.error("Error completo:", {
-        message: error.message,
-        stack: error.stack,
-        response: error.response?.data,
-      });
+      console.error("Error al guardar cita:", error)
 
       const duracionTotal = formData.servicios.reduce(
         (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
         0
-      );
+      )
 
-      // Manejo mejorado de conflictos
-      if (
-        error.response?.status === 409 ||
-        error.message.includes("Conflicto")
-      ) {
-        const rawMessage = error.response?.data?.error || error.message;
-
-        const horarioOcupado =
-          extractTimeRange(rawMessage) || "Horario no disponible";
-        const duracionOcupada =
-          extractDuration(rawMessage) || "No especificada";
+      if (error.response?.status === 409 || error.message.includes("Conflicto")) {
+        const rawMessage = error.response?.data?.error || error.message
+        const horarioOcupado = extractTimeRange(rawMessage) || "Horario no disponible"
+        const duracionOcupada = extractDuration(rawMessage) || "No especificada"
 
         toast.error(
           <div>
@@ -396,7 +377,7 @@ const TableCitas = ({ isCollapsed }) => {
             </p>
           </div>,
           { autoClose: 10000 }
-        );
+        )
       } else {
         toast.error(
           <div>
@@ -406,349 +387,521 @@ const TableCitas = ({ isCollapsed }) => {
             <p>{error.response?.data?.message || error.message}</p>
           </div>,
           { autoClose: 5000 }
-        );
+        )
       }
+    } finally {
+      setSubmitting(false)
     }
-  };
+  }
 
   const extractTimeRange = (message) => {
     const timeRegex =
-      /(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?\s*[-a]\s*(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?/i;
-    const match = message.match(timeRegex);
-    if (!match) return null;
-  
-    const start = match[1]; // Hora de inicio (hora: minutos)
-    const end = match[4]; // Hora de fin (hora: minutos)
-    
-    // Verificar y devolver el rango con formato militar (hora de 24 horas)
-    return `${cleanTime(start, match[3])} - ${cleanTime(end, match[6])}`; 
-  };
-  
-  // Función para convertir la hora a formato de 24 horas (militar) y asegurar que no pase de las 22:00
+      /(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?\s*[-a]\s*(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?/i
+    const match = message.match(timeRegex)
+    if (!match) return null
+
+    const start = match[1]
+    const end = match[4]
+
+    return `${cleanTime(start, match[3])} - ${cleanTime(end, match[6])}`
+  }
+
   const cleanTime = (timeStr, ampm) => {
-    const [hour, minute] = timeStr.split(":").map(Number);
-  
-    let adjustedHour = hour;
-  
-    // Ajuste de hora según AM/PM
+    const [hour, minute] = timeStr.split(":").map(Number)
+
+    let adjustedHour = hour
+
     if (ampm) {
       if (ampm.toLowerCase().includes("a\. m\.") && hour === 12) {
-        adjustedHour = 0; // Convertir 12 AM a 00
+        adjustedHour = 0
       } else if (ampm.toLowerCase().includes("p\. m\.") && hour !== 12) {
-        adjustedHour += 12; // Convertir PM (excepto 12 PM)
+        adjustedHour += 12
       }
     }
-  
-    // Asegurarse de que la hora no sea mayor que 22 (10:00 PM)
+
     if (adjustedHour >= 22) {
-      adjustedHour = 22;
+      adjustedHour = 22
     }
-  
-    // Regresar la hora en formato militar (24 horas)
-    return `${adjustedHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-  };
-  
+
+    return `${adjustedHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+  }
 
   const extractDuration = (message) => {
-    const durationRegex = /una cita de (\d+) minutos/i;
-    const match = message.match(durationRegex);
-    return match ? match[1] : null;
-  };
+    const durationRegex = /una cita de (\d+) minutos/i
+    const match = message.match(durationRegex)
+    return match ? match[1] : null
+  }
 
-  // Función para calcular hora final
   const calculateEndTime = (startTime, durationMinutes) => {
-    const [hours, minutes] = startTime.split(":").map(Number);
-    const startDate = new Date();
-    startDate.setHours(hours, minutes, 0, 0);
+    const [hours, minutes] = startTime.split(":").map(Number)
+    const startDate = new Date()
+    startDate.setHours(hours, minutes, 0, 0)
 
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
-    return endDate.toTimeString().substring(0, 5);
-  };
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000)
+    return endDate.toTimeString().substring(0, 5)
+  }
 
   const handleDelete = async (citaId) => {
-    try {
-      await deleteCita(citaId);
-      setCitas((prev) => prev.filter((c) => c.idCita !== citaId));
-      toast.success("Cita eliminada con éxito");
-    } catch (err) {
-      toast.error(err.message || "Error al eliminar la cita");
+    if (window.confirm("¿Está seguro que desea eliminar esta cita?")) {
+      try {
+        await deleteCita(citaId)
+        setCitas((prev) => prev.filter((c) => c.idCita !== citaId))
+        toast.success("Cita eliminada con éxito")
+      } catch (err) {
+        toast.error(err.message || "Error al eliminar la cita")
+      }
     }
-  };
+  }
 
   const formatFechaHora = (fechaString) => {
-    const fecha = new Date(fechaString);
+    const fecha = new Date(fechaString)
     return fecha.toLocaleDateString("es-ES", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    });
-  };
+    })
+  }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
       </div>
-    );
+    )
   }
 
   if (error) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-        <strong className="font-bold">Error!</strong>
-        <span className="block sm:inline"> {error}</span>
+      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md mb-6">
+        <div className="flex items-center">
+          <X className="h-5 w-5 text-red-500 mr-2" />
+          <span className="text-red-700">{error}</span>
+        </div>
       </div>
-    );
+    )
   }
 
   return (
-    <section className="py-16 lg:py-20">
+    <section className="py-8">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between mb-4">
-          <button
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Gestión de Citas</h1>
+          <p className="text-zinc-500 text-sm">Administra las citas de tus clientes</p>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+          <Button
             onClick={() => openModal()}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
+            className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white font-medium py-2 px-4 rounded-md flex items-center gap-2 transition-colors"
           >
-            <PlusCircleIcon className="w-6 h-6" /> Agregar Cita
-          </button>
-          <input
-            type="text"
-            placeholder="Buscar por cliente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-          />
+            <Plus size={18} /> Nueva Cita
+          </Button>
+
+          <div className="relative w-full md:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={18} className="text-zinc-400" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Buscar por cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full bg-white border border-zinc-300 text-zinc-900 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder-zinc-400"
+            />
+          </div>
         </div>
 
-        <div
-          className={`${styles.tableContainer} ${
-            isCollapsed ? "mx-4" : "mx-0"
-          }`}
-        >
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Fecha y Hora</th>
-                <th className={styles.th}>Cliente</th>
-                <th className={styles.th}>Empleado</th>
-                <th className={styles.th}>Servicios</th>
-                <th className={styles.th}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {citas.map((cita) => (
-                <tr key={cita.idCita} className="bg-neutral-100">
-                  <td className={styles.td}>{formatFechaHora(cita.fecha)}</td>
-                  <td className={styles.td}>
-                    {cita.cliente
-                      ? `${cita.cliente.nombre} ${cita.cliente.apellido}`
-                      : "Cliente no asignado"}
-                  </td>
-                  <td className={styles.td}>
-                    {cita.empleado.nombre} {cita.empleado.apellido}
-                  </td>
-                  <td className={styles.td}>
-                    {cita.servicios.map((s) => s.nombre).join(", ")}
-                  </td>
-                  <td className={styles.td}>
-                    <button
-                      onClick={() => openModal(cita.idCita)}
-                      className={`${styles.button} ${styles.editButton} mr-2`}
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(cita.idCita)}
-                      className={`${styles.button} ${styles.deleteButton}`}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
+        <div className="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-zinc-50">
+                  <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} className="text-zinc-400" />
+                      <span>Fecha y Hora</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-zinc-400" />
+                      <span>Cliente</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <Users size={14} className="text-zinc-400" />
+                      <span>Empleado</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <Scissors size={14} className="text-zinc-400" />
+                      <span>Servicios</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                    Acciones
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {citas.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-8 text-center text-zinc-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <Calendar size={24} className="text-zinc-300" />
+                        <p>No se encontraron citas</p>
+                        <Button
+                          variant="link"
+                          onClick={() => openModal()}
+                          className="text-red-500 hover:text-red-600 text-sm"
+                        >
+                          Agregar una cita
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  citas.map((cita) => (
+                    <tr key={cita.idCita} className="hover:bg-zinc-50 transition-colors">
+                      <td className="py-3 px-4 text-sm text-zinc-700">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} className="text-zinc-400" />
+                          {formatFechaHora(cita.fecha)}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-zinc-700">
+                        {cita.cliente
+                          ? `${cita.cliente.nombre} ${cita.cliente.apellido}`
+                          : "Cliente no asignado"}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-zinc-700">
+                        {cita.empleado.nombre} {cita.empleado.apellido}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-zinc-700">
+                        <div className="flex flex-wrap gap-1">
+                          {cita.servicios.map((s) => (
+                            <Button key={s.idServicio} variant="outline" className="text-xs">
+                              {s.nombre}
+                            </Button>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            onClick={() => openModal(cita.idCita)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+                            title="Editar"
+                          >
+                            <Pencil size={15} />
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(cita.idCita)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={15} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {citas.length > 0 && (
+            <div className="py-3 px-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
+              <div>
+                Mostrando <span className="font-medium">{citas.length}</span> citas
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs border-zinc-300 text-zinc-700"
+                  disabled
+                >
+                  Anterior
+                </Button>
+                <span className="px-2 py-1 bg-red-500 text-white rounded-md">1</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs border-zinc-300 text-zinc-700"
+                  disabled
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
-                {editingCitaId !== null ? "Editar Cita" : "Nueva Cita"}
-              </h2>
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                  {error}
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in-90 zoom-in-90 duration-200"
+              style={{ maxHeight: "90vh" }}
+            >
+              <div className="bg-gradient-to-r from-zinc-800 to-black px-6 py-5 relative">
+                <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-zinc-600 to-zinc-800"></div>
+                <div className="flex items-center gap-3">
+                  {editingCitaId !== null ? (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Pencil className="text-white h-6 w-6" />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Plus className="text-white h-6 w-6" />
+                    </div>
+                  )}
+                  <h2 className="text-xl font-bold text-white">
+                    {editingCitaId !== null ? "Editar Cita" : "Nueva Cita"}
+                  </h2>
                 </div>
-              )}
-              <form onSubmit={handleSubmit} className="space-y-4">
+                <p className="text-white/80 text-sm mt-1">
+                  {editingCitaId !== null
+                    ? "Actualiza la información de la cita"
+                    : "Complete el formulario para registrar una nueva cita"}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
+                {error && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <X className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Fecha <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-zinc-500" />
+                        <span>Fecha <span className="text-red-500">*</span></span>
+                      </div>
                     </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        name="fecha"
-                        value={formData.fecha}
-                        onChange={handleChange}
-                        min={new Date().toISOString().split("T")[0]}
-                        className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${
-                          fechaError ? "border-red-500" : "border-gray-300"
-                        }`}
-                        required
-                      />
-                    </div>
+                    <DatePicker
+                      value={formData.fecha}
+                      onChange={(newDate) => handleChange({ target: { name: "fecha", value: newDate } })}
+                      error={fechaError}
+                    />
                     <ValidationMessage message={fechaError} isValid={false} />
                   </div>
 
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Hora <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} className="text-zinc-500" />
+                        <span>Hora <span className="text-red-500">*</span></span>
+                      </div>
                     </label>
-                    <div className="relative">
-                      <select
-                        name="hora"
-                        value={formData.hora}
-                        onChange={handleChange}
-                        className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${
-                          horaError ? "border-red-500" : "border-gray-300"
-                        }`}
-                        required
-                      >
-                        <option value="">Seleccione hora</option>
+                    <Select
+                      value={formData.hora}
+                      onValueChange={(value) => handleSelectChange("hora", value)}
+                    >
+                      <SelectTrigger className={`w-full ${horaError ? "border-red-300 focus:ring-red-500" : ""}`}>
+                        <SelectValue placeholder="Seleccione hora" />
+                      </SelectTrigger>
+                      <SelectContent>
                         {horasDisponibles.map((hora) => (
-                          <option key={hora} value={hora}>
+                          <SelectItem key={hora} value={hora}>
                             {hora}
-                          </option>
+                          </SelectItem>
                         ))}
-                      </select>
-                    </div>
+                      </SelectContent>
+                    </Select>
                     <ValidationMessage message={horaError} isValid={false} />
                   </div>
                 </div>
 
+                {/* Select de Cliente */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Cliente <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-zinc-500" />
+                      <span>Cliente <span className="text-red-500">*</span></span>
+                    </div>
                   </label>
                   <Select
-                    options={clientes.map((c) => ({
-                      value: c.idCliente,
-                      label: `${c.nombre} ${c.apellido}`,
-                    }))}
-                    value={
-                      formData.cliente
-                        ? {
-                            value: formData.cliente.idCliente,
-                            label: `${formData.cliente.nombre} ${formData.cliente.apellido}`,
-                          }
-                        : null
-                    }
-                    onChange={(selected) =>
+                    value={formData.cliente?.idCliente || ""}
+                    onValueChange={(value) =>
                       handleSelectChange(
                         "cliente",
-                        clientes.find((c) => c.idCliente === selected.value)
+                        clientes.find((c) => c.idCliente === value)
                       )
                     }
-                    placeholder="Seleccione un cliente"
-                    className="mt-1"
-                  />
+                  >
+                    <SelectTrigger className={`w-full ${clienteError ? "border-red-300 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder="Seleccione un cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.length > 0 ? (
+                        clientes.map((cliente) => (
+                          <SelectItem key={cliente.idCliente} value={cliente.idCliente}>
+                            {`${cliente.nombre} ${cliente.apellido}`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem disabled value="none">
+                          No hay clientes disponibles
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                   <ValidationMessage message={clienteError} isValid={false} />
                 </div>
 
+                {/* Select de Barbero */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Empleado <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    <div className="flex items-center gap-2">
+                      <Users size={14} className="text-zinc-500" />
+                      <span>Barbero <span className="text-red-500">*</span></span>
+                    </div>
                   </label>
                   <Select
-                    options={barberos.map((e) => ({
-                      value: e.idEmpleado,
-                      label: `${e.nombre} ${e.apellido}`,
-                    }))}
-                    value={
-                      formData.empleado
-                        ? {
-                            value: formData.empleado.idEmpleado,
-                            label: `${formData.empleado.nombre} ${formData.empleado.apellido}`,
-                          }
-                        : null
-                    }
-                    onChange={(selected) =>
+                    value={formData.empleado?.idEmpleado || ""}
+                    onValueChange={(value) =>
                       handleSelectChange(
                         "empleado",
-                        empleados.find((e) => e.idEmpleado === selected.value)
+                        empleados.find((e) => e.idEmpleado === value)
                       )
                     }
-                    placeholder="Seleccione un empleado"
-                    className="mt-1"
-                  />
+                  >
+                    <SelectTrigger className={`w-full ${empleadoError ? "border-red-300 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder="Seleccione un barbero" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {barberos.length > 0 ? (
+                        barberos.map((barbero) => (
+                          <SelectItem key={barbero.idEmpleado} value={barbero.idEmpleado}>
+                            {`${barbero.nombre} ${barbero.apellido}`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem disabled value="none">
+                          No hay barberos disponibles
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                   <ValidationMessage message={empleadoError} isValid={false} />
-                  {disponibilidadError && (
-                    <ValidationMessage
-                      message={disponibilidadError}
-                      isValid={false}
-                    />
-                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Servicios <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    <div className="flex items-center gap-2">
+                      <Scissors size={14} className="text-zinc-500" />
+                      <span>Servicios <span className="text-red-500">*</span></span>
+                    </div>
                   </label>
-                  <Select
-                    isMulti
-                    options={servicios.map((s) => ({
-                      value: s.idServicio,
-                      label: s.nombre,
-                    }))}
-                    value={formData.servicios.map((s) => ({
-                      value: s.idServicio,
-                      label: s.nombre,
-                    }))}
-                    onChange={handleServiciosChange}
-                    placeholder="Seleccione servicios"
-                    className="mt-1"
-                  />
+
+                  <div className={`border rounded-md p-2 max-h-48 overflow-y-auto ${serviciosError ? "border-red-300" : "border-zinc-300"}`}>
+                    {servicios.length > 0 ? (
+                      servicios.map(servicio => {
+                        const isChecked = formData.servicios.some(s => s.idServicio === servicio.idServicio);
+
+                        return (
+                          <label key={servicio.idServicio} className="flex items-center gap-2 mb-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox accent-blue-600"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFormData(prev => {
+                                  const nuevosServicios = checked
+                                    ? [...prev.servicios, servicio]
+                                    : prev.servicios.filter(s => s.idServicio !== servicio.idServicio);
+                                  return { ...prev, servicios: nuevosServicios };
+                                });
+                              }}
+                            />
+                            <span>{`${servicio.nombre} (${servicio.duracion} min)`}</span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-zinc-500">No hay servicios disponibles</p>
+                    )}
+                  </div>
+
                   <ValidationMessage message={serviciosError} isValid={false} />
+
                   {formData.servicios.length > 0 && (
-                    <div className="mt-2 text-sm text-gray-600">
+                    <div className="mt-2 text-sm text-zinc-600">
                       Duración total:{" "}
-                      {formData.servicios.reduce(
-                        (total, s) => total + parseInt(s.duracion || 0),
-                        0
-                      )}{" "}
-                      minutos
+                      {formData.servicios.reduce((total, s) => total + parseInt(s.duracion || 0), 0)} minutos
                     </div>
                   )}
                 </div>
 
-                <div className="flex gap-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded-md"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                  >
-                    {editingCitaId !== null ? "Actualizar" : "Guardar"}
-                  </button>
-                </div>
-              </form>
+              </div>
+              <div className="bg-zinc-50 px-6 py-4 flex justify-end gap-3 border-t border-zinc-200">
+                <Button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={submitting}
+                  variant="outline"
+                  className="text-zinc-700 border-zinc-300 hover:bg-zinc-100"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  onClick={handleSubmit}
+                  disabled={submitting || !formData.fecha || !formData.hora || !formData.cliente || !formData.empleado || formData.servicios.length === 0}
+                  className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white"
+                >
+                  {submitting ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{editingCitaId !== null ? "Actualizando..." : "Guardando..."}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {editingCitaId !== null ? (
+                        <>
+                          <Check size={16} />
+                          <span>Actualizar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          <span>Guardar</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </div>
     </section>
-  );
-};
+  )
+}
 
 export default TableCitas;
