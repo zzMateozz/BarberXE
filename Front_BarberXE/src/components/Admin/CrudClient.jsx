@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import {
-  EyeIcon,
-  EyeSlashIcon,
-  PlusCircleIcon,
-} from "@heroicons/react/24/outline";
+"use client"
+
+import { useState, useEffect } from "react"
+import { Pencil, Trash2, Search, Plus, Eye, EyeOff, X, Check, Loader2, Mail, User, Phone, Lock } from "lucide-react"
 import {
   fetchClients,
   updateClient,
@@ -12,37 +9,29 @@ import {
   fetchUsers,
   searchClientsByName,
   createUser,
-} from "../../services/ClientService.js";
-import { toast } from "react-toastify";
-
-const styles = {
-  tableContainer: "overflow-x-auto rounded-lg shadow-lg bg-white",
-  table: "w-full table-auto border-collapse",
-  th: "min-w-[80px] py-2 px-2 md:py-4 md:px-3 text-base md:text-lg font-semibold text-white bg-red-500",
-  td: "py-2 px-2 md:py-4 md:px-3 text-center text-xs md:text-base border-b border-gray-200",
-  button:
-    "px-2 py-1 md:px-3 md:py-1.5 rounded-md font-medium transition duration-200",
-  editButton: "text-blue-500 hover:bg-blue-100",
-  deleteButton: "text-red-500 hover:bg-red-100",
-};
+} from "../../services/ClientService.js"
+import { toast } from "react-toastify"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 const ValidationMessage = ({ message, isValid }) => {
-  if (!message) return null;
-  
+  if (!message) return null
+
   return (
-    <div className={`text-sm mt-1 ${isValid ? "text-green-600" : "text-red-600"}`}>
-      {message}
+    <div className={`flex items-center gap-1.5 text-xs mt-1 ${isValid ? "text-green-600" : "text-red-500"}`}>
+      {isValid ? <Check size={12} /> : <X size={12} />}
+      <span>{message}</span>
     </div>
-  );
-};
+  )
+}
 
 const TableClients = ({ isCollapsed }) => {
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [clients, setClients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showModal, setShowModal] = useState(false)
   const [formData, setFormData] = useState({
     usuario: "",
     contraseña: "",
@@ -51,198 +40,195 @@ const TableClients = ({ isCollapsed }) => {
       apellido: "",
       telefono: "",
     },
-  });
-  const [editingClientId, setEditingClientId] = useState(null);
+  })
+  const [editingClientId, setEditingClientId] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // Estados para errores de validación
-  const [nombreError, setNombreError] = useState("");
-  const [apellidoError, setApellidoError] = useState("");
-  const [telefonoError, setTelefonoError] = useState("");
-  const [usuarioError, setUsuarioError] = useState("");
-  const [contraseñaError, setContraseñaError] = useState("");
+  const [nombreError, setNombreError] = useState("")
+  const [apellidoError, setApellidoError] = useState("")
+  const [telefonoError, setTelefonoError] = useState("")
+  const [usuarioError, setUsuarioError] = useState("")
+  const [contraseñaError, setContraseñaError] = useState("")
 
   const getInputBorderClass = (value, error) => {
-    if (!value) return "border-gray-300";
-    return error ? "border-red-500 focus:ring-red-500" : "border-green-500 focus:ring-green-500";
-  };
+    if (!value) return "border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500"
+    return error
+      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+      : "border-green-300 focus:border-green-500 focus:ring-green-500"
+  }
 
   // Validaciones
   useEffect(() => {
     if (formData.cliente.nombre) {
       if (formData.cliente.nombre.length < 3) {
-        setNombreError("El nombre debe tener al menos 3 caracteres");
+        setNombreError("El nombre debe tener al menos 3 caracteres")
       } else if (formData.cliente.nombre.length > 30) {
-        setNombreError("El nombre no debe exceder 30 caracteres");
+        setNombreError("El nombre no debe exceder 30 caracteres")
       } else {
-        setNombreError("");
+        setNombreError("")
       }
     } else {
-      setNombreError("");
+      setNombreError("")
     }
-  }, [formData.cliente.nombre]);
+  }, [formData.cliente.nombre])
 
   useEffect(() => {
     if (formData.cliente.apellido) {
       if (formData.cliente.apellido.length < 3) {
-        setApellidoError("El apellido debe tener al menos 3 caracteres");
+        setApellidoError("El apellido debe tener al menos 3 caracteres")
       } else if (formData.cliente.apellido.length > 30) {
-        setApellidoError("El apellido no debe exceder 30 caracteres");
+        setApellidoError("El apellido no debe exceder 30 caracteres")
       } else {
-        setApellidoError("");
+        setApellidoError("")
       }
     } else {
-      setApellidoError("");
+      setApellidoError("")
     }
-  }, [formData.cliente.apellido]);
+  }, [formData.cliente.apellido])
 
   useEffect(() => {
     if (formData.cliente.telefono) {
       if (!/^\d+$/.test(formData.cliente.telefono)) {
-        setTelefonoError("El teléfono solo debe contener números");
+        setTelefonoError("El teléfono solo debe contener números")
       } else if (formData.cliente.telefono.length < 7) {
-        setTelefonoError("El teléfono debe tener al menos 7 dígitos");
+        setTelefonoError("El teléfono debe tener al menos 7 dígitos")
       } else if (formData.cliente.telefono.length > 10) {
-        setTelefonoError("El teléfono no debe exceder 10 dígitos");
+        setTelefonoError("El teléfono no debe exceder 10 dígitos")
       } else {
-        setTelefonoError("");
+        setTelefonoError("")
       }
     } else {
-      setTelefonoError("");
+      setTelefonoError("")
     }
-  }, [formData.cliente.telefono]);
+  }, [formData.cliente.telefono])
 
   useEffect(() => {
     if (formData.usuario) {
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/
       if (!emailRegex.test(formData.usuario)) {
-        setUsuarioError("Correo inválido. Debe incluir @ y terminar en .com");
+        setUsuarioError("Correo inválido. Debe incluir @ y terminar en .com")
       } else {
-        setUsuarioError("");
+        setUsuarioError("")
       }
     } else {
-      setUsuarioError("");
+      setUsuarioError("")
     }
-  }, [formData.usuario]);
+  }, [formData.usuario])
 
   useEffect(() => {
     if (formData.contraseña) {
       if (formData.contraseña.length < 8) {
-        setContraseñaError("La contraseña debe tener al menos 8 caracteres");
+        setContraseñaError("La contraseña debe tener al menos 8 caracteres")
       } else if (formData.contraseña.length > 12) {
-        setContraseñaError("La contraseña no debe exceder 12 caracteres");
+        setContraseñaError("La contraseña no debe exceder 12 caracteres")
       } else if (!/^[a-zA-Z0-9]{8,12}$/.test(formData.contraseña)) {
-        setContraseñaError("La contraseña solo debe contener letras y números");
+        setContraseñaError("La contraseña solo debe contener letras y números")
       } else {
-        setContraseñaError("");
+        setContraseñaError("")
       }
     } else {
-      setContraseñaError("");
+      setContraseñaError("")
     }
-  }, [formData.contraseña]);
+  }, [formData.contraseña])
 
   // Cargar clientes al montar el componente
   useEffect(() => {
     const loadCombinedData = async () => {
       try {
-        setLoading(true);
+        setLoading(true)
         // Cargar ambos conjuntos de datos en paralelo
-        const [clientsData, usersData] = await Promise.all([
-          fetchClients(),
-          fetchUsers()
-        ]);
-  
+        const [clientsData, usersData] = await Promise.all([fetchClients(), fetchUsers()])
+
         // Combinar los datos
-        const combinedData = clientsData.map(client => {
+        const combinedData = clientsData.map((client) => {
           // Buscar el usuario correspondiente a este cliente
-          const user = usersData.find(u => u.cliente?.idCliente === client.idCliente);
-          
+          const user = usersData.find((u) => u.cliente?.idCliente === client.idCliente)
+
           return {
             ...client,
-            usuario: user?.usuario || '', // Usuario o string vacío
-            user: user || null // Objeto usuario completo o null
-          };
-        });
-  
-        setClients(combinedData);
-        setLoading(false);
+            usuario: user?.usuario || "", // Usuario o string vacío
+            user: user || null, // Objeto usuario completo o null
+          }
+        })
+
+        setClients(combinedData)
+        setLoading(false)
       } catch (err) {
-        setError(err.message);
-        setLoading(false);
+        setError(err.message)
+        setLoading(false)
       }
-    };
-  
-    loadCombinedData();
-  }, []);
-  
+    }
+
+    loadCombinedData()
+  }, [])
+
   // Buscar clientes por nombre
   useEffect(() => {
     const searchClientsUser = async (term) => {
       try {
         // 1. Buscar clientes por nombre
-        const foundClients = await searchClientsByName(term);
-        
+        const foundClients = await searchClientsByName(term)
+
         // 2. Obtener todos los usuarios para hacer el match
-        const usersData = await fetchUsers();
-        
+        const usersData = await fetchUsers()
+
         // 3. Combinar los resultados
-        const combinedResults = foundClients.map(client => {
-          const user = usersData.find(u => u.cliente?.idCliente === client.idCliente);
+        const combinedResults = foundClients.map((client) => {
+          const user = usersData.find((u) => u.cliente?.idCliente === client.idCliente)
           return {
             ...client,
-            usuario: user?.usuario || '', // Usuario o string vacío
-            user: user || null // Objeto usuario completo o null
-          };
-        });
-        
-        setClients(combinedResults);
+            usuario: user?.usuario || "", // Usuario o string vacío
+            user: user || null, // Objeto usuario completo o null
+          }
+        })
+
+        setClients(combinedResults)
       } catch (err) {
-        setError(err.message);
+        setError(err.message)
       }
-    };
+    }
 
     if (searchTerm) {
       const timer = setTimeout(() => {
-        searchClientsUser(searchTerm);
-      }, 500);
+        searchClientsUser(searchTerm)
+      }, 500)
 
-      return () => clearTimeout(timer);
+      return () => clearTimeout(timer)
     } else {
       // Si no hay término de búsqueda, cargar todos los clientes con usuarios
       const loadCombinedData = async () => {
         try {
-          setLoading(true);
-          const [clientsData, usersData] = await Promise.all([
-            fetchClients(),
-            fetchUsers()
-          ]);
+          setLoading(true)
+          const [clientsData, usersData] = await Promise.all([fetchClients(), fetchUsers()])
 
-          const combinedData = clientsData.map(client => {
-            const user = usersData.find(u => u.cliente?.idCliente === client.idCliente);
+          const combinedData = clientsData.map((client) => {
+            const user = usersData.find((u) => u.cliente?.idCliente === client.idCliente)
             return {
               ...client,
-              usuario: user?.usuario || '',
-              user: user || null
-            };
-          });
+              usuario: user?.usuario || "",
+              user: user || null,
+            }
+          })
 
-          setClients(combinedData);
-          setLoading(false);
+          setClients(combinedData)
+          setLoading(false)
         } catch (err) {
-          setError(err.message);
-          setLoading(false);
+          setError(err.message)
+          setLoading(false)
         }
-      };
+      }
 
-      loadCombinedData();
+      loadCombinedData()
     }
-  }, [searchTerm]);
-  
+  }, [searchTerm])
+
   const openModal = (clientId = null) => {
-    setShowModal(true);
-    setEditingClientId(clientId);
-    
+    setShowModal(true)
+    setEditingClientId(clientId)
+
     if (clientId !== null) {
-      const clientToEdit = clients.find(c => c.idCliente === clientId);
+      const clientToEdit = clients.find((c) => c.idCliente === clientId)
       if (clientToEdit) {
         setFormData({
           usuario: clientToEdit.user?.usuario || clientToEdit.usuario || "",
@@ -250,9 +236,9 @@ const TableClients = ({ isCollapsed }) => {
           cliente: {
             nombre: clientToEdit.nombre || clientToEdit.cliente?.nombre || "",
             apellido: clientToEdit.apellido || clientToEdit.cliente?.apellido || "",
-            telefono: clientToEdit.telefono || clientToEdit.cliente?.telefono || ""
-          }
-        });
+            telefono: clientToEdit.telefono || clientToEdit.cliente?.telefono || "",
+          },
+        })
       }
     } else {
       setFormData({
@@ -261,96 +247,104 @@ const TableClients = ({ isCollapsed }) => {
         cliente: {
           nombre: "",
           apellido: "",
-          telefono: ""
-        }
-      });
+          telefono: "",
+        },
+      })
     }
-    
+
     // Resetear errores
-    setNombreError("");
-    setApellidoError("");
-    setTelefonoError("");
-    setUsuarioError("");
-    setContraseñaError("");
-  };
+    setNombreError("")
+    setApellidoError("")
+    setTelefonoError("")
+    setUsuarioError("")
+    setContraseñaError("")
+  }
 
   const closeModal = () => {
-    setShowModal(false);
+    setShowModal(false)
     setFormData({
       usuario: "",
       contraseña: "",
       cliente: {
         nombre: "",
         apellido: "",
-        telefono: ""
-      }
-    });
-    setEditingClientId(null);
-    setError(null);
-  };
+        telefono: "",
+      },
+    })
+    setEditingClientId(null)
+    setError(null)
+  }
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
 
-    let processedValue = value;
+    let processedValue = value
     if (name === "cliente.telefono" || name === "telefono") {
-      processedValue = value.replace(/\D/g, '');
+      processedValue = value.replace(/\D/g, "")
     }
 
     if (name.startsWith("cliente.")) {
-      const fieldName = name.split(".")[1];
-      setFormData(prev => ({
+      const fieldName = name.split(".")[1]
+      setFormData((prev) => ({
         ...prev,
         cliente: {
           ...prev.cliente,
           [fieldName]: processedValue,
         },
-      }));
+      }))
     } else {
-      setFormData(prev => ({ ...prev, [name]: processedValue }));
+      setFormData((prev) => ({ ...prev, [name]: processedValue }))
     }
-  };
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+    e.preventDefault()
+
     // Validaciones
-    if (nombreError || apellidoError || telefonoError || 
-        (editingClientId === null && (usuarioError || contraseñaError))) {
-      toast.error("Por favor corrija los errores en el formulario");
-      return;
+    if (
+      nombreError ||
+      apellidoError ||
+      telefonoError ||
+      (editingClientId === null && (usuarioError || contraseñaError))
+    ) {
+      toast.error("Por favor corrija los errores en el formulario")
+      return
     }
-    
+
     if (!formData.cliente.nombre || !formData.cliente.apellido || !formData.cliente.telefono) {
-      toast.error("Los campos nombre, apellido y teléfono son obligatorios");
-      return;
+      toast.error("Los campos nombre, apellido y teléfono son obligatorios")
+      return
     }
-    
+
     if (editingClientId === null && (!formData.usuario || !formData.contraseña)) {
-      toast.error("Para nuevos clientes, usuario y contraseña son obligatorios");
-      return;
+      toast.error("Para nuevos clientes, usuario y contraseña son obligatorios")
+      return
     }
 
     try {
+      setSubmitting(true)
+
       if (editingClientId !== null) {
         // Actualización
         const updatedClient = await updateClient(editingClientId, {
           nombre: formData.cliente.nombre,
           apellido: formData.cliente.apellido,
-          telefono: formData.cliente.telefono
-        });
-        
-        setClients(prev => 
-          prev.map(cli => 
-            cli.idCliente === editingClientId ? { 
-              ...cli,
-              nombre: updatedClient.nombre,
-              apellido: updatedClient.apellido,
-              telefono: updatedClient.telefono
-            } : cli
-          )
-        );
-        toast.success("Cliente actualizado con éxito");
+          telefono: formData.cliente.telefono,
+        })
+
+        setClients((prev) =>
+          prev.map((cli) =>
+            cli.idCliente === editingClientId
+              ? {
+                  ...cli,
+                  nombre: updatedClient.nombre,
+                  apellido: updatedClient.apellido,
+                  telefono: updatedClient.telefono,
+                }
+              : cli,
+          ),
+        )
+        toast.success("Cliente actualizado con éxito")
       } else {
         // Creación
         const response = await createUser({
@@ -359,9 +353,9 @@ const TableClients = ({ isCollapsed }) => {
           cliente: {
             nombre: formData.cliente.nombre,
             apellido: formData.cliente.apellido,
-            telefono: formData.cliente.telefono
-          }
-        });
+            telefono: formData.cliente.telefono,
+          },
+        })
 
         const newClient = {
           ...response.cliente,
@@ -369,267 +363,473 @@ const TableClients = ({ isCollapsed }) => {
           usuario: response.usuario,
           user: {
             usuario: response.usuario,
-            idUsuario: response.idUsuario
-          }
-        };
-        
-        setClients(prev => [...prev, newClient]);
-        toast.success("Cliente creado con éxito");
+            idUsuario: response.idUsuario,
+          },
+        }
+
+        setClients((prev) => [...prev, newClient])
+        toast.success("Cliente creado con éxito")
       }
-      closeModal();
+      closeModal()
     } catch (err) {
-      toast.error(err.message || 'Error al guardar los cambios');
+      toast.error(err.message || "Error al guardar los cambios")
+    } finally {
+      setSubmitting(false)
     }
-  };
-
-  const handleDelete = async (clientId) => {
-    try {
-      await deleteClient(clientId);
-      setClients(prev => prev.filter(c => c.idCliente !== clientId));
-      toast.success("Cliente eliminado con éxito");
-    } catch (err) {
-      toast.error(err.message || "Error al eliminar el cliente");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
-      </div>
-    );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-        <strong className="font-bold">Error!</strong>
-        <span className="block sm:inline"> {error}</span>
-      </div>
-    );
+  const handleDelete = async (clientId) => {
+    if (window.confirm("¿Está seguro que desea eliminar este cliente?")) {
+      try {
+        await deleteClient(clientId)
+        setClients((prev) => prev.filter((c) => c.idCliente !== clientId))
+        toast.success("Cliente eliminado con éxito")
+      } catch (err) {
+        toast.error(err.message || "Error al eliminar el cliente")
+      }
+    }
   }
 
   return (
-    <section className="py-16 lg:py-20">
+    <section className="py-8">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between mb-4">
-          <button
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Gestión de Clientes</h1>
+          <p className="text-zinc-500 text-sm">Administra la información de tus clientes</p>
+        </div>
+
+        {/* Barra de acciones */}
+        <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+          <Button
             onClick={() => openModal()}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
+            className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white font-medium py-2 px-4 rounded-md flex items-center gap-2 transition-colors"
           >
-            <PlusCircleIcon className="w-6 h-6" /> Agregar
-          </button>
-          <input
-            type="text"
-            placeholder="Buscar por nombre..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-          />
+            <Plus size={18} /> Nuevo Cliente
+          </Button>
+
+          <div className="relative w-full md:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={18} className="text-zinc-400" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full bg-white border border-zinc-300 text-zinc-900 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder-zinc-400"
+            />
+          </div>
         </div>
 
-        <div className={`${styles.tableContainer} ${isCollapsed ? "mx-4" : "mx-0"}`}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Usuario</th>
-                <th className={styles.th}>Nombre</th>
-                <th className={styles.th}>Apellido</th>
-                <th className={styles.th}>Teléfono</th>
-                <th className={styles.th}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((cli) => (
-                <tr key={cli.idCliente} className="bg-neutral-100">
-                  <td className={styles.td}>
-                    {cli.usuario || cli.user?.usuario || ''}
-                  </td>
-                  <td className={styles.td}>{cli.nombre || cli.cliente?.nombre}</td>
-                  <td className={styles.td}>{cli.apellido || cli.cliente?.apellido}</td>
-                  <td className={styles.td}>{cli.telefono || cli.cliente?.telefono}</td>
-                  <td className={styles.td}>
-                    <button
-                      onClick={() => openModal(cli.idCliente)}
-                      className={`${styles.button} ${styles.editButton} mr-2`}
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(cli.idCliente)}
-                      className={`${styles.button} ${styles.deleteButton}`}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
-                {editingClientId !== null ? "Editar Cliente" : "Crear Cliente y Usuario"}
-              </h2>
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                  {error}
-                </div>
-              )}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {editingClientId === null && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Nombre de Usuario (Correo)
-                      </label>
-                      <input
-                        type="email"
-                        name="usuario"
-                        value={formData.usuario}
-                        onChange={handleChange}
-                        placeholder="correo@ejemplo.com"
-                        className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.usuario, usuarioError)}`}
-                        required
-                      />
-                      <ValidationMessage message={usuarioError} isValid={false} />
-                      {formData.usuario && !usuarioError && (
-                        <ValidationMessage message="Correo válido" isValid={true} />
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Contraseña
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="contraseña"
-                          value={formData.contraseña}
-                          onChange={handleChange}
-                          placeholder="Ingrese contraseña (8-12 caracteres)"
-                          className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.contraseña, contraseñaError)}`}
-                          required
-                          minLength={8}
-                          maxLength={12}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-3 flex items-center"
-                        >
-                          {showPassword ? (
-                            <EyeSlashIcon className="w-5 h-5 text-gray-500" />
-                          ) : (
-                            <EyeIcon className="w-5 h-5 text-gray-500" />
-                          )}
-                        </button>
+        {/* Estado de carga */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64 bg-white rounded-lg shadow-sm border border-zinc-200">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 size={36} className="animate-spin text-red-500" />
+              <p className="text-zinc-500">Cargando clientes...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md mb-6">
+            <div className="flex items-center">
+              <X className="h-5 w-5 text-red-500 mr-2" />
+              <span className="text-red-700">{error}</span>
+            </div>
+          </div>
+        ) : (
+          /* Tabla mejorada */
+          <div className="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-50">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                      <div className="flex items-center gap-2">
+                        <Mail size={14} className="text-zinc-400" />
+                        <span>Usuario</span>
                       </div>
-                      <ValidationMessage message={contraseñaError} isValid={false} />
-                      {formData.contraseña && !contraseñaError && (
-                        <ValidationMessage message="Contraseña válida" isValid={true} />
-                      )}
+                    </th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                      <div className="flex items-center gap-2">
+                        <User size={14} className="text-zinc-400" />
+                        <span>Nombre</span>
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                      <div className="flex items-center gap-2">
+                        <User size={14} className="text-zinc-400" />
+                        <span>Apellido</span>
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} className="text-zinc-400" />
+                        <span>Teléfono</span>
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {clients.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-8 text-center text-zinc-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <User size={24} className="text-zinc-300" />
+                          <p>No se encontraron clientes</p>
+                          <Button
+                            variant="link"
+                            onClick={() => openModal()}
+                            className="text-red-500 hover:text-red-600 text-sm"
+                          >
+                            Agregar un cliente
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    clients.map((cli) => (
+                      <tr key={cli.idCliente} className="hover:bg-zinc-50 transition-colors">
+                        <td className="py-3 px-4 text-sm text-zinc-700">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 mr-3">
+                              <Mail size={14} />
+                            </div>
+                            <span className="truncate max-w-[180px]">{cli.usuario || cli.user?.usuario || "-"}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-zinc-700">{cli.nombre || cli.cliente?.nombre}</td>
+                        <td className="py-3 px-4 text-sm text-zinc-700">{cli.apellido || cli.cliente?.apellido}</td>
+                        <td className="py-3 px-4 text-sm text-zinc-700">
+                          <div className="flex items-center gap-1">
+                            <Phone size={14} className="text-zinc-400" />
+                            {cli.telefono || cli.cliente?.telefono}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              onClick={() => openModal(cli.idCliente)}
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+                              title="Editar"
+                            >
+                              <Pencil size={15} />
+                            </Button>
+                            <Button
+                              onClick={() => handleDelete(cli.idCliente)}
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={15} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Paginación (estática por ahora) */}
+            {clients.length > 0 && (
+              <div className="py-3 px-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
+                <div>
+                  Mostrando <span className="font-medium">{clients.length}</span> clientes
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-3 text-xs border-zinc-300 text-zinc-700"
+                    disabled
+                  >
+                    Anterior
+                  </Button>
+                  <span className="px-2 py-1 bg-red-500 text-white rounded-md">1</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-3 text-xs border-zinc-300 text-zinc-700"
+                    disabled
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in-90 zoom-in-90 duration-200"
+              style={{ maxHeight: "90vh" }}
+            >
+              {/* Encabezado con gradiente negro */}
+              <div className="bg-gradient-to-r from-zinc-800 to-black px-6 py-5 relative">
+                <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-zinc-600 to-zinc-800"></div>
+                <div className="flex items-center gap-3">
+                  {editingClientId !== null ? (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Pencil className="text-white h-6 w-6" />
                     </div>
-                  </>
+                  ) : (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Plus className="text-white h-6 w-6" />
+                    </div>
+                  )}
+                  <h2 className="text-xl font-bold text-white">
+                    {editingClientId !== null ? "Editar Cliente" : "Nuevo Cliente"}
+                  </h2>
+                </div>
+                <p className="text-white/80 text-sm mt-1">
+                  {editingClientId !== null
+                    ? "Actualiza la información del cliente"
+                    : "Complete el formulario para registrar un nuevo cliente"}
+                </p>
+              </div>
+
+              {/* Contenido con scroll */}
+              <div className="p-6 space-y-6 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
+                {/* Mensaje de error general */}
+                {error && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <X className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    name="cliente.nombre"
-                    value={formData.cliente.nombre}
-                    onChange={handleChange}
-                    placeholder="Ingrese nombre (3-30 caracteres)"
-                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.cliente.nombre, nombreError)}`}
-                    required
-                    minLength={3}
-                    maxLength={30}
-                  />
-                  <ValidationMessage message={nombreError} isValid={false} />
-                  {formData.cliente.nombre && !nombreError && (
-                    <ValidationMessage message="Nombre válido" isValid={true} />
-                  )}
-                </div>
+                {/* Sección de acceso */}
+                {editingClientId === null && (
+                  <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 p-5 rounded-xl border border-zinc-200 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-black font-medium mb-4 pb-2 border-b border-zinc-200">
+                      <Mail className="h-5 w-5 text-zinc-700" />
+                      Datos de acceso
+                    </h3>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    name="cliente.apellido"
-                    value={formData.cliente.apellido}
-                    onChange={handleChange}
-                    placeholder="Ingrese apellido (3-30 caracteres)"
-                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.cliente.apellido, apellidoError)}`}
-                    required
-                    minLength={3}
-                    maxLength={30}
-                  />
-                  <ValidationMessage message={apellidoError} isValid={false} />
-                  {formData.cliente.apellido && !apellidoError && (
-                    <ValidationMessage message="Apellido válido" isValid={true} />
-                  )}
-                </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-1">Correo electrónico</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Mail className="h-4 w-4 text-zinc-500" />
+                          </div>
+                          <Input
+                            type="email"
+                            name="usuario"
+                            value={formData.usuario}
+                            onChange={handleChange}
+                            placeholder="correo@ejemplo.com"
+                            className={`pl-10 ${usuarioError ? "border-red-300 focus:ring-red-500" : formData.usuario ? "border-green-300 focus:ring-green-500" : ""}`}
+                          />
+                        </div>
+                        {usuarioError && (
+                          <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                            <X className="h-3 w-3" /> {usuarioError}
+                          </p>
+                        )}
+                        {formData.usuario && !usuarioError && (
+                          <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Correo válido
+                          </p>
+                        )}
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    name="cliente.telefono"
-                    value={formData.cliente.telefono}
-                    onChange={handleChange}
-                    placeholder="Ingrese teléfono (7-10 dígitos)"
-                    className={`mt-1 w-full border rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 ${getInputBorderClass(formData.cliente.telefono, telefonoError)}`}
-                    required
-                    minLength={7}
-                    maxLength={10}
-                    pattern="[0-9]{7,10}"
-                  />
-                  <ValidationMessage message={telefonoError} isValid={false} />
-                  {formData.cliente.telefono && !telefonoError && (
-                    <ValidationMessage message="Teléfono válido" isValid={true} />
-                  )}
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-1">Contraseña</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Lock className="h-4 w-4 text-zinc-500" />
+                          </div>
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            name="contraseña"
+                            value={formData.contraseña}
+                            onChange={handleChange}
+                            placeholder="8-12 caracteres"
+                            className={`pl-10 pr-10 ${contraseñaError ? "border-red-300 focus:ring-red-500" : formData.contraseña ? "border-green-300 focus:ring-green-500" : ""}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-zinc-700"
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        {contraseñaError && (
+                          <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                            <X className="h-3 w-3" /> {contraseñaError}
+                          </p>
+                        )}
+                        {formData.contraseña && !contraseñaError && (
+                          <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Contraseña válida
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                <div className="flex gap-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded-md"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                    disabled={
-                      nombreError ||
-                      apellidoError ||
-                      telefonoError ||
-                      (editingClientId === null && (usuarioError || contraseñaError))
-                    }
-                  >
-                    {editingClientId !== null ? "Actualizar" : "Guardar"}
-                  </button>
+                {/* Sección de datos personales */}
+                <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 p-5 rounded-xl border border-zinc-200 shadow-sm">
+                  <h3 className="flex items-center gap-2 text-black font-medium mb-4 pb-2 border-b border-zinc-200">
+                    <User className="h-5 w-5 text-zinc-700" />
+                    Datos personales
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-1">Nombre</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <User className="h-4 w-4 text-zinc-500" />
+                          </div>
+                          <Input
+                            name="cliente.nombre"
+                            value={formData.cliente.nombre}
+                            onChange={handleChange}
+                            placeholder="Nombre"
+                            className={`pl-10 ${nombreError ? "border-red-300 focus:ring-red-500" : formData.cliente.nombre ? "border-green-300 focus:ring-green-500" : ""}`}
+                          />
+                        </div>
+                        {nombreError && (
+                          <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                            <X className="h-3 w-3" /> {nombreError}
+                          </p>
+                        )}
+                        {formData.cliente.nombre && !nombreError && (
+                          <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Nombre válido
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-1">Apellido</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <User className="h-4 w-4 text-zinc-500" />
+                          </div>
+                          <Input
+                            name="cliente.apellido"
+                            value={formData.cliente.apellido}
+                            onChange={handleChange}
+                            placeholder="Apellido"
+                            className={`pl-10 ${apellidoError ? "border-red-300 focus:ring-red-500" : formData.cliente.apellido ? "border-green-300 focus:ring-green-500" : ""}`}
+                          />
+                        </div>
+                        {apellidoError && (
+                          <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                            <X className="h-3 w-3" /> {apellidoError}
+                          </p>
+                        )}
+                        {formData.cliente.apellido && !apellidoError && (
+                          <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Apellido válido
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-1">Teléfono</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Phone className="h-4 w-4 text-zinc-500" />
+                        </div>
+                        <Input
+                          name="cliente.telefono"
+                          value={formData.cliente.telefono}
+                          onChange={handleChange}
+                          placeholder="3001234567"
+                          className={`pl-10 ${telefonoError ? "border-red-300 focus:ring-red-500" : formData.cliente.telefono ? "border-green-300 focus:ring-green-500" : ""}`}
+                        />
+                      </div>
+                      {telefonoError && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <X className="h-3 w-3" /> {telefonoError}
+                        </p>
+                      )}
+                      {formData.cliente.telefono && !telefonoError && (
+                        <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Teléfono válido
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </form>
+              </div>
+
+              {/* Footer con botones */}
+              <div className="bg-zinc-50 px-6 py-4 flex justify-end gap-3 border-t border-zinc-200">
+                <Button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={submitting}
+                  variant="outline"
+                  className="text-zinc-700 border-zinc-300 hover:bg-zinc-100"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  onClick={handleSubmit}
+                  disabled={
+                    submitting ||
+                    nombreError ||
+                    apellidoError ||
+                    telefonoError ||
+                    (editingClientId === null &&
+                      (usuarioError || contraseñaError || !formData.usuario || !formData.contraseña))
+                  }
+                  className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white"
+                >
+                  {submitting ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{editingClientId !== null ? "Actualizando..." : "Guardando..."}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {editingClientId !== null ? (
+                        <>
+                          <Check size={16} />
+                          <span>Actualizar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          <span>Guardar</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default TableClients;
+export default TableClients

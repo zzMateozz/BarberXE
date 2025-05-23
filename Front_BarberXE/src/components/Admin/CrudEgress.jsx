@@ -38,14 +38,14 @@ function CrudEgresos() {
   });
 
   const categorias = [
-  "Gastos Operativos",
-  "Compra de Insumos",
-  "Pago de Servicios",
-  "Sueldos y comisiones",
-  "Publicidad ",
-  "Mantenimiento",
-  "Otros"
-];
+    "Gastos Operativos",
+    "Compra de Insumos",
+    "Pago de Servicios",
+    "Sueldos y comisiones",
+    "Publicidad ",
+    "Mantenimiento",
+    "Otros"
+  ];
 
   // Estado para edición
   const [editingId, setEditingId] = useState(null);
@@ -179,8 +179,8 @@ function CrudEgresos() {
     setSuccess(null);
 
     if (!editForm.monto || !editForm.descripcion || !editForm.categoria) {
-        setError("Monto, descripción y categoría son requeridos para actualizar el egreso.");
-        return;
+      setError("Monto, descripción y categoría son requeridos para actualizar el egreso.");
+      return;
     }
 
     try {
@@ -241,7 +241,7 @@ function CrudEgresos() {
     <div className="min-h-[70vh] bg-gray-50 p-3">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6 flex items-center">
-          <ArrowDownCircle className="mr-2 text-red-600" /> {/* Icono para Egresos */}
+          <ArrowDownCircle className="mr-2 text-black-600" />
           Gestión de Egresos
         </h1>
 
@@ -336,8 +336,8 @@ function CrudEgresos() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading || !arqueoActual}
-                  className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 flex items-center justify-center"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-zinc-800 to-black text-white py-2 px-4 rounded-md hover:from-black hover:to-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-800 focus:ring-offset-2 disabled:opacity-70 transition-all duration-200 flex items-center justify-center"
                 >
                   <PlusCircle className="w-5 h-5 mr-2" />
                   {loading ? "Procesando..." : "Registrar Egreso"}
@@ -454,18 +454,18 @@ function CrudEgresos() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex space-x-2">
                                   <button
-                                    onClick={() => handleStartEdit(egreso)}
-                                    className="text-blue-600 hover:text-blue-900"
+                                    onClick={() => handleStartEdit(ingreso)}
+                                    className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <Edit className="w-5 h-5" />
+                                    <Edit className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() => handleDelete(egreso.idEgreso)}
-                                    className="text-red-600 hover:text-red-900"
+                                    onClick={() => handleDelete(ingreso.idIngreso)}
+                                    className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <Trash2 className="w-5 h-5" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
                               </td>

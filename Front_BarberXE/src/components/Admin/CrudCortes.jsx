@@ -1,297 +1,450 @@
-import React, { useState, useEffect } from "react";
-import { Pencil, Trash2, Upload } from "lucide-react";
-import { PlusCircleIcon } from "@heroicons/react/24/outline";
+"use client"
+import React, { useState, useEffect } from "react"
+import { Pencil, Trash2, Search, Plus, Upload, X, Check } from "lucide-react"
+import { PlusCircleIcon } from "@heroicons/react/24/outline"
 import {
-    fetchCuts,
-    createCut,
-    updateCut,
-    deleteCut,
-} from "../../services/CortesServices.js"; // Asegúrate de que la ruta sea correcta
+  fetchCuts,
+  createCut,
+  updateCut,
+  deleteCut,
+} from "../../services/CortesServices.js"
+import { toast } from "react-toastify"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 
-const IMAGE_BASE_URL = 'http://localhost:3000';
+const IMAGE_BASE_URL = 'http://localhost:3000'
 
 const TableCortes = () => {
+  const [cortes, setCortes] = useState([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showModal, setShowModal] = useState(false)
+  const [formData, setFormData] = useState({
+    estilo: "",
+    imagen: null,
+  })
+  const [previewImage, setPreviewImage] = useState(null)
+  const [editingCutId, setEditingCutId] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
-    const [cortes, setCortes] = useState([]);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({
-        estilo: "",
-        imagen: "",
-    });
+  useEffect(() => {
+    const loadCortes = async () => {
+      setLoading(true)
+      try {
+        const data = await fetchCuts()
+        const cortesConImagenes = data.map(corte => ({
+          ...corte,
+          imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null
+        }))
+        setCortes(cortesConImagenes)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadCortes()
+  }, [])
 
-    const [previewImage, setPreviewImage] = useState(null);
-    const [editIndex, setEditIndex] = useState(null);
-    const [error, setError] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const openModal = (cutId = null) => {
+    setShowModal(true)
+    setEditingCutId(cutId)
 
-    useEffect(() => {
-        const loadCortes = async () => {
-            setLoading(true);
-            try {
-                const data = await fetchCuts();
-                // Asegurarnos que las URLs de imagen son completas
-                const cortesConImagenes = data.map(corte => ({
-                    ...corte,
-                    imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null
-                }));
-                setCortes(cortesConImagenes);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadCortes();
-    }, []);
+    if (cutId !== null) {
+      const corte = cortes.find(c => c.idCorte === cutId)
+      if (corte) {
+        setFormData({
+          estilo: corte.estilo,
+          imagen: null
+        })
+        setPreviewImage(corte.imagenUrl)
+      }
+    } else {
+      setFormData({ estilo: "", imagen: null })
+      setPreviewImage(null)
+    }
+    setError(null)
+  }
 
-    const openModal = (index = null) => {
-        setShowModal(true);
-        if (index !== null) {
-        setFormData(cortes[index]);
-        setPreviewImage(cortes[index].imagen);
-        setEditIndex(index);
-        } else {
-        setFormData({ estilo: "", imagen: "" });
-        setPreviewImage(null);
-        setEditIndex(null);
+  const closeModal = () => {
+    setShowModal(false)
+    setFormData({ estilo: "", imagen: null })
+    setPreviewImage(null)
+    setEditingCutId(null)
+    setError(null)
+  }
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitting(true)
+    
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('estilo', formData.estilo)
+      
+      if (formData.imagen instanceof File) {
+        formDataToSend.append('imagen', formData.imagen)
+      }
+
+      let response
+      if (editingCutId !== null) {
+        response = await updateCut(editingCutId, formDataToSend)
+        
+        let newImageUrl = cortes.find(c => c.idCorte === editingCutId).imagenUrl
+        if (formData.imagen instanceof File) {
+          newImageUrl = URL.createObjectURL(formData.imagen)
+        } else if (response.imagenUrl) {
+          newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`
         }
-    };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setFormData({ estilo: "", imagen: "" });
-        setPreviewImage(null);
-        setEditIndex(null);
-        setError(null);
-    };
+        setCortes(prev => prev.map(item => 
+          item.idCorte === editingCutId ? {
+            ...response,
+            imagenUrl: newImageUrl
+          } : item
+        ))
+        toast.success("Corte actualizado con éxito")
+      } else {
+        response = await createCut(formDataToSend)
+        
+        let newImageUrl = null
+        if (formData.imagen instanceof File) {
+          newImageUrl = URL.createObjectURL(formData.imagen)
+        } else if (response.imagenUrl) {
+          newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`
+        }
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({
+        setCortes(prev => [...prev, {
+          ...response,
+          imagenUrl: newImageUrl
+        }])
+        toast.success("Corte creado con éxito")
+      }
+      
+      closeModal()
+    } catch (err) {
+      console.error("Error al enviar datos:", err)
+      setError(err.message || "Error al guardar el corte")
+      toast.error(err.message || "Error al guardar el corte")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setFormData((prev) => ({
         ...prev,
-        [name]: value,
-        }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const formDataToSend = new FormData();
-            formDataToSend.append('estilo', formData.estilo);
-            
-            // Asegúrate de que la imagen esté correctamente adjuntada
-            if (formData.imagen instanceof File) {
-                formDataToSend.append('imagen', formData.imagen);
-            }
-    
-            let response;
-            if (editIndex !== null) {
-                response = await updateCut(cortes[editIndex].idCorte, formDataToSend);
-                
-                // Crear URL temporal para la previsualización inmediata
-                let newImageUrl = cortes[editIndex].imagenUrl;
-                if (formData.imagen instanceof File) {
-                    newImageUrl = URL.createObjectURL(formData.imagen);
-                } else if (response.imagenUrl) {
-                    newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`;
-                }
-    
-                setCortes(prev => prev.map((item, idx) => 
-                    idx === editIndex ? {
-                        ...response,
-                        imagenUrl: newImageUrl
-                    } : item
-                ));
-            } else {
-                response = await createCut(formDataToSend);
-                
-                // Crear URL temporal para la previsualización inmediata
-                let newImageUrl = null;
-                if (formData.imagen instanceof File) {
-                    newImageUrl = URL.createObjectURL(formData.imagen);
-                } else if (response.imagenUrl) {
-                    newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`;
-                }
-    
-                setCortes(prev => [...prev, {
-                    ...response,
-                    imagenUrl: newImageUrl
-                }]);
-            }
-            
-            closeModal();
-        } catch (err) {
-            console.error("Error al enviar datos:", err);
-            setError(err.message || "Error al guardar el corte");
-        }
-    };
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setFormData((prev) => ({
-                ...prev,
-                imagen: file  // Guarda el objeto File directamente
-            }));
-            
-            // Crear URL para previsualización
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreviewImage(reader.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleDelete = async (index) => {
-        try {
-        await deleteCut(cortes[index].idCorte);
-        setCortes((prev) => prev.filter((_, i) => i !== index));
-        } catch (err) {
-        setError(err.message);
-        }
-    };
-
-    const handleSearchChange = (e) => {
-        setSearchTerm(e.target.value);
-    };
-
-    const filteredCortes = cortes.filter((corte) =>
-        corte.estilo.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    if (loading) {
-        return (
-        <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
-        </div>
-        );
+        imagen: file
+      }))
+      
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewImage(reader.result)
+      }
+      reader.readAsDataURL(file)
     }
+  }
 
-    if (error) {
-        return (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-            <strong className="font-bold">Error!</strong>
-            <span className="block sm:inline"> {error}</span>
-        </div>
-        );
+  const removeImage = () => {
+    setFormData((prev) => ({ ...prev, imagen: null }))
+    setPreviewImage(null)
+  }
+
+  const handleDelete = async (cutId) => {
+    try {
+      await deleteCut(cutId)
+      setCortes((prev) => prev.filter(c => c.idCorte !== cutId))
+      toast.success("Corte eliminado con éxito")
+    } catch (err) {
+      toast.error(err.message || "Error al eliminar el corte")
     }
+  }
 
+  const filteredCortes = cortes.filter((corte) =>
+    corte.estilo.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  if (loading) {
     return (
-        <section className="py-16 lg:py-20">
-        <div className="container mx-auto px-4">
-            <div className="flex justify-between mb-4">
-            <button
-                onClick={() => openModal()}
-                className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 flex items-center gap-2 rounded-3xl"
-            >
-                <PlusCircleIcon className="w-6 h-6" /> Agregar
-            </button>
-            <input
-                type="text"
-                placeholder="Buscar estilo..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                className="border border-gray-300 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500"
-            />
-            </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      </div>
+    )
+  }
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-20 gap-y-8 px-1 py-6">
-                    {filteredCortes.map((corte, i) => (
-                        <div key={i} className="w-60 bg-gray-100 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
-                            {corte.imagenUrl ? (
-                                <img
-                                    src={corte.imagenUrl}
-                                    alt={`Corte ${corte.estilo}`}
-                                    className="w-full h-60 object-cover"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = 'https://via.placeholder.com/300x200?text=Imagen+no+disponible';
-                                    }}
-                                />
-                            ) : (
-                                <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
-                                    <span className="text-gray-500">Sin imagen</span>
-                                </div>
-                            )}
-                            <div className="p-4">
-                                <h3 className="text-xl font-semibold">{corte.estilo}</h3>
-                                <div className="flex justify-center text-center gap-8 mt-4">
-                                    <button
-                                        onClick={() => openModal(i)}
-                                        className="text-blue-500 hover:text-blue-700 hover:scale-110 transition-transform duration-200"
-                                    >
-                                        <Pencil size={22} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(i)}
-                                        className="text-red-500 hover:text-red-700 hover:scale-110 transition-transform duration-200"
-                                    >
-                                        <Trash2 size={22} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+  if (error && !showModal) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md shadow-sm">
+        <strong className="font-bold">Error!</strong>
+        <span className="block sm:inline"> {error}</span>
+      </div>
+    )
+  }
+
+  return (
+    <section className="py-8">
+      <div className="container mx-auto px-4">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Gestión de Cortes</h1>
+          <p className="text-zinc-500">Administra los cortes de cabello disponibles</p>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+          <Button
+            onClick={() => openModal()}
+            className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white font-medium py-2 px-4 rounded-md flex items-center gap-2 transition-colors"
+          >
+            <Plus size={18} /> Nuevo Corte
+          </Button>
+
+          <div className="relative w-full md:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={18} className="text-zinc-400" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Buscar por estilo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full bg-white border border-zinc-300 text-zinc-900 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder-zinc-400"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+          {filteredCortes.length > 0 ? (
+            filteredCortes.map((corte) => (
+              <div
+                key={corte.idCorte}
+                className="bg-white rounded-lg shadow-md overflow-hidden border border-zinc-200 hover:shadow-lg transition-shadow duration-300"
+              >
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={corte.imagenUrl || "https://via.placeholder.com/300x200?text=Sin+imagen"}
+                    alt={`Corte ${corte.estilo}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null
+                      e.target.src = "https://via.placeholder.com/300x200?text=Sin+imagen"
+                    }}
+                  />
                 </div>
 
-                {showModal && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black/75 bg-opacity-50 z-50">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-200">
-                            <h2 className="text-2xl font-semibold flex items-center gap-2">
-                                <PlusCircleIcon className="w-6 h-6 text-red-500" />{" "}
-                                {editIndex !== null ? "Editar Corte" : "Añadir Corte"}
-                            </h2>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <input
-                                    type="text"
-                                    name="estilo"
-                                    value={formData.estilo}
-                                    onChange={handleChange}
-                                    placeholder="Estilo"
-                                    required
-                                    className="w-full border p-2 rounded-md"
-                                />
-                                <label className="border p-4 rounded-md flex flex-col items-center cursor-pointer">
-                                    <Upload size={32} className="text-gray-500" />
-                                    <span className="text-gray-500">Subir imagen</span>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageChange}
-                                        className="hidden"
-                                    />
-                                </label>
-                                {previewImage && (
-                                    <img
-                                        src={previewImage}
-                                        alt="Vista previa"
-                                        className="w-full h-40 object-cover mt-2 rounded-lg"
-                                    />
-                                )}
-                                <div className="flex gap-4 justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={closeModal}
-                                        className="px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded-md"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                                    >
-                                        {editIndex !== null ? "Actualizar" : "Guardar"}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </section>
-    );
-};
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-zinc-800 text-center">
+                    {corte.estilo}
+                  </h3>
 
-export default TableCortes;
+                  <div className="flex justify-center gap-4 mt-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openModal(corte.idCorte)}
+                      className="text-zinc-600 hover:text-zinc-900"
+                    >
+                      <Pencil size={16} className="mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(corte.idCorte)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 size={16} className="mr-1" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-10">
+              <p className="text-zinc-500">
+                {searchTerm
+                  ? "No se encontraron cortes con ese nombre"
+                  : "No hay cortes registrados"}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Modal */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div
+              className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in-90 zoom-in-90 duration-200"
+              style={{ maxHeight: "90vh" }}
+            >
+              <div className="bg-gradient-to-r from-zinc-800 to-black px-6 py-5 relative">
+                <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-zinc-600 to-zinc-800"></div>
+                <div className="flex items-center gap-3">
+                  {editingCutId !== null ? (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Pencil className="text-white h-6 w-6" />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <PlusCircleIcon className="text-white h-6 w-6" />
+                    </div>
+                  )}
+                  <h2 className="text-xl font-bold text-white">
+                    {editingCutId !== null ? "Editar Corte" : "Nuevo Corte"}
+                  </h2>
+                </div>
+                <p className="text-white/80 text-sm mt-1">
+                  {editingCutId !== null
+                    ? "Actualiza la información del corte"
+                    : "Complete el formulario para registrar un nuevo corte"}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
+                {error && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg
+                          className="h-5 w-5 text-red-500"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="estilo">Estilo</Label>
+                    <Input
+                      id="estilo"
+                      type="text"
+                      name="estilo"
+                      value={formData.estilo}
+                      onChange={handleChange}
+                      placeholder="Ej: Corte clásico"
+                      required
+                      className="w-full mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">Imagen del Corte</label>
+                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-300 rounded-lg p-6 cursor-pointer hover:border-zinc-400 transition-colors mt-1">
+                      {previewImage ? (
+                        <div className="relative">
+                          <img
+                            src={previewImage}
+                            alt="Vista previa"
+                            className="h-40 object-cover rounded-md"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-white/80 hover:bg-white p-1 rounded-full shadow-sm"
+                          >
+                            <X size={16} className="text-zinc-700" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload size={24} className="text-zinc-400 mb-2" />
+                          <p className="text-sm text-zinc-500 text-center">
+                            Arrastra una imagen o haz clic para seleccionar Imagen
+                          </p>
+                          <p className="text-xs text-zinc-400 mt-1">
+                            Formatos: JPG, PNG
+                          </p>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                            id="cut-image"
+                          />
+                        </>
+                      )}
+                    </div>
+                    <Label
+                      htmlFor="cut-image"
+                      className="mt-2 inline-block text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-3 py-1 rounded-md cursor-pointer transition-colors"
+                    >
+                      {previewImage ? "Cambiar imagen" : "Seleccionar imagen"}
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-50 px-6 py-4 flex justify-end gap-3 border-t border-zinc-200">
+                <Button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={submitting}
+                  variant="outline"
+                  className="text-zinc-700 border-zinc-300 hover:bg-zinc-100"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  onClick={handleSubmit}
+                  disabled={submitting || !formData.estilo}
+                  className="bg-gradient-to-r from-zinc-800 to-black hover:from-black hover:to-zinc-900 text-white"
+                >
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {editingCutId !== null ? "Actualizando..." : "Guardando..."}
+                    </>
+                  ) : (
+                    <>
+                      {editingCutId !== null ? (
+                        <>
+                          <Check size={16} className="mr-1" />
+                          Actualizar
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} className="mr-1" />
+                          Guardar
+                        </>
+                      )}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export default TableCortes

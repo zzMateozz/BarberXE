@@ -250,10 +250,9 @@ function CrudIncome() {
                     name="monto"
                     value={formData.monto}
                     onChange={handleChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0.01"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                    placeholder="0"
+                    min="1"
                     required
                     disabled={loading}
                   />
@@ -268,8 +267,9 @@ function CrudIncome() {
                     name="descripcion"
                     value={formData.descripcion}
                     onChange={handleChange}
-                    className="w-full p-2 border rounded-md"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
                     placeholder="Descripción del ingreso"
+                    required
                     disabled={loading}
                   />
                 </div>
@@ -282,7 +282,7 @@ function CrudIncome() {
                     name="medioPago"
                     value={formData.medioPago}
                     onChange={handleChange}
-                    className="w-full p-2 border rounded-md"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
                     disabled={loading}
                   >
                     <option value="Efectivo">Efectivo</option>
@@ -295,7 +295,7 @@ function CrudIncome() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 flex items-center justify-center"
+                  className="w-full bg-gradient-to-r from-zinc-800 to-black text-white py-2 px-4 rounded-md hover:from-black hover:to-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-800 focus:ring-offset-2 disabled:opacity-70 transition-all duration-200 flex items-center justify-center"
                 >
                   <PlusCircle className="w-5 h-5 mr-2" />
                   {loading ? "Procesando..." : "Registrar Ingreso"}
@@ -345,9 +345,8 @@ function CrudIncome() {
                                   name="monto"
                                   value={editForm.monto}
                                   onChange={handleEditChange}
-                                  className="w-full p-1 border rounded-sm text-sm"
-                                  step="0.01"
-                                  min="0.01"
+                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                                  min="1"
                                   required
                                 />
                               </td>
@@ -357,7 +356,8 @@ function CrudIncome() {
                                   name="descripcion"
                                   value={editForm.descripcion}
                                   onChange={handleEditChange}
-                                  className="w-full p-1 border rounded-sm text-sm"
+                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                                  required
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -365,7 +365,7 @@ function CrudIncome() {
                                   name="medioPago"
                                   value={editForm.medioPago}
                                   onChange={handleEditChange}
-                                  className="w-full p-1 border rounded-sm text-sm"
+                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
                                 >
                                   <option value="Efectivo">Efectivo</option>
                                   <option value="Tarjeta">Tarjeta</option>
@@ -377,17 +377,17 @@ function CrudIncome() {
                                 <div className="flex space-x-2">
                                   <button
                                     onClick={() => handleSaveEdit(ingreso.idIngreso)}
-                                    className="text-green-600 hover:text-green-900"
+                                    className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <Check className="w-5 h-5" />
+                                    <Check className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={handleCancelEdit}
-                                    className="text-red-600 hover:text-red-900"
+                                    className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <X className="w-5 h-5" />
+                                    <X className="w-4 h-4" />
                                   </button>
                                 </div>
                               </td>
@@ -408,17 +408,17 @@ function CrudIncome() {
                                 <div className="flex space-x-2">
                                   <button
                                     onClick={() => handleStartEdit(ingreso)}
-                                    className="text-blue-600 hover:text-blue-900"
+                                    className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <Edit className="w-5 h-5" />
+                                    <Edit className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => handleDelete(ingreso.idIngreso)}
-                                    className="text-red-600 hover:text-red-900"
+                                    className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
                                     disabled={loading}
                                   >
-                                    <Trash2 className="w-5 h-5" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
                               </td>
@@ -446,4 +446,4 @@ function CrudIncome() {
   );
 }
 
-export default CrudIncome;
+export default CrudIncome; 
