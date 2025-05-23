@@ -122,14 +122,23 @@ const BarberosCards = ({ isCollapsed }) => {
                 className={`${styles.card} ${barbero.estado === "activo" ? styles.cardActive : styles.cardInactive}`}
               >
                 {/* Imagen de perfil del barbero - puedes reemplazar con una imagen real si está disponible */}
-                <div className={styles.cardImage}>
-                  <svg 
-                    className="w-full h-full text-gray-300 bg-gray-100" 
-                    fill="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
+                <div className="relative w-full h-48 overflow-hidden bg-gray-100 group">
+                  {barbero.imagenPerfil ? (
+                    <img 
+                      src={barbero.imagenPerfil}
+                      alt={`${barbero.nombre} ${barbero.apellido}`}
+                      className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM3ODc4N2EiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCIvPjwvc3ZnPg==';
+                        e.currentTarget.className = 'absolute inset-0 w-full h-full object-contain p-8 bg-gray-100';
+                      }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <User className="w-24 h-24 text-gray-300" />
+                    </div>
+                  )}
                 </div>
                 
                 <div className={styles.cardBody}>

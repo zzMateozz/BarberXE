@@ -17,6 +17,9 @@ export class Empleado {
     @Column()
     telefono!: string;
 
+    @Column({ nullable: true })
+    imagenPerfil?: string;
+
     @Column({
         type: 'enum',
         enum: ['activo', 'inactivo'],

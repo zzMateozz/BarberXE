@@ -20,7 +20,8 @@ export class EmpleadoService {
         empleado.telefono = empleadoData.telefono;
         empleado.estado = empleadoData.estado || 'activo';
         empleado.cargo = empleadoData.cargo === 'Cajero' ? 'Cajero' : 'Barbero';
-    
+        empleado.imagenPerfil = empleadoData.imagenPerfil || undefined;
+
         return await EmpleadoRepository.save(empleado);
     }
     
@@ -42,6 +43,8 @@ export class EmpleadoService {
             if (empleadoData.telefono !== undefined) empleado.telefono = empleadoData.telefono;
             if (empleadoData.estado !== undefined) empleado.estado = empleadoData.estado;
             if (empleadoData.cargo !== undefined) empleado.cargo = empleadoData.cargo;
+            if (empleadoData.imagenPerfil !== undefined) empleado.imagenPerfil = empleadoData.imagenPerfil;
+
     
             const empleadoActualizado = await queryRunner.manager.save(empleado);
             await queryRunner.commitTransaction();

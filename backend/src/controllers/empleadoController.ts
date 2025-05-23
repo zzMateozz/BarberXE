@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { EmpleadoService } from '../services/empleadoService';
 import { UpdateEmpleadoDto } from '../dtos/Empleado/UpdateEmpleado.dto';
 import { CreateEmpleadoDto } from '../dtos/Empleado/CreateEmpleado.dto';
+import { uploadProfile } from '../middleware/upload';
 
 export class EmpleadoController {
     private empleadoService: EmpleadoService;
@@ -11,13 +12,22 @@ export class EmpleadoController {
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const empleados = await this.empleadoService.findAll();
-            res.status(200).json(empleados);
-        } catch (error) {
-            res.status(500).json({ message: 'Error al obtener empleados', error });
-        }
-    };
+    try {
+        const empleados = await this.empleadoService.findAll();
+        
+        // Asegurar URLs absolutas para las imágenes
+        const empleadosConImagen = empleados.map(empleado => ({
+            ...empleado,
+            imagenPerfil: empleado.imagenPerfil 
+                ? `${req.protocol}://${req.get('host')}${empleado.imagenPerfil}`
+                : null
+        }));
+        
+        res.status(200).json(empleadosConImagen);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener empleados', error });
+    }
+};
 
     getById = async (req: Request, res: Response): Promise<void> => {
         try {
@@ -37,18 +47,29 @@ export class EmpleadoController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            const empleadoData = new CreateEmpleadoDto(req.body);
+            const empleadoData = new CreateEmpleadoDto({
+            ...req.body,
+            imagenPerfil: req.file ? `/uploads/profiles/${req.file.filename}` : undefined
+            });
+            
             const empleado = await this.empleadoService.create(empleadoData);
             res.status(201).json(empleado);
         } catch (error) {
-            res.status(500).json({ message: 'Error al crear empleado', error });
+            res.status(500).json({ 
+            message: 'Error al crear empleado',
+            error: error instanceof Error ? error.message : 'Error desconocido'
+            });
         }
     };
 
     update = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = parseInt(req.params.id);
-            const empleadoData = new UpdateEmpleadoDto(req.body);
+            const empleadoData = new UpdateEmpleadoDto({
+                ...req.body,
+                imagenPerfil: req.file ? `/uploads/profiles/${req.file.filename}` : undefined
+            });
+
             const empleado = await this.empleadoService.update(id, empleadoData);
             res.status(200).json(empleado);
         } catch (error: any) {

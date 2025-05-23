@@ -65,8 +65,7 @@ export const fetchEmployees = async () => {
   export const createEmployee = async (employeeData) => {
     const response = await fetch(`${API_BASE_URL}/empleados`, {
       method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(employeeData),
+      body: employeeData,
     });
     return handleResponse(response);
   };
@@ -74,8 +73,7 @@ export const fetchEmployees = async () => {
   export const updateEmployee = async (id, employeeData) => {
     const response = await fetch(`${API_BASE_URL}/empleados/${id}`, {
       method: 'PUT',
-      headers: getHeaders(),
-      body: JSON.stringify(employeeData),
+      body: employeeData,
     });
     return handleResponse(response);
   };
