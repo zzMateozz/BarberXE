@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Pencil, Trash2, Search, Plus, Eye, EyeOff, X, Check, Loader2, Mail, User, Phone, Lock, Calendar as CalendarIcon } from "lucide-react"
+import { Pencil, Trash2, Search, Plus, Eye, EyeOff, X, Check, Loader2, Mail, User, Phone, Lock, Calendar as CalendarIcon, Image as ImageIcon } from "lucide-react"
 import { PlusCircleIcon } from "@heroicons/react/24/outline"
 import {
   fetchEmployees,
@@ -27,6 +27,8 @@ const TableEmployees = ({ isCollapsed }) => {
   const [showPassword, setShowPassword] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [showModal, setShowModal] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const [formData, setFormData] = useState({
     nombre: "",
     apellido: "",
@@ -181,6 +183,8 @@ const TableEmployees = ({ isCollapsed }) => {
   const openModal = (employeeId = null) => {
     setShowModal(true)
     setEditingEmployeeId(employeeId)
+    setSelectedImage(null)
+    setImagePreview(null)
 
     if (employeeId !== null) {
       const employee = employees.find((emp) => emp.idEmpleado === employeeId)
@@ -194,6 +198,9 @@ const TableEmployees = ({ isCollapsed }) => {
           usuario: "", // No cargar usuario al editar
           contraseña: "",
         })
+        if (employee.imagenPerfil) {
+          setImagePreview(employee.imagenPerfil)
+        }
       }
     } else {
       setFormData({
@@ -214,6 +221,25 @@ const TableEmployees = ({ isCollapsed }) => {
     setUsuarioError("")
     setContraseñaError("")
   }
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tamaño (ejemplo: máximo 2MB)
+      const maxSize = 5 * 1024 * 1024; // 2MB
+      if (file.size > maxSize) {
+        toast.error("La imagen es demasiado grande. El tamaño máximo permitido es 5MB");
+        return;
+      }
+      
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const closeModal = () => {
     setShowModal(false)
@@ -252,6 +278,17 @@ const TableEmployees = ({ isCollapsed }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    const formDataToSend = new FormData();
+      formDataToSend.append('nombre', formData.nombre);
+      formDataToSend.append('apellido', formData.apellido);
+      formDataToSend.append('telefono', formData.telefono);
+      formDataToSend.append('estado', formData.estado);
+      formDataToSend.append('cargo', formData.cargo);
+      
+    if (selectedImage) {
+        formDataToSend.append('imagenPerfil', selectedImage);
+    }
+
     // Validaciones básicas
     if (nombreError || apellidoError || telefonoError) {
       toast.error("Por favor corrija los errores en el formulario")
@@ -274,41 +311,26 @@ const TableEmployees = ({ isCollapsed }) => {
     }
 
     try {
-      setSubmitting(true)
+      setSubmitting(true);
+      
+      
+
       if (editingEmployeeId !== null) {
-        // 1. Buscar el empleado original para obtener su cargo actual
-        const originalEmployee = employees.find((emp) => emp.idEmpleado === editingEmployeeId)
-
-        // 2. Preparar datos para actualización (sin incluir el cargo)
-        const updateData = {
-          nombre: formData.nombre,
-          apellido: formData.apellido,
-          telefono: formData.telefono,
-          estado: formData.estado,
-          cargo: originalEmployee.cargo, // Mantenemos el cargo original
-        }
-
-        // 3. Actualizar en el backend
-        await updateEmployee(editingEmployeeId, updateData)
-
-        // 4. Actualizar el estado local
-        setEmployees((prev) =>
-          prev.map((emp) =>
+        // Actualización de empleado
+        const updatedEmployee = await updateEmployee(editingEmployeeId, formDataToSend);
+        
+        setEmployees(prev =>
+          prev.map(emp =>
             emp.idEmpleado === editingEmployeeId
-              ? {
-                ...emp, // Mantenemos todos los datos existentes
-                ...updateData, // Aplicamos solo los cambios permitidos
-              }
-              : emp,
-          ),
-        )
-
-        toast.success("Empleado actualizado con éxito")
+              ? { ...emp, ...updatedEmployee }
+              : emp
+          )
+        );
+        toast.success("Empleado actualizado con éxito");
       } else {
         // Creación de nuevo empleado
-        const cargoSeleccionado = formData.cargo // Asegúrate de que esto tenga el valor correcto
-
-        if (cargoSeleccionado === "Cajero") {
+        if (formData.cargo === "Cajero") {
+          // Para cajeros
           const cajeroData = {
             usuario: formData.usuario,
             contraseña: formData.contraseña,
@@ -316,51 +338,28 @@ const TableEmployees = ({ isCollapsed }) => {
               nombre: formData.nombre,
               apellido: formData.apellido,
               telefono: formData.telefono,
-              cargo: "Cajero", // Forzar el valor por si acaso
-              estado: formData.estado || "Activo",
+              cargo: "Cajero",
+              estado: formData.estado,
             },
-          }
-
-          const response = await createUser(cajeroData)
-
-          setEmployees((prev) => [
-            ...prev,
-            {
-              ...response.empleado,
-              usuario: response.usuario,
-              idUsuario: response.idUsuario,
-              cargo: "Cajero", // Asegurar que se guarde como Cajero
-            },
-          ])
-          toast.success("Cajero creado con éxito")
+          };
+          
+          const response = await createUser(cajeroData);
+          setEmployees(prev => [...prev, response.empleado]);
+          toast.success("Cajero creado con éxito");
         } else {
-          const barberoData = {
-            nombre: formData.nombre,
-            apellido: formData.apellido,
-            telefono: formData.telefono,
-            estado: formData.estado || "Activo",
-            cargo: "Barbero", // Forzar el valor
-          }
-
-          const newEmployee = await createEmployee(barberoData)
-
-          setEmployees((prev) => [
-            ...prev,
-            {
-              ...newEmployee,
-              cargo: "Barbero", // Asegurar que se guarde como Barbero
-            },
-          ])
-          toast.success("Barbero creado con éxito")
+          // Para barberos
+          const newEmployee = await createEmployee(formDataToSend);
+          setEmployees(prev => [...prev, newEmployee]);
+          toast.success("Barbero creado con éxito");
         }
       }
-      closeModal()
+      closeModal();
     } catch (err) {
-      console.error("Error en handleSubmit:", err)
-      setSubmitting(false)
-      toast.error(err.response?.data?.message || err.message || "Error al guardar empleado")
+      console.error("Error en handleSubmit:", err);
+      setSubmitting(false);
+      toast.error(err.response?.data?.message || err.message || "Error al guardar empleado");
     }
-  }
+  };
 
   const handleDelete = async (employeeId) => {
     try {
@@ -419,7 +418,6 @@ const TableEmployees = ({ isCollapsed }) => {
           </div>
         </div>
 
-      
         {/* Tabla rediseñada */}
         <div className="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -483,9 +481,7 @@ const TableEmployees = ({ isCollapsed }) => {
                     <tr key={emp.idEmpleado} className="hover:bg-zinc-50 transition-colors">
                       <td className="py-3 px-4 text-sm text-zinc-700">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 mr-3">
-                            <User size={14} />
-                          </div>
+                          
                           <span>{emp.nombre}</span>
                         </div>
                       </td>
@@ -783,6 +779,53 @@ const TableEmployees = ({ isCollapsed }) => {
                         </select>
                       )}
                     </div>
+
+                    {/* Nuevo campo para la imagen */}
+                    {formData.cargo === "Barbero" && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-black mb-2">Imagen de perfil</label>
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <div className="h-20 w-20 rounded-full bg-zinc-200 overflow-hidden border-2 border-zinc-300 flex items-center justify-center">
+                              {imagePreview ? (
+                                <img 
+                                  src={imagePreview} 
+                                  alt="Vista previa"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <ImageIcon className="h-8 w-8 text-zinc-400" />
+                              )}
+                            </div>
+                            <label 
+                              htmlFor="imagenPerfil"
+                              className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 border border-zinc-300 shadow-sm cursor-pointer hover:bg-zinc-50"
+                              title="Cambiar imagen"
+                            >
+                              <Pencil className="h-4 w-4 text-zinc-600" />
+                            </label>
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="file"
+                              id="imagenPerfil"
+                              accept="image/*"
+                              onChange={handleImageChange}
+                              className="hidden"
+                            />
+                            <label 
+                              htmlFor="imagenPerfil"
+                              className="inline-block text-sm text-zinc-600 hover:text-zinc-800 cursor-pointer"
+                            >
+                              {selectedImage ? 'Cambiar imagen' : 'Seleccionar imagen'}
+                            </label>
+                            <p className="text-xs text-zinc-500 mt-1">
+                              Formatos: JPG, PNG (Max. 5MB)
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

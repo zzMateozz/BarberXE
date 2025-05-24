@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import bodyParser from 'body-parser';
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -27,8 +28,11 @@ app.get("/", (req, res) => {
 });
 
 // Rutas
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')), (req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });
 app.use('/api/clientes', clienteRoutes);
@@ -40,6 +44,7 @@ app.use('/api/empleados', empleadoRoutes);
 app.use('/api/ingresos', ingresoRoutes);
 app.use('/api/servicios', servicioRoutes);
 app.use('/api/users', userRoutes);
+
 // Registrar otras rutas aquí
 
 // Iniciar la conexión a la base de datos y el servidor

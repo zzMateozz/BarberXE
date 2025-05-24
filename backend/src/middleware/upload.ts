@@ -9,6 +9,17 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const profileStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, '../../uploads/profiles'));
+    },
+    filename: (req, file, cb) => {
+        const uniqueId = uuidv4();
+        const ext = path.extname(file.originalname);
+        cb(null, `profile_${uniqueId}${ext}`);
+    }
+});
+
 const storage = multer.diskStorage({
     destination: (_req: Request, _file: Express.Multer.File, cb) => {
         cb(null, uploadDir);
@@ -28,10 +39,27 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
     }
 };
 
+export const uploadProfileMiddleware = multer({
+    storage: profileStorage,
+    fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB
+    }
+}).single('imagenPerfil');
+
+
+export const uploadProfile = multer({
+    storage: profileStorage,
+    fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB
+    }
+}).single('imagenPerfil');
+
 export const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB
+        fileSize: 10 * 1024 * 1024 // 5MB
     }
 }).single('imagen');

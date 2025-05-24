@@ -4,6 +4,7 @@ export class UpdateEmpleadoDto {
     readonly telefono?: string;
     readonly estado?: 'activo' | 'inactivo';
     readonly cargo?: 'Barbero' | 'Cajero';
+    readonly imagenPerfil?: string;
 
     constructor(data: any = {}) {
         this.nombre = data.nombre;
@@ -11,5 +12,6 @@ export class UpdateEmpleadoDto {
         this.telefono = data.telefono;
         this.estado = data.estado;
         this.cargo = data.cargo;
+        this.imagenPerfil = data.imagenPerfil;
     }
 }

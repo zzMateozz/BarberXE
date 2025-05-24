@@ -4,6 +4,7 @@ export class CreateEmpleadoDto {
     readonly telefono: string;
     readonly estado?: 'activo' | 'inactivo';
     readonly cargo?: 'Barbero' | 'Cajero';
+    readonly imagenPerfil?: string;
 
     constructor(data: any) {
         if (!data.nombre || !data.apellido || !data.telefono) {
@@ -15,5 +16,6 @@ export class CreateEmpleadoDto {
         this.telefono = data.telefono;
         this.estado = data.estado || 'activo';
         this.cargo = data.cargo === 'Cajero' ? 'Cajero' : 'Barbero';
+        this.imagenPerfil = data.imagenPerfil;
     }
 }
