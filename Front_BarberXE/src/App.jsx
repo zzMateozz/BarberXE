@@ -6,6 +6,7 @@ import { ToastContainer } from 'react-toastify';
 import EmpleadoPage from './pages/Cajero'; // Asegúrate de crear este componente
 import ClientePage from './pages/Cliente'; // Asegúrate de crear este componente
 
+
 function App() {
     return (
         <>

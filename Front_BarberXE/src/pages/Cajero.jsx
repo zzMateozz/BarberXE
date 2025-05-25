@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom"; 
-import SidebarCajero from "../components/Cajero/SidebarCajero.jsx";       
-import NavbarCajero from "../components/Cajero/NavbarCajero.jsx";   
-import ArqueoDeCaja from "../components/Cajero/CrudArqueo.jsx";     
+import SidebarCajero from "../components/Cajero/Navbar-Sidebar/SidebarCajero.jsx";       
+import NavbarCajero from "../components/Cajero/Navbar-Sidebar/NavbarCajero.jsx";   
+import ArqueoDeCaja from "../components/Cajero/Caja/CrudArqueo.jsx";     
 
 const CajeroPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);

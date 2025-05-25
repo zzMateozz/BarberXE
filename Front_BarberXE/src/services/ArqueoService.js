@@ -220,6 +220,22 @@ export const fetchAllIngresos = async () => {
   }
 };
 
+export const fetchAllegresos = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/egresos`, {
+      headers: getHeaders() // Usando la función definida
+    });
+    
+    if (!response.ok) throw new Error('Error al obtener ingresos');
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error en fetchAllIngresos:', error);
+    throw error;
+  }
+};
+
+
 
 // Funciones para egresos
 export const addEgreso = async (egresoData) => {

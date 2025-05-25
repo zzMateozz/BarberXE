@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom"; 
-import SidebarClient from "../components/Cliente/SidebarClient.jsx";       
-import NavbarClient from "../components/Cliente/NavbarClient.jsx";
-import BarberosCards from "../components/Cliente/CardEmployees.jsx";     
-import TableCitas from "../components/Cliente/TableCitas.jsx";
-import CardServices from "../components/Cliente/TableServices.jsx";
+import SidebarClient from "../components/Cliente/Navbar-Sidebar/SidebarClient.jsx";       
+import NavbarClient from "../components/Cliente/Navbar-Sidebar/NavbarClient.jsx";
+import BarberosCards from "../components/Cliente/Empleados/CardEmployees.jsx";     
+import TableCitas from "../components/Cliente/Servicios-Citas/TableCitas.jsx";
+import CardServices from "../components/Cliente/Servicios-Citas/TableServices.jsx";
 
 const ClientPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);

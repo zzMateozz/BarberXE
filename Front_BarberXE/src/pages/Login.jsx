@@ -10,8 +10,7 @@ import {
   FaExclamationCircle,
   FaCheckCircle,
 } from "react-icons/fa";
-import {createUser } from "../services/ClientService";
-// Actualiza las importaciones
+import { createUser } from "../services/ClientService";
 import { LoginService } from "../services/LoginService";
 import { toast } from "react-toastify";
 
@@ -82,12 +81,38 @@ function Login() {
   // Validación en tiempo real para la contraseña
   useEffect(() => {
     if (password) {
+      // Validación de longitud
       if (password.length < 8) {
         setPasswordError("La contraseña debe tener al menos 8 caracteres");
+        return;
       } else if (password.length > 12) {
         setPasswordError("La contraseña no debe exceder 12 caracteres");
-      } else if (!/^[a-zA-Z0-9]{8,12}$/.test(password)) {
-        setPasswordError("La contraseña solo debe contener letras y números");
+        return;
+      }
+
+      // Validación de caracteres permitidos
+      if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(password)) {
+        setPasswordError("La contraseña contiene caracteres no permitidos");
+        return;
+      }
+
+      // Validación de requisitos adicionales
+      let errorMessages = [];
+      
+      if (!/[A-Z]/.test(password)) {
+        errorMessages.push("al menos una letra mayúscula");
+      }
+      
+      if (!/[0-9]/.test(password)) {
+        errorMessages.push("al menos un número");
+      }
+      
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+        errorMessages.push("al menos un carácter especial");
+      }
+
+      if (errorMessages.length > 0) {
+        setPasswordError(`La contraseña debe contener ${errorMessages.join(", ")}`);
       } else {
         setPasswordError("");
       }
@@ -180,9 +205,9 @@ function Login() {
         setShowRegister(false);
       } else {
         const credentials = {
-        usuario: email,  // Make sure this matches your backend expectation
-        contraseña: password  // Make sure this matches your backend expectation
-      };
+          usuario: email,
+          contraseña: password
+        };
 
         const response = await LoginService.login(credentials);
 
@@ -240,8 +265,7 @@ function Login() {
 
     return (
       <div
-        className={`text-sm mt-1 flex items-center ${isValid ? "text-green-600" : "text-red-600"
-          }`}
+        className={`text-sm mt-1 flex items-center ${isValid ? "text-green-600" : "text-red-600"}`}
       >
         {isValid ? (
           <FaCheckCircle className="mr-1" />
@@ -262,8 +286,8 @@ function Login() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+    <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md mx-4 border border-gray-200">
         <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">
           {showRegister ? "Crear cuenta" : "Iniciar sesión"}
         </h2>
@@ -272,7 +296,7 @@ function Login() {
         <div className="flex mb-6 border-b border-gray-200">
           <button
             className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${!showRegister
-                ? "text-white bg-blue-600 rounded-t-lg"
+                ? "text-white bg-gradient-to-r from-gray-800 to-black rounded-t-lg"
                 : "text-gray-500 hover:text-gray-700"
               }`}
             onClick={() => setShowRegister(false)}
@@ -281,7 +305,7 @@ function Login() {
           </button>
           <button
             className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${showRegister
-                ? "text-white bg-blue-600 rounded-t-lg"
+                ? "text-white bg-gradient-to-r from-gray-800 to-black rounded-t-lg"
                 : "text-gray-500 hover:text-gray-700"
               }`}
             onClick={handleRegister}
@@ -290,15 +314,12 @@ function Login() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {showRegister && (
             <>
-              <div className="mb-4 flex space-x-4">
+              <div className="flex space-x-4">
                 <div className="w-1/2">
-                  <label
-                    className="block text-gray-700 text-sm font-semibold mb-2"
-                    htmlFor="name"
-                  >
+                  <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="name">
                     Nombre
                   </label>
                   <div className="relative">
@@ -306,13 +327,10 @@ function Login() {
                       <FaUser className="text-gray-400" />
                     </div>
                     <input
-                      className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                        name,
-                        nameError
-                      )}`}
+                      className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(name, nameError)}`}
                       id="name"
                       type="text"
-                      placeholder="Nombre (3-30 caracteres)"
+                      placeholder="Nombre"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       minLength={3}
@@ -321,15 +339,9 @@ function Login() {
                     />
                   </div>
                   <ValidationMessage message={nameError} isValid={false} />
-                  {name && !nameError && (
-                    <ValidationMessage message="Nombre válido" isValid={true} />
-                  )}
                 </div>
                 <div className="w-1/2">
-                  <label
-                    className="block text-gray-700 text-sm font-semibold mb-2"
-                    htmlFor="lastName"
-                  >
+                  <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="lastName">
                     Apellido
                   </label>
                   <div className="relative">
@@ -337,13 +349,10 @@ function Login() {
                       <FaUser className="text-gray-400" />
                     </div>
                     <input
-                      className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                        lastName,
-                        lastNameError
-                      )}`}
+                      className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(lastName, lastNameError)}`}
                       id="lastName"
                       type="text"
-                      placeholder="Apellido (3-30 caracteres)"
+                      placeholder="Apellido"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       minLength={3}
@@ -352,20 +361,11 @@ function Login() {
                     />
                   </div>
                   <ValidationMessage message={lastNameError} isValid={false} />
-                  {lastName && !lastNameError && (
-                    <ValidationMessage
-                      message="Apellido válido"
-                      isValid={true}
-                    />
-                  )}
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label
-                  className="block text-gray-700 text-sm font-semibold mb-2"
-                  htmlFor="phone"
-                >
+              <div>
+                <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="phone">
                   Teléfono
                 </label>
                 <div className="relative">
@@ -373,17 +373,12 @@ function Login() {
                     <FaPhone className="text-gray-400" />
                   </div>
                   <input
-                    className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                      phone,
-                      phoneError
-                    )}`}
+                    className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(phone, phoneError)}`}
                     id="phone"
                     type="tel"
-                    placeholder="Teléfono (7-10 dígitos)"
+                    placeholder="Teléfono"
                     value={phone}
-                    onChange={(e) =>
-                      setPhone(e.target.value.replace(/\D/g, ""))
-                    }
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                     minLength={7}
                     maxLength={10}
                     pattern="[0-9]{7,10}"
@@ -391,18 +386,12 @@ function Login() {
                   />
                 </div>
                 <ValidationMessage message={phoneError} isValid={false} />
-                {phone && !phoneError && (
-                  <ValidationMessage message="Teléfono válido" isValid={true} />
-                )}
               </div>
             </>
           )}
 
-          <div className="mb-4">
-            <label
-              className="block text-gray-700 text-sm font-semibold mb-2"
-              htmlFor="email"
-            >
+          <div>
+            <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
               Correo electrónico
             </label>
             <div className="relative">
@@ -410,10 +399,7 @@ function Login() {
                 <FaEnvelope className="text-gray-400" />
               </div>
               <input
-                className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                  email,
-                  emailError
-                )}`}
+                className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(email, emailError)}`}
                 id="email"
                 type="email"
                 placeholder="correo@ejemplo.com"
@@ -424,16 +410,10 @@ function Login() {
               />
             </div>
             <ValidationMessage message={emailError} isValid={false} />
-            {email && !emailError && (
-              <ValidationMessage message="Correo válido" isValid={true} />
-            )}
           </div>
 
-          <div className="mb-4">
-            <label
-              className="block text-gray-700 text-sm font-semibold mb-2"
-              htmlFor="password"
-            >
+          <div>
+            <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
               Contraseña
             </label>
             <div className="relative">
@@ -441,13 +421,10 @@ function Login() {
                 <FaLock className="text-gray-400" />
               </div>
               <input
-                className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                  password,
-                  passwordError
-                )}`}
+                className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(password, passwordError)}`}
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Contraseña (8-12 caracteres)"
+                placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
@@ -460,24 +437,18 @@ function Login() {
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <FaEyeSlash className="text-gray-400 hover:text-gray-600" />
+                  <FaEyeSlash className="text-gray-500 hover:text-gray-700" />
                 ) : (
-                  <FaEye className="text-gray-400 hover:text-gray-600" />
+                  <FaEye className="text-gray-500 hover:text-gray-700" />
                 )}
               </button>
             </div>
             <ValidationMessage message={passwordError} isValid={false} />
-            {password && !passwordError && (
-              <ValidationMessage message="Contraseña válida" isValid={true} />
-            )}
           </div>
 
           {showRegister && (
-            <div className="mb-6">
-              <label
-                className="block text-gray-700 text-sm font-semibold mb-2"
-                htmlFor="confirmPassword"
-              >
+            <div>
+              <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="confirmPassword">
                 Confirmar contraseña
               </label>
               <div className="relative">
@@ -485,10 +456,7 @@ function Login() {
                   <FaLock className="text-gray-400" />
                 </div>
                 <input
-                  className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${getInputBorderClass(
-                    confirmPassword,
-                    confirmPasswordError
-                  )}`}
+                  className={`pl-10 w-full py-2 px-3 bg-white text-gray-700 border rounded-lg focus:outline-none focus:ring-2 ${getInputBorderClass(confirmPassword, confirmPasswordError)}`}
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirmar contraseña"
@@ -504,28 +472,19 @@ function Login() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? (
-                    <FaEyeSlash className="text-gray-400 hover:text-gray-600" />
+                    <FaEyeSlash className="text-gray-500 hover:text-gray-700" />
                   ) : (
-                    <FaEye className="text-gray-400 hover:text-gray-600" />
+                    <FaEye className="text-gray-500 hover:text-gray-700" />
                   )}
                 </button>
               </div>
-              <ValidationMessage
-                message={confirmPasswordError}
-                isValid={false}
-              />
-              {confirmPassword && !confirmPasswordError && (
-                <ValidationMessage
-                  message="Contraseñas coinciden"
-                  isValid={true}
-                />
-              )}
+              <ValidationMessage message={confirmPasswordError} isValid={false} />
             </div>
           )}
 
-          <div className="mt-8">
+          <div className="pt-4">
             <button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200"
+              className="w-full bg-gradient-to-r from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors duration-200"
               type="submit"
             >
               {showRegister ? "Crear cuenta" : "Iniciar sesión"}
@@ -538,7 +497,7 @@ function Login() {
             <p className="text-gray-600 text-sm">
               ¿No tienes una cuenta?{" "}
               <button
-                className="text-blue-600 hover:text-blue-800 font-semibold focus:outline-none"
+                className="text-black hover:text-blue-800 font-semibold focus:outline-none"
                 onClick={handleRegister}
               >
                 Regístrate
