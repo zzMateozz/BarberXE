@@ -1,42 +1,41 @@
 import React, { useState, useEffect } from "react";
 import { fetchEmployees, searchEmployeesByName } from "../../../services/EmployeeService.js";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Phone, User, Loader2 } from "lucide-react";
 
-const styles = {
-  searchContainer: "mb-6 flex justify-center",
-  searchInput: "border border-gray-300 rounded-md py-2 px-4 w-full max-w-md focus:ring-2 focus:ring-blue-500",
-  cardsContainer: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
-  card: "bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300",
-  cardActive: "border-l-4 border-green-500",
-  cardInactive: "border-l-4 border-gray-300 opacity-70",
-  cardImage: "w-full h-48 object-cover",
-  cardBody: "p-4",
-  cardTitle: "text-xl font-semibold text-gray-800",
-  cardSubtitle: "text-gray-600 mb-2",
-  cardStatusActive: "inline-block px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800",
-  cardStatusInactive: "inline-block px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800",
-  cardPhone: "text-gray-700 mt-2 flex items-center",
-  phoneIcon: "w-4 h-4 mr-2 text-gray-500"
-};
+
+const IMAGE_BASE_URL = "http://localhost:3000";
 
 const BarberosCards = ({ isCollapsed }) => {
   const [barberos, setBarberos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [imageVersion, setImageVersion] = useState(0); // Control de versiones de imagen
 
   // Cargar barberos al montar el componente
   useEffect(() => {
     const loadBarberos = async () => {
       try {
         const data = await fetchEmployees();
-        // Filtrar solo barberos activos
-        const filteredData = data.filter(emp => 
+        const filteredData = data.filter(emp =>
           (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
         );
         setBarberos(filteredData);
-        setLoading(false);
       } catch (err) {
         setError(err.message);
+      } finally {
         setLoading(false);
       }
     };
@@ -45,45 +44,73 @@ const BarberosCards = ({ isCollapsed }) => {
 
   // Buscar barberos por nombre
   useEffect(() => {
-    if (searchTerm) {
-      const searchBarberos = async () => {
+    if (searchTerm.trim() === "") {
+      const loadAllBarberos = async () => {
         try {
-          const results = await searchEmployeesByName(searchTerm);
-          // Filtrar resultados para mostrar solo barberos activos
-          const filteredResults = results.filter(emp => 
-            (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
-          );
-          setBarberos(filteredResults);
-        } catch (err) {
-          setError(err.message);
-        }
-      };
-
-      const timer = setTimeout(() => {
-        searchBarberos();
-      }, 500);
-
-      return () => clearTimeout(timer);
-    } else {
-      const reloadBarberos = async () => {
-        try {
+          setIsSearching(true);
           const data = await fetchEmployees();
-          const filteredData = data.filter(emp => 
+          const filteredData = data.filter(emp =>
             (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
           );
           setBarberos(filteredData);
+          setImageVersion(prev => prev + 1); // Incrementar versión de imágenes
         } catch (err) {
           setError(err.message);
+        } finally {
+          setIsSearching(false);
         }
       };
-      reloadBarberos();
+      loadAllBarberos();
+      return;
     }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchEmployeesByName(searchTerm);
+        const filteredResults = results.filter(emp =>
+          (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
+        );
+        setBarberos(filteredResults);
+        setImageVersion(prev => prev + 1); // Incrementar versión de imágenes
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  const getImageUrl = (url) => {
+    if (!url) return null;
+
+    // Si la url ya es absoluta, no la modifiques
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url + `?v=${imageVersion}`;
+    }
+
+    // Si es relativa, limpiala y concatena
+    const cleanUrl = url.replace(/^\/+/, "");
+    return `${IMAGE_BASE_URL}/${cleanUrl}?v=${imageVersion}`;
+  };
+
+
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
+        {[...Array(8)].map((_, i) => (
+          <Card key={`skeleton-${i}`} className="bg-gray-50">
+            <CardHeader>
+              <Skeleton className="h-48 w-full bg-gray-200" />
+              <Skeleton className="h-6 w-3/4 bg-gray-200" />
+              <Skeleton className="h-4 w-full bg-gray-200" />
+              <Skeleton className="h-4 w-1/2 bg-gray-200" />
+            </CardHeader>
+          </Card>
+        ))}
       </div>
     );
   }
@@ -100,74 +127,81 @@ const BarberosCards = ({ isCollapsed }) => {
   return (
     <section className="py-8 lg:py-12">
       <div className="container mx-auto px-4">
-        <div className={styles.searchContainer}>
-          <input
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <div className="w-full md:w-auto">
+            <h2 className="text-2xl font-bold text-gray-800">Nuestros Barberos</h2>
+          </div>
+
+          <Input
             type="text"
             placeholder="Buscar barberos por nombre..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={styles.searchInput}
+            className="w-full md:w-64"
           />
         </div>
 
-        {barberos.length === 0 ? (
+        {isSearching ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          </div>
+        ) : barberos.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">No se encontraron barberos activos</p>
+            <p className="text-muted-foreground text-lg">
+              {searchTerm
+                ? "No se encontraron barberos con ese nombre"
+                : "No hay barberos disponibles"}
+            </p>
           </div>
         ) : (
-          <div className={styles.cardsContainer}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {barberos.map((barbero) => (
-              <div 
-                key={barbero.idEmpleado} 
-                className={`${styles.card} ${barbero.estado === "activo" ? styles.cardActive : styles.cardInactive}`}
+              <Card
+                key={`${barbero.idEmpleado}-${imageVersion}`}
+                className="hover:shadow-lg transition-shadow h-full flex flex-col bg-gray-50 border-gray-200"
               >
-                {/* Imagen de perfil del barbero - puedes reemplazar con una imagen real si está disponible */}
-                <div className="relative w-full h-48 overflow-hidden bg-gray-100 group">
+                <div className="relative w-full h-48 overflow-hidden bg-gray-200">
                   {barbero.imagenPerfil ? (
-                    <img 
-                      src={barbero.imagenPerfil}
+                    <img
+                      key={`img-${barbero.idEmpleado}-${getImageUrl(barbero.imagenPerfil)}`}
+                      src={getImageUrl(barbero.imagenPerfil)}
                       alt={`${barbero.nombre} ${barbero.apellido}`}
-                      className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                      className="absolute inset-0 w-full h-full object-cover object-center"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM3ODc4N2EiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCIvPjwvc3ZnPg==';
-                        e.currentTarget.className = 'absolute inset-0 w-full h-full object-contain p-8 bg-gray-100';
+                        e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjg2ODY4IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRIOGE0IDQgMCAwIDAtNCA0djIiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiLz48L3N2Zz4=';
+                        e.currentTarget.className = 'absolute inset-0 w-full h-full object-contain p-8 bg-gray-200';
                       }}
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <User className="w-24 h-24 text-gray-300" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+                      <User className="w-1/3 h-1/3 text-gray-400" />
                     </div>
                   )}
                 </div>
-                
-                <div className={styles.cardBody}>
-                  <h3 className={styles.cardTitle}>{barbero.nombre} {barbero.apellido}</h3>
-                  <p className={styles.cardSubtitle}>Barbero profesional</p>
-                  
-                  <span className={barbero.estado === "activo" ? styles.cardStatusActive : styles.cardStatusInactive}>
+
+                <CardHeader>
+                  <CardTitle className="text-xl text-gray-800">
+                    {barbero.nombre} {barbero.apellido}
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Barbero profesional
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="flex-grow">
+                  <div className="flex items-center text-sm text-gray-700">
+                    <Phone className="w-4 h-4 mr-2 text-gray-500" />
+                    {barbero.telefono || "No disponible"}
+                  </div>
+                </CardContent>
+
+                <CardFooter>
+                  <Badge variant="secondary" className="w-full text-center">
                     {barbero.estado === "activo" ? "Disponible" : "No disponible"}
-                  </span>
-                  
-                  <p className={styles.cardPhone}>
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className={styles.phoneIcon} 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" 
-                      />
-                    </svg>
-                    {barbero.telefono}
-                  </p>
-                </div>
-              </div>
+                  </Badge>
+                </CardFooter>
+              </Card>
             ))}
           </div>
         )}
