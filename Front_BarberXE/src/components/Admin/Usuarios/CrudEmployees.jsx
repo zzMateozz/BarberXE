@@ -14,6 +14,7 @@ import { toast } from "react-toastify"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
+const IMAGE_BASE_URL = "http://localhost:3000"
 
 const TableEmployees = ({ isCollapsed }) => {
   const [employees, setEmployees] = useState([])
@@ -126,47 +127,47 @@ const TableEmployees = ({ isCollapsed }) => {
     }
   }, [formData.usuario, formData.cargo])
 
- useEffect(() => {
+  useEffect(() => {
     if (formData.contraseña) {
-        // Validación de longitud
-        if (formData.contraseña.length < 8) {
-            setContraseñaError("La contraseña debe tener al menos 8 caracteres");
-            return;
-        } else if (formData.contraseña.length > 12) {
-            setContraseñaError("La contraseña no debe exceder 12 caracteres");
-            return;
-        }
+      // Validación de longitud
+      if (formData.contraseña.length < 8) {
+        setContraseñaError("La contraseña debe tener al menos 8 caracteres");
+        return;
+      } else if (formData.contraseña.length > 12) {
+        setContraseñaError("La contraseña no debe exceder 12 caracteres");
+        return;
+      }
 
-        // Validación de caracteres permitidos (letras, números y caracteres especiales comunes)
-        if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.contraseña)) {
-            setContraseñaError("La contraseña contiene caracteres no permitidos");
-            return;
-        }
+      // Validación de caracteres permitidos (letras, números y caracteres especiales comunes)
+      if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.contraseña)) {
+        setContraseñaError("La contraseña contiene caracteres no permitidos");
+        return;
+      }
 
-        // Validación de requisitos adicionales
-        let errorMessages = [];
-        
-        if (!/[A-Z]/.test(formData.contraseña)) {
-            errorMessages.push("al menos una letra mayúscula");
-        }
-        
-        if (!/[0-9]/.test(formData.contraseña)) {
-            errorMessages.push("al menos un número");
-        }
-        
-        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.contraseña)) {
-            errorMessages.push("al menos un carácter especial");
-        }
+      // Validación de requisitos adicionales
+      let errorMessages = [];
 
-        if (errorMessages.length > 0) {
-            setContraseñaError(`La contraseña debe contener ${errorMessages.join(", ")}`);
-        } else {
-            setContraseñaError("");
-        }
-    } else {
+      if (!/[A-Z]/.test(formData.contraseña)) {
+        errorMessages.push("al menos una letra mayúscula");
+      }
+
+      if (!/[0-9]/.test(formData.contraseña)) {
+        errorMessages.push("al menos un número");
+      }
+
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.contraseña)) {
+        errorMessages.push("al menos un carácter especial");
+      }
+
+      if (errorMessages.length > 0) {
+        setContraseñaError(`La contraseña debe contener ${errorMessages.join(", ")}`);
+      } else {
         setContraseñaError("");
+      }
+    } else {
+      setContraseñaError("");
     }
-}, [formData.contraseña]);
+  }, [formData.contraseña]);
 
   // Cargar empleados al montar el componente
   useEffect(() => {
@@ -220,59 +221,63 @@ const TableEmployees = ({ isCollapsed }) => {
     }
   }, [searchTerm])
 
+  useEffect(() => {
+    return () => {
+      // Limpiar URLs de imágenes creadas con URL.createObjectURL()
+      if (selectedImage) {
+        URL.revokeObjectURL(selectedImage);
+      }
+    };
+  }, [selectedImage]);
+
   const openModal = (employeeId = null) => {
-    setShowModal(true)
-    setEditingEmployeeId(employeeId)
-    setSelectedImage(null)
-    setImagePreview(null)
+    setShowModal(true);
+    setEditingEmployeeId(employeeId);
 
     if (employeeId !== null) {
-      const employee = employees.find((emp) => emp.idEmpleado === employeeId)
+      const employee = employees.find((emp) => emp.idEmpleado === employeeId);
       if (employee) {
         setFormData({
           nombre: employee.nombre,
           apellido: employee.apellido,
           telefono: employee.telefono,
           estado: employee.estado,
-          cargo: employee.cargo || "Barbero", // Mostrar el cargo pero no se podrá editar
-          usuario: "", // No cargar usuario al editar
+          cargo: employee.cargo || "Barbero",
+          imagenPerfil: null,
+          usuario: "",
           contraseña: "",
-        })
-        if (employee.imagenPerfil) {
-          setImagePreview(employee.imagenPerfil)
-        }
-      }
-    } else {
+        });
+       setImagePreview(employee.imagenPerfil)
+    } 
+  } else {
       setFormData({
         nombre: "",
         apellido: "",
         telefono: "",
         estado: "activo",
         cargo: "Barbero",
+        imagen: null,
         usuario: "",
         contraseña: "",
-      })
+      });
+      setImagePreview(null)
     }
-
-    // Resetear errores
-    setNombreError("")
-    setApellidoError("")
-    setTelefonoError("")
-    setUsuarioError("")
-    setContraseñaError("")
-  }
+    setError(null)
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validar tamaño (ejemplo: máximo 2MB)
-      const maxSize = 5 * 1024 * 1024; // 2MB
+      // Validar tamaño (ejemplo: máximo 5MB)
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         toast.error("La imagen es demasiado grande. El tamaño máximo permitido es 5MB");
         return;
       }
 
       setSelectedImage(file);
+
+      // Crear vista previa
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -282,7 +287,7 @@ const TableEmployees = ({ isCollapsed }) => {
   };
 
   const closeModal = () => {
-    setShowModal(false)
+    setShowModal(false);
     setFormData({
       nombre: "",
       apellido: "",
@@ -291,10 +296,13 @@ const TableEmployees = ({ isCollapsed }) => {
       cargo: "Barbero",
       usuario: "",
       contraseña: "",
-    })
-    setEditingEmployeeId(null)
-    setError(null)
-  }
+    });
+    setEditingEmployeeId(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setError(null);
+    setSubmitting(false);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -315,68 +323,78 @@ const TableEmployees = ({ isCollapsed }) => {
     }))
   }
 
-
   const handleSubmit = async (e) => {
-    e.preventDefault()
-
-    const formDataToSend = new FormData();
-    formDataToSend.append('nombre', formData.nombre);
-    formDataToSend.append('apellido', formData.apellido);
-    formDataToSend.append('telefono', formData.telefono);
-    formDataToSend.append('estado', formData.estado);
-    formDataToSend.append('cargo', formData.cargo);
-
-    if (selectedImage) {
-      formDataToSend.append('imagenPerfil', selectedImage);
-    }
+    e.preventDefault();
 
     // Validaciones básicas
     if (nombreError || apellidoError || telefonoError) {
-      toast.error("Por favor corrija los errores en el formulario")
-      return
+      toast.error("Por favor corrija los errores en el formulario");
+      return;
     }
 
     if (!formData.nombre || !formData.apellido || !formData.telefono) {
-      toast.error("Los campos nombre, apellido y teléfono son obligatorios")
-      return
+      toast.error("Los campos nombre, apellido y teléfono son obligatorios");
+      return;
     }
 
-    // Validaciones específicas para Cajeros
+    // Validaciones para Cajeros
     if (
       editingEmployeeId === null &&
       formData.cargo === "Cajero" &&
       (usuarioError || contraseñaError || !formData.usuario || !formData.contraseña)
     ) {
-      toast.error("Para cajeros, usuario y contraseña son obligatorios y deben ser válidos")
-      return
+      toast.error("Para cajeros, usuario y contraseña son obligatorios y deben ser válidos");
+      return;
     }
 
     const timeoutId = setTimeout(() => {
       setSubmitting(false);
       toast.warning("La operación está tardando más de lo esperado");
-    }, 10000); // 10 segundos
+    }, 10000);
 
     try {
       setSubmitting(true);
 
+      const formDataToSend = new FormData();
+      formDataToSend.append('nombre', formData.nombre);
+      formDataToSend.append('apellido', formData.apellido);
+      formDataToSend.append('telefono', formData.telefono);
+      formDataToSend.append('estado', formData.estado);
+      formDataToSend.append('cargo', formData.cargo);
 
+      if (selectedImage) {
+        formDataToSend.append('imagenPerfil', selectedImage);
+      }
 
       if (editingEmployeeId !== null) {
-        // Actualización de empleado
         const updatedEmployee = await updateEmployee(editingEmployeeId, formDataToSend);
 
-        setEmployees(prev =>
-          prev.map(emp =>
-            emp.idEmpleado === editingEmployeeId
-              ? { ...emp, ...updatedEmployee }
-              : emp
-          )
-        );
+        // Actualizar el estado local con la nueva imagen
+        setEmployees(prev => prev.map(emp => {
+          if (emp.idEmpleado === editingEmployeeId) {
+            // Si hay una nueva imagen, crear una URL temporal
+            let newImageUrl = emp.imagenPerfil;
+            if (selectedImage) {
+              newImageUrl = URL.createObjectURL(selectedImage);
+            } else if (updatedEmployee.imagenPerfil) {
+              // Si el backend devuelve una nueva URL de imagen
+              newImageUrl = `${IMAGE_BASE_URL}${updatedEmployee.imagenPerfil}`;
+            }
+
+            return {
+              ...emp,
+              ...updatedEmployee,
+              imagenPerfil: newImageUrl
+            };
+          }
+          return emp;
+        }));
+
         toast.success("Empleado actualizado con éxito");
+        closeModal();
       } else {
         // Creación de nuevo empleado
         if (formData.cargo === "Cajero") {
-          // Para cajeros
           const cajeroData = {
             usuario: formData.usuario,
             contraseña: formData.contraseña,
@@ -388,23 +406,39 @@ const TableEmployees = ({ isCollapsed }) => {
               estado: formData.estado,
             },
           };
-
           const response = await createUser(cajeroData);
           setEmployees(prev => [...prev, response.empleado]);
           toast.success("Cajero creado con éxito");
         } else {
-          // Para barberos
           const newEmployee = await createEmployee(formDataToSend);
-          setEmployees(prev => [...prev, newEmployee]);
+
+          // Generar vista previa si se seleccionó imagen
+          let imageUrl = "";
+          if (selectedImage) {
+            imageUrl = URL.createObjectURL(selectedImage);
+          } else if (newEmployee.imagenPerfil) {
+            imageUrl = `${IMAGE_BASE_URL}${newEmployee.imagenPerfil}?t=${Date.now()}`;
+          }
+
+          // Añadir empleado con imagen actualizada en tiempo real
+          setEmployees(prev => [...prev, {
+            ...newEmployee,
+            imagenPerfil: imageUrl
+          }]);
+
+          setImagePreview(imageUrl); // Mostrar en vista previa
+
           toast.success("Barbero creado con éxito");
         }
       }
       closeModal();
     } catch (err) {
       console.error("Error en handleSubmit:", err);
-      clearTimeout(timeoutId); // Limpiar el timeout
+      clearTimeout(timeoutId);
       setSubmitting(false);
       toast.error(err.response?.data?.message || err.message || "Error al guardar empleado");
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
@@ -526,7 +560,22 @@ const TableEmployees = ({ isCollapsed }) => {
                   currentItems.map((emp) => (
                     <tr key={emp.idEmpleado} className="hover:bg-zinc-50 transition-colors">
                       <td className="py-3 px-4 text-sm text-zinc-700">
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-3">
+                          {emp.imagenPerfil ? (
+                            <img
+                              src={emp.imagenPerfil}
+                              alt={`${emp.nombre} ${emp.apellido}`}
+                              className="h-8 w-8 rounded-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/default-profile.jpg';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                              <User className="h-4 w-4 text-gray-500" />
+                            </div>
+                          )}
                           <span>{emp.nombre}</span>
                         </div>
                       </td>
@@ -862,7 +911,7 @@ const TableEmployees = ({ isCollapsed }) => {
                             <input
                               type="file"
                               id="imagenPerfil"
-                              accept="image/*"
+                              accept="image/jpeg,image/png"
                               onChange={handleImageChange}
                               className="hidden"
                             />
@@ -875,6 +924,11 @@ const TableEmployees = ({ isCollapsed }) => {
                             <p className="text-xs text-zinc-500 mt-1">
                               Formatos: JPG, PNG (Max. 5MB)
                             </p>
+                            {selectedImage && (
+                              <p className="text-xs text-green-600 mt-1">
+                                Imagen seleccionada: {selectedImage.name}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
