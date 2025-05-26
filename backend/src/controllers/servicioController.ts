@@ -4,20 +4,23 @@ import { CreateServicioDto } from '../dtos/Servicio/CreateServicio.dto';
 import { UpdateServicioDto } from '../dtos/Servicio/UpdateServicio.dto';
 import path from 'path';
 import * as fs from 'fs';
+import { HttpResponse } from '../shared/response/http.response';
 
 export class ServicioController {
     private servicioService: ServicioService;
+    private httpResponse: HttpResponse;
 
     constructor() {
         this.servicioService = new ServicioService();
+        this.httpResponse = new HttpResponse();
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
             const servicios = await this.servicioService.findAll();
-            res.status(200).json(servicios);
+            this.httpResponse.OK(res, servicios);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener servicios', error });
+            this.httpResponse.Error(res, 'Error al obtener servicios');
         }
     };
 
@@ -27,13 +30,13 @@ export class ServicioController {
             const servicio = await this.servicioService.findById(id);
             
             if (!servicio) {
-                res.status(404).json({ message: 'Servicio no encontrado' });
+                this.httpResponse.NotFound(res, 'Servicio no encontrado');
                 return;
             }
             
-            res.status(200).json(servicio);
+            this.httpResponse.OK(res, servicio);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener servicio', error });
+            this.httpResponse.Error(res, 'Error al obtener servicio');
         }
     };
 
@@ -41,9 +44,9 @@ export class ServicioController {
         try {
             const nombre = req.params.nombre;
             const servicios = await this.servicioService.findByNombre(nombre);
-            res.status(200).json(servicios);
+            this.httpResponse.OK(res, servicios);
         } catch (error) {
-            res.status(500).json({ message: 'Error al buscar servicios por nombre', error });
+            this.httpResponse.Error(res, 'Error al buscar servicios por nombre');
         }
     };
 
@@ -53,20 +56,21 @@ export class ServicioController {
             console.log("Archivo recibido:", req.file);
 
             if (!req.body.nombre || !req.body.precio || !req.body.duracion) {
-                throw new Error('Nombre, precio y duración son requeridos');
+                this.httpResponse.BadRequest(res, 'Nombre, precio y duración son requeridos');
+                return;
             }
 
-            // Verifica que el archivo se recibió correctamente
             if (!req.file) {
-                throw new Error('No se recibió ningún archivo de imagen');
+                this.httpResponse.BadRequest(res, 'No se recibió ningún archivo de imagen');
+                return;
             }
 
             const imagenUrl = `/uploads/${req.file.filename}`;
             
-            // Verifica que el archivo existe físicamente
             const filePath = path.join(__dirname, '../../', imagenUrl);
             if (!fs.existsSync(filePath)) {
-                throw new Error('El archivo no se guardó correctamente en el servidor');
+                this.httpResponse.Error(res, 'El archivo no se guardó correctamente en el servidor');
+                return;
             }
 
             const servicioData = new CreateServicioDto({
@@ -79,13 +83,10 @@ export class ServicioController {
             });
 
             const servicio = await this.servicioService.create(servicioData);
-            res.status(201).json(servicio);
+            this.httpResponse.Created(res, servicio);
         } catch (error: any) {
             console.error('Error en create:', error);
-            res.status(500).json({
-                message: 'Error al crear servicio',
-                error: error.message
-            });
+            this.httpResponse.Error(res, error.message || 'Error al crear servicio');
         }
     };
 
@@ -93,7 +94,6 @@ export class ServicioController {
         try {
             const id = parseInt(req.params.id);
             
-            // Preparar los datos de actualización
             const updates: any = {
                 nombre: req.body.nombre,
                 precio: req.body.precio ? parseFloat(req.body.precio) : undefined,
@@ -102,7 +102,6 @@ export class ServicioController {
                 corteIds: req.body.corteIds ? JSON.parse(req.body.corteIds) : undefined
             };
             
-            // Si hay una nueva imagen, actualizar la URL
             if (req.file) {
                 updates.imagenUrl = `/uploads/${req.file.filename}`;
             }
@@ -110,18 +109,15 @@ export class ServicioController {
             const servicioData = new UpdateServicioDto(updates);
             const servicio = await this.servicioService.update(id, servicioData);
             
-            res.status(200).json(servicio);
+            this.httpResponse.OK(res, servicio);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
-                res.status(404).json({ message: error.message });
+                this.httpResponse.NotFound(res, error.message);
             } else if (error.message.includes('Cortes no encontrados')) {
-                res.status(400).json({ message: error.message });
+                this.httpResponse.BadRequest(res, error.message);
             } else {
                 console.error('Error en update:', error);
-                res.status(500).json({ 
-                    message: 'Error al actualizar servicio',
-                    error: error.message 
-                });
+                this.httpResponse.Error(res, 'Error al actualizar servicio');
             }
         }
     };
@@ -130,12 +126,12 @@ export class ServicioController {
         try {
             const id = parseInt(req.params.id);
             await this.servicioService.delete(id);
-            res.status(204).send();
+            this.httpResponse.NoContent(res);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
-                res.status(404).json({ message: error.message });
+                this.httpResponse.NotFound(res, error.message);
             } else {
-                res.status(500).json({ message: 'Error al eliminar servicio', error });
+                this.httpResponse.Error(res, 'Error al eliminar servicio');
             }
         }
     };

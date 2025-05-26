@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Menu, User, LogOut } from "lucide-react"
 import { toast } from "react-toastify"
-
+import { LoginService } from "../../services/LoginService" // Asegúrate de que la ruta sea correcta
 const Navbar = ({ toggleSidebar, isCollapsed }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const dropdownRef = useRef(null)
@@ -24,12 +24,31 @@ const Navbar = ({ toggleSidebar, isCollapsed }) => {
     }
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem("authData")
-    toast.success("Sesión cerrada correctamente")
-    navigate("/login")
-    setShowUserDropdown(false)
-  }
+  const handleLogout = async () => {
+    try {
+        console.log("Iniciando proceso de logout...");
+        
+        // Usar el LoginService que ya tienes configurado
+        await LoginService.logout();
+        
+        console.log("Logout exitoso - token enviado a blacklist");
+        toast.success("Sesión cerrada correctamente");
+        
+        // Redirigir al login
+        navigate('/login');
+        
+    } catch (error) {
+        console.error("Error en logout:", error);
+        
+        // Limpiar localStorage incluso si hay error en el servidor
+        localStorage.removeItem('authData');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        
+        toast.error("Error al cerrar sesión, pero se limpió la sesión local");
+        navigate('/login');
+    }
+  };
 
   return (
     <header

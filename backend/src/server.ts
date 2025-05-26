@@ -14,12 +14,23 @@ import empleadoRoutes from './routes/empleadoRoutes';
 import ingresoRoutes from './routes/ingresoRoutes';
 import servicioRoutes from './routes/servicioRoutes';
 import userRoutes from './routes/userRoutes';
+import authRoutes from './routes/auth.routes';
+import passport from 'passport';
+import { configurePassport } from './config/auth';
+
+
+config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
-app.use(cors());
+configurePassport();
+app.use(passport.initialize()); 
+app.use(cors({
+    origin: 'http://localhost:5173', // or your frontend URL
+    credentials: true
+}));
 app.use(express.json());
 
 // Ruta de prueba
@@ -35,6 +46,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')), (req, re
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });
+app.use('/api/auth', authRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/arqueos', arqueoCajaRoutes);
 app.use('/api/citas', citaRoutes);

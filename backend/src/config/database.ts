@@ -8,6 +8,7 @@ import { Empleado } from '../entity/empleado';
 import { Ingreso } from '../entity/ingreso';
 import { Servicio } from '../entity/servicio';
 import { User } from '../entity/user';
+import { TokenBlacklist } from '../entity/tokenBlacklist';
 
 export const AppDataSource = new DataSource({
     type: 'mysql',
@@ -26,7 +27,8 @@ export const AppDataSource = new DataSource({
         Empleado,
         Ingreso,
         Servicio,
-        User
+        User,
+        TokenBlacklist
     ],
     synchronize: false, // Cambia esto a false
     migrationsRun: true,
