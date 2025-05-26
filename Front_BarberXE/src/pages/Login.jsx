@@ -1,496 +1,496 @@
 import { useState, useEffect } from "react";
-import { 
-  Eye, 
-  EyeOff, 
-  User, 
-  Mail, 
-  Lock, 
-  Phone, 
-  AlertCircle, 
-  CheckCircle2,
-  ArrowRight,
-  UserPlus
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { FaEye, FaEyeSlash, FaUser, FaEnvelope, FaLock, FaPhone, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
+import { toast } from "react-toastify";
+import { LoginService } from "../services/LoginService";
+import { createUser } from "../services/ClientService";
+
 
 function Login() {
-  const [showRegister, setShowRegister] = useState(false);
-  const [name, setName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const navigate = useNavigate();
+    const [showRegister, setShowRegister] = useState(false);
+    const [formData, setFormData] = useState({
+        name: "",
+        lastName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        phone: ""
+    });
+    
+    const [errors, setErrors] = useState({
+        name: "",
+        lastName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        phone: ""
+    });
+    
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Estados de validación
-  const [nameError, setNameError] = useState("");
-  const [lastNameError, setLastNameError] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [confirmPasswordError, setConfirmPasswordError] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-
-  // Validación en tiempo real para el nombre
-  useEffect(() => {
-    if (name) {
-      if (name.length < 3) {
-        setNameError("El nombre debe tener al menos 3 caracteres");
-      } else if (name.length > 30) {
-        setNameError("El nombre no debe exceder 30 caracteres");
-      } else {
-        setNameError("");
-      }
-    } else {
-      setNameError("");
-    }
-  }, [name]);
-
-  // Validación en tiempo real para el apellido
-  useEffect(() => {
-    if (lastName) {
-      if (lastName.length < 3) {
-        setLastNameError("El apellido debe tener al menos 3 caracteres");
-      } else if (lastName.length > 30) {
-        setLastNameError("El apellido no debe exceder 30 caracteres");
-      } else {
-        setLastNameError("");
-      }
-    } else {
-      setLastNameError("");
-    }
-  }, [lastName]);
-
-  // Validación en tiempo real para el email
-  useEffect(() => {
-    if (email) {
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
-      if (!emailRegex.test(email)) {
-        setEmailError("Correo inválido. Debe incluir @ y terminar en .com");
-      } else {
-        setEmailError("");
-      }
-    } else {
-      setEmailError("");
-    }
-  }, [email]);
-
-  // Validación en tiempo real para la contraseña
-  useEffect(() => {
-    if (password) {
-      // Validación de longitud
-      if (password.length < 8) {
-        setPasswordError("La contraseña debe tener al menos 8 caracteres");
-        return;
-      } else if (password.length > 12) {
-        setPasswordError("La contraseña no debe exceder 12 caracteres");
-        return;
-      }
-
-      // Validación de caracteres permitidos
-      if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(password)) {
-        setPasswordError("La contraseña contiene caracteres no permitidos");
-        return;
-      }
-
-      // Validación de requisitos adicionales
-      let errorMessages = [];
-      
-      if (!/[A-Z]/.test(password)) {
-        errorMessages.push("al menos una letra mayúscula");
-      }
-      
-      if (!/[0-9]/.test(password)) {
-        errorMessages.push("al menos un número");
-      }
-      
-      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-        errorMessages.push("al menos un carácter especial");
-      }
-
-      if (errorMessages.length > 0) {
-        setPasswordError(`La contraseña debe contener ${errorMessages.join(", ")}`);
-      } else {
-        setPasswordError("");
-      }
-    } else {
-      setPasswordError("");
-    }
-  }, [password]);
-
-  // Validación en tiempo real para confirmar contraseña
-  useEffect(() => {
-    if (confirmPassword && password) {
-      if (confirmPassword !== password) {
-        setConfirmPasswordError("Las contraseñas no coinciden");
-      } else {
-        setConfirmPasswordError("");
-      }
-    } else {
-      setConfirmPasswordError("");
-    }
-  }, [confirmPassword, password]);
-
-  // Validación en tiempo real para el teléfono
-  useEffect(() => {
-    if (phone) {
-      if (phone.length < 7) {
-        setPhoneError("El teléfono debe tener al menos 7 dígitos");
-      } else if (phone.length > 10) {
-        setPhoneError("El teléfono no debe exceder 10 dígitos");
-      } else {
-        setPhoneError("");
-      }
-    } else {
-      setPhoneError("");
-    }
-  }, [phone]);
-
-  const handleRegister = () => {
-    setShowRegister(true);
-  };
-
-  const handleSubmit = async () => {
-    try {
-      if (showRegister) {
-        // Validaciones de registro
-        if (
-          nameError ||
-          lastNameError ||
-          emailError ||
-          passwordError ||
-          confirmPasswordError ||
-          phoneError
-        ) {
-          alert("Por favor corrige los errores en el formulario");
-          return;
+    // Validaciones
+    useEffect(() => {
+        // Validación de nombre
+        if (formData.name) {
+            if (formData.name.length < 3) {
+                setErrors(prev => ({...prev, name: "El nombre debe tener al menos 3 caracteres"}));
+            } else if (formData.name.length > 30) {
+                setErrors(prev => ({...prev, name: "El nombre no debe exceder 30 caracteres"}));
+            } else {
+                setErrors(prev => ({...prev, name: ""}));
+            }
         }
-
-        if (password !== confirmPassword) {
-          alert("Las contraseñas no coinciden");
-          return;
+        
+        // Validación de apellido
+        if (formData.lastName) {
+            if (formData.lastName.length < 3) {
+                setErrors(prev => ({...prev, lastName: "El apellido debe tener al menos 3 caracteres"}));
+            } else if (formData.lastName.length > 30) {
+                setErrors(prev => ({...prev, lastName: "El apellido no debe exceder 30 caracteres"}));
+            } else {
+                setErrors(prev => ({...prev, lastName: ""}));
+            }
         }
+        
+        // Validación de email
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
+        if (formData.email) {
+            if (!emailRegex.test(formData.email)) {
+                setErrors(prev => ({...prev, email: "Correo inválido. Debe incluir @ y terminar en .com"}));
+            } else {
+                setErrors(prev => ({...prev, email: ""}));
+            }
+        }
+        
+        // Validación de contraseña
+        if (formData.password) {
+            if (formData.password.length < 8) {
+                setErrors(prev => ({...prev, password: "La contraseña debe tener al menos 8 caracteres"}));
+            } else if (formData.password.length > 12) {
+                setErrors(prev => ({...prev, password: "La contraseña no debe exceder 12 caracteres"}));
+            } else if (!/^[a-zA-Z0-9]{8,12}$/.test(formData.password)) {
+                setErrors(prev => ({...prev, password: "La contraseña solo debe contener letras y números"}));
+            } else {
+                setErrors(prev => ({...prev, password: ""}));
+            }
+        }
+        
+        // Validación de confirmación de contraseña
+        if (formData.confirmPassword) {
+            if (formData.confirmPassword !== formData.password) {
+                setErrors(prev => ({...prev, confirmPassword: "Las contraseñas no coinciden"}));
+            } else {
+                setErrors(prev => ({...prev, confirmPassword: ""}));
+            }
+        }
+        
+        // Validación de teléfono
+        if (formData.phone) {
+            if (formData.phone.length < 7) {
+                setErrors(prev => ({...prev, phone: "El teléfono debe tener al menos 7 dígitos"}));
+            } else if (formData.phone.length > 10) {
+                setErrors(prev => ({...prev, phone: "El teléfono no debe exceder 10 dígitos"}));
+            } else {
+                setErrors(prev => ({...prev, phone: ""}));
+            }
+        }
+    }, [formData]);
 
-        // Simular creación de usuario
-        const newUser = {
-          cliente: {
-            nombre: name,
-            apellido: lastName,
-            telefono: phone,
-          },
-          usuario: email,
-          contraseña: password,
-        };
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
 
-        console.log("Registrando usuario:", newUser);
-        alert("Cuenta creada con éxito. Ahora puedes iniciar sesión.");
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (showRegister) {
+            // Lógica de registro (sin cambios)
+            if (Object.values(errors).some(error => error !== "")) {
+                toast.error("Por favor corrige los errores en el formulario");
+                return;
+            }
+            
+            if (formData.password !== formData.confirmPassword) {
+                toast.error("Las contraseñas no coinciden");
+                return;
+            }
+            
+            try {
+                const newUser = {
+                    cliente: {
+                        nombre: formData.name,
+                        apellido: formData.lastName,
+                        telefono: formData.phone,
+                    },
+                    usuario: formData.email,
+                    contraseña: formData.password,
+                };
 
-        // Limpiar campos y cambiar a vista de login
-        setName("");
-        setLastName("");
-        setPhone("");
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setShowRegister(false);
-      } else {
-        // Lógica de login
-        const credentials = {
-          usuario: email,
-          contraseña: password
-        };
+                const response = await createUser(newUser);
+                toast.success("Cuenta creada con éxito. Ahora puedes iniciar sesión.");
+                
+                setFormData({
+                    name: "",
+                    lastName: "",
+                    email: "",
+                    password: "",
+                    confirmPassword: "",
+                    phone: ""
+                });
+                setShowRegister(false);
+            } catch (error) {
+                toast.error(error.message || "Error al crear la cuenta");
+            }
+        } else {
+            // Lógica de login mejorada
+            try {
+                const credentials = {
+                    usuario: formData.email,
+                    contraseña: formData.password
+                };
 
-        console.log("Iniciando sesión:", credentials);
-        alert(`¡Bienvenido ${email}!`);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Ha ocurrido un error. Por favor intenta de nuevo.");
-    }
-  };
+                console.log("Enviando credenciales:", credentials);
+                const authData = await LoginService.login(credentials);
+                console.log("Datos de autenticación recibidos:", authData);
 
-  // Componente para mensajes de validación
-  const ValidationMessage = ({ message, isValid }) => {
-    if (!message) return null;
+                // Verificación más estricta de la estructura de respuesta
+                if (!authData || !authData.token || !authData.user || !authData.role) {
+                    console.error("Estructura de respuesta inválida:", authData);
+                    throw new Error('Respuesta de autenticación inválida del servidor');
+                }
+
+                // Guardar en localStorage con estructura consistente
+                const authInfo = {
+                    isAuthenticated: true,
+                    user: authData.user,
+                    role: authData.role,
+                    token: authData.token
+                };
+                
+                localStorage.setItem('authData', JSON.stringify(authInfo));
+                localStorage.setItem('authToken', authData.token);
+                
+                console.log("Datos guardados en localStorage:", authInfo);
+
+                toast.success(`¡Bienvenido ${authData.user.username || authData.user.name || 'Usuario'}!`);
+
+                // Redirección mejorada según rol
+                const roleRoutes = {
+                    admin: '/admin',
+                    empleado: '/cajero',
+                    cajero: '/cajero',
+                    cliente: '/cliente'
+                };
+                
+                const userRole = authData.role.toLowerCase();
+                const redirectPath = roleRoutes[userRole];
+                
+                if (!redirectPath) {
+                    console.error(`Rol no reconocido: ${userRole}`);
+                    toast.error("Rol de usuario no válido");
+                    return;
+                }
+                
+                console.log(`Redirigiendo a: ${redirectPath} (Rol: ${userRole})`);
+                
+                // Usar setTimeout para asegurar que el localStorage se haya guardado
+                setTimeout(() => {
+                    navigate(redirectPath, { replace: true });
+                }, 100);
+                
+            } catch (error) {
+                console.error("Error completo de login:", {
+                    message: error.message,
+                    stack: error.stack,
+                    response: error.response
+                });
+                
+                let errorMessage = "Error en el servidor";
+                
+                if (error.message.includes("401") || error.message.toLowerCase().includes("credenciales")) {
+                    errorMessage = "Credenciales incorrectas";
+                } else if (error.message.includes("estructura") || error.message.includes("inválida")) {
+                    errorMessage = "Error en el formato de respuesta del servidor";
+                } else if (error.message.toLowerCase().includes("network") || error.message.toLowerCase().includes("fetch")) {
+                    errorMessage = "Error de conexión con el servidor";
+                } else if (error.message.toLowerCase().includes("cors")) {
+                    errorMessage = "Error de configuración del servidor";
+                }
+                
+                toast.error(errorMessage);
+                
+                // Limpiar localStorage en caso de error
+                localStorage.removeItem('authData');
+                localStorage.removeItem('authToken');
+            }
+        }
+    };
+
+    const ValidationMessage = ({ message, isValid }) => {
+        if (!message) return null;
+
+        return (
+            <div className={`text-sm mt-1 flex items-center ${isValid ? "text-green-600" : "text-red-600"}`}>
+                {isValid ? (
+                    <FaCheckCircle className="mr-1" />
+                ) : (
+                    <FaExclamationCircle className="mr-1" />
+                )}
+                {message}
+            </div>
+        );
+    };
+
+    const getInputBorderClass = (value, error) => {
+        if (!value) return "border-gray-300";
+        return error ? "border-red-500 focus:ring-red-500" : "border-green-500 focus:ring-green-500";
+    };
 
     return (
-      <div className={`text-xs mt-2 flex items-center transition-all duration-200 ${
-        isValid ? "text-green-600" : "text-red-500"
-      }`}>
-        {isValid ? (
-          <CheckCircle2 className="w-3 h-3 mr-1.5 flex-shrink-0" />
-        ) : (
-          <AlertCircle className="w-3 h-3 mr-1.5 flex-shrink-0" />
-        )}
-        <span className="leading-tight">{message}</span>
-      </div>
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
+            <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+                <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">
+                    {showRegister ? "Crear cuenta" : "Iniciar sesión"}
+                </h2>
+
+                <div className="flex mb-6 border-b border-gray-200">
+                    <button
+                        type="button"
+                        className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${
+                            !showRegister 
+                            ? "text-white bg-blue-600 rounded-t-lg" 
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                        onClick={() => setShowRegister(false)}
+                    >
+                        Iniciar sesión
+                    </button>
+                    <button
+                        type="button"
+                        className={`py-3 px-6 font-medium text-sm flex-1 text-center transition-colors ${
+                            showRegister 
+                            ? "text-white bg-blue-600 rounded-t-lg" 
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                        onClick={() => setShowRegister(true)}
+                    >
+                        Registrarse
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    {showRegister && (
+                        <>
+                            <div className="mb-4 flex gap-4">
+                                <div className="w-1/2">
+                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                        Nombre
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <FaUser className="text-gray-400" />
+                                        </div>
+                                        <input
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleInputChange}
+                                            className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                                getInputBorderClass(formData.name, errors.name)
+                                            }`}
+                                            type="text"
+                                            placeholder="Nombre (3-30 caracteres)"
+                                            minLength={3}
+                                            maxLength={30}
+                                            required
+                                        />
+                                    </div>
+                                    <ValidationMessage message={errors.name} isValid={!errors.name} />
+                                </div>
+                                
+                                <div className="w-1/2">
+                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                        Apellido
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <FaUser className="text-gray-400" />
+                                        </div>
+                                        <input
+                                            name="lastName"
+                                            value={formData.lastName}
+                                            onChange={handleInputChange}
+                                            className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                                getInputBorderClass(formData.lastName, errors.lastName)
+                                            }`}
+                                            type="text"
+                                            placeholder="Apellido (3-30 caracteres)"
+                                            minLength={3}
+                                            maxLength={30}
+                                            required
+                                        />
+                                    </div>
+                                    <ValidationMessage message={errors.lastName} isValid={!errors.lastName} />
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                    Teléfono
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <FaPhone className="text-gray-400" />
+                                    </div>
+                                    <input
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleInputChange}
+                                        className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                            getInputBorderClass(formData.phone, errors.phone)
+                                        }`}
+                                        type="tel"
+                                        placeholder="Teléfono (7-10 dígitos)"
+                                        minLength={7}
+                                        maxLength={10}
+                                        pattern="[0-9]{7,10}"
+                                        required
+                                    />
+                                </div>
+                                <ValidationMessage message={errors.phone} isValid={!errors.phone} />
+                            </div>
+                        </>
+                    )}
+
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                            Correo electrónico
+                        </label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaEnvelope className="text-gray-400" />
+                            </div>
+                            <input
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                    getInputBorderClass(formData.email, errors.email)
+                                }`}
+                                type="email"
+                                placeholder="correo@ejemplo.com"
+                                required
+                            />
+                        </div>
+                        <ValidationMessage message={errors.email} isValid={!errors.email} />
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                            Contraseña
+                        </label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaLock className="text-gray-400" />
+                            </div>
+                            <input
+                                name="password"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                    getInputBorderClass(formData.password, errors.password)
+                                }`}
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Contraseña (8-12 caracteres)"
+                                minLength={8}
+                                maxLength={12}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <FaEyeSlash className="text-gray-400 hover:text-gray-600" />
+                                ) : (
+                                    <FaEye className="text-gray-400 hover:text-gray-600" />
+                                )}
+                            </button>
+                        </div>
+                        <ValidationMessage message={errors.password} isValid={!errors.password} />
+                    </div>
+
+                    {showRegister && (
+                        <div className="mb-6">
+                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                Confirmar contraseña
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaLock className="text-gray-400" />
+                                </div>
+                                <input
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleInputChange}
+                                    className={`pl-10 appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:border-transparent ${
+                                        getInputBorderClass(formData.confirmPassword, errors.confirmPassword)
+                                    }`}
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder="Confirmar contraseña"
+                                    minLength={8}
+                                    maxLength={12}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                >
+                                    {showConfirmPassword ? (
+                                        <FaEyeSlash className="text-gray-400 hover:text-gray-600" />
+                                    ) : (
+                                        <FaEye className="text-gray-400 hover:text-gray-600" />
+                                    )}
+                                </button>
+                            </div>
+                            <ValidationMessage message={errors.confirmPassword} isValid={!errors.confirmPassword} />
+                        </div>
+                    )}
+
+                    <div className="mt-8">
+                        <button
+                            type="submit"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200"
+                        >
+                            {showRegister ? "Crear cuenta" : "Iniciar sesión"}
+                        </button>
+                    </div>
+                </form>
+
+                {!showRegister && (
+                    <div className="mt-6 text-center">
+                        <p className="text-gray-600 text-sm">
+                            ¿No tienes una cuenta?{" "}
+                            <button
+                                type="button"
+                                className="text-blue-600 hover:text-blue-800 font-semibold focus:outline-none"
+                                onClick={() => setShowRegister(true)}
+                            >
+                                Regístrate
+                            </button>
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
     );
-  };
-
-  // Función para determinar el estilo del borde según la validación
-  const getInputBorderClass = (value, error) => {
-    if (!value) return "border-gray-200 focus:border-red-500";
-    return error
-      ? "border-red-400 focus:border-red-500 bg-red-50"
-      : "border-green-400 focus:border-green-500 bg-green-50";
-  };
-
-  return (
-    <div className="min-h-screen bg-white from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
-        {/* Header con animación */}
-        <div className="text-center mb-8">
-          <div className="relative">
-            <div className="w-20 h-20 bg-gradient-to-r from-red-500 to-red-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform duration-300">
-              {showRegister ? (
-                <UserPlus className="w-10 h-10 text-white" />
-              ) : (
-                <User className="w-10 h-10 text-white" />
-              )}
-            </div>
-            {/* Círculos decorativos */}
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4 w-32 h-32 bg-red-500/10 rounded-full blur-xl"></div>
-          </div>
-          
-          <h1 className="text-3xl font-bold text-black mb-3">
-            {showRegister ? "Crear Nueva Cuenta" : "Bienvenido de Vuelta"}
-          </h1>
-          <p className="text-gray-500 text-sm">
-            {showRegister 
-              ? "Únete a nuestra plataforma completando el registro" 
-              : "Ingresa tus credenciales para acceder a tu cuenta"
-            }
-          </p>
-        </div>
-
-        {/* Main Card */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-gray-200/50">
-          {/* Toggle Buttons */}
-          <div className="flex mb-8 bg-gray-100 rounded-2xl p-1.5 relative overflow-hidden">
-            <div 
-              className={`absolute top-1.5 bottom-1.5 bg-gradient-to-r from-red-500 to-red-600 rounded-xl transition-all duration-300 shadow-lg ${
-                showRegister ? 'left-1/2 right-1.5' : 'left-1.5 right-1/2'
-              }`}
-            ></div>
-            
-            <button
-              className={`flex-1 py-3.5 px-4 rounded-xl font-semibold text-sm transition-all duration-300 relative z-10 ${
-                !showRegister
-                  ? "text-white"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-              onClick={() => setShowRegister(false)}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              className={`flex-1 py-3.5 px-4 rounded-xl font-semibold text-sm transition-all duration-300 relative z-10 ${
-                showRegister
-                  ? "text-white"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-              onClick={handleRegister}
-            >
-              Registrarse
-            </button>
-          </div>
-
-          {/* Form Content */}
-          <div className="space-y-6">
-            {showRegister && (
-              <>
-                {/* Nombre y Apellido */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block text-gray-700 text-sm font-semibold">
-                      Nombre
-                    </label>
-                    <div className="relative group">
-                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                      <input
-                        className={`w-full pl-12 pr-4 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(name, nameError)}`}
-                        type="text"
-                        placeholder="Escribe tu nombre"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        minLength={3}
-                        maxLength={30}
-                      />
-                    </div>
-                    <ValidationMessage message={nameError} isValid={false} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-gray-700 text-sm font-semibold">
-                      Apellido
-                    </label>
-                    <div className="relative group">
-                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                      <input
-                        className={`w-full pl-12 pr-4 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(lastName, lastNameError)}`}
-                        type="text"
-                        placeholder="Escribe tu apellido"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        minLength={3}
-                        maxLength={30}
-                      />
-                    </div>
-                    <ValidationMessage message={lastNameError} isValid={false} />
-                  </div>
-                </div>
-
-                {/* Teléfono */}
-                <div className="space-y-2">
-                  <label className="block text-gray-700 text-sm font-semibold">
-                    Número de Teléfono
-                  </label>
-                  <div className="relative group">
-                    <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                    <input
-                      className={`w-full pl-12 pr-4 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(phone, phoneError)}`}
-                      type="tel"
-                      placeholder="1234567890"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                      minLength={7}
-                      maxLength={10}
-                    />
-                  </div>
-                  <ValidationMessage message={phoneError} isValid={false} />
-                </div>
-              </>
-            )}
-
-            {/* Email */}
-            <div className="space-y-2">
-              <label className="block text-gray-700 text-sm font-semibold">
-                Correo Electrónico
-              </label>
-              <div className="relative group">
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                <input
-                  className={`w-full pl-12 pr-4 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(email, emailError)}`}
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  maxLength={100}
-                />
-              </div>
-              <ValidationMessage message={emailError} isValid={false} />
-            </div>
-
-            {/* Contraseña */}
-            <div className="space-y-2">
-              <label className="block text-gray-700 text-sm font-semibold">
-                Contraseña
-              </label>
-              <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                <input
-                  className={`w-full pl-12 pr-14 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(password, passwordError)}`}
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Crea una contraseña segura"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  minLength={8}
-                  maxLength={12}
-                />
-                <button
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors duration-200"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              <ValidationMessage message={passwordError} isValid={false} />
-            </div>
-
-            {/* Confirmar Contraseña */}
-            {showRegister && (
-              <div className="space-y-2">
-                <label className="block text-gray-700 text-sm font-semibold">
-                  Confirmar Contraseña
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors" />
-                  <input
-                    className={`w-full pl-12 pr-14 py-4 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 text-black placeholder-gray-400 ${getInputBorderClass(confirmPassword, confirmPasswordError)}`}
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Repite tu contraseña"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    minLength={8}
-                    maxLength={12}
-                  />
-                  <button
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors duration-200"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                <ValidationMessage message={confirmPasswordError} isValid={false} />
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <div className="pt-4">
-              <button
-                onClick={handleSubmit}
-                className="group w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-4 px-6 rounded-2xl focus:outline-none focus:ring-4 focus:ring-red-500/30 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-xl hover:shadow-2xl flex items-center justify-center space-x-3"
-              >
-                <span className="text-lg">
-                  {showRegister ? "Crear Mi Cuenta" : "Iniciar Sesión"}
-                </span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-              </button>
-            </div>
-          </div>
-
-          {/* Footer Links */}
-          <div className="mt-8 text-center">
-            {!showRegister ? (
-              <p className="text-gray-600 text-sm">
-                ¿No tienes cuenta?{" "}
-                <button
-                  onClick={handleRegister}
-                  className="text-red-600 hover:text-red-700 font-semibold focus:outline-none transition-colors duration-200 underline decoration-2 underline-offset-2"
-                >
-                  Regístrate
-                </button>
-              </p>
-            ) : (
-              <p className="text-gray-600 text-sm">
-                ¿Ya tienes cuenta?{" "}
-                <button
-                  onClick={() => setShowRegister(false)}
-                  className="text-red-600 hover:text-red-700 font-semibold focus:outline-none transition-colors duration-200 underline decoration-2 underline-offset-2"
-                >
-                  Inicia sesión
-                </button>
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Text */}
-        <div className="text-center mt-6">
-          <p className="text-gray-400 text-xs">
-            Al continuar, aceptas nuestros{" "}
-            <span className="text-red-400 hover:text-red-300 cursor-pointer transition-colors">
-              Términos de Servicio
-            </span>{" "}
-            y{" "}
-            <span className="text-red-400 hover:text-red-300 cursor-pointer transition-colors">
-              Política de Privacidad
-            </span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default Login;

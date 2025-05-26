@@ -4,20 +4,23 @@ import { CreateCorteDto } from '../dtos/Corte/CreateCorter.dto';
 import * as fs from 'fs';
 import { UpdateCorteDto } from '../dtos/Corte/UpdateCorte.dto';
 import path from 'path';
+import { HttpResponse } from '../shared/response/http.response';
 
 export class CorteController {
     private corteService: CorteService;
+    private httpResponse: HttpResponse;
 
     constructor() {
         this.corteService = new CorteService();
+        this.httpResponse = new HttpResponse();
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
             const cortes = await this.corteService.findAll();
-            res.status(200).json(cortes);
+            this.httpResponse.OK(res, cortes);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener cortes', error });
+            this.httpResponse.Error(res, 'Error al obtener cortes');
         }
     };
 
@@ -27,13 +30,13 @@ export class CorteController {
             const corte = await this.corteService.findById(id);
             
             if (!corte) {
-                res.status(404).json({ message: 'Corte no encontrado' });
+                this.httpResponse.NotFound(res, 'Corte no encontrado');
                 return;
             }
             
-            res.status(200).json(corte);
+            this.httpResponse.OK(res, corte);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener corte', error });
+            this.httpResponse.Error(res, 'Error al obtener corte');
         }
     };
 
@@ -41,9 +44,9 @@ export class CorteController {
         try {
             const estilo = req.params.estilo;
             const cortes = await this.corteService.findByEstilo(estilo);
-            res.status(200).json(cortes);
+            this.httpResponse.OK(res, cortes);
         } catch (error) {
-            res.status(500).json({ message: 'Error al buscar cortes por estilo', error });
+            this.httpResponse.Error(res, 'Error al buscar cortes por estilo');
         }
     };
 
@@ -51,37 +54,35 @@ export class CorteController {
         try {
             console.log("Body recibido:", req.body);
             console.log("Archivo recibido:", req.file);
-    
+
             if (!req.body.estilo) {
-                throw new Error('El campo estilo es requerido');
+                this.httpResponse.BadRequest(res, 'El campo estilo es requerido');
+                return;
             }
-    
-            // Verifica que el archivo se recibió correctamente
+
             if (!req.file) {
-                throw new Error('No se recibió ningún archivo de imagen');
+                this.httpResponse.BadRequest(res, 'No se recibió ningún archivo de imagen');
+                return;
             }
-    
+
             const imagenUrl = `/uploads/${req.file.filename}`;
             
-            // Verifica que el archivo existe físicamente
             const filePath = path.join(__dirname, '../../', imagenUrl);
             if (!fs.existsSync(filePath)) {
-                throw new Error('El archivo no se guardó correctamente en el servidor');
+                this.httpResponse.Error(res, 'El archivo no se guardó correctamente en el servidor');
+                return;
             }
-    
+
             const corteData = new CreateCorteDto({
                 estilo: req.body.estilo,
-                imagenUrl: imagenUrl // Asegúrate de incluir la URL
+                imagenUrl: imagenUrl
             });
-    
+
             const corte = await this.corteService.create(corteData);
-            res.status(201).json(corte);
+            this.httpResponse.Created(res, corte);
         } catch (error: any) {
             console.error('Error en create:', error);
-            res.status(500).json({
-                message: 'Error al crear corte',
-                error: error.message
-            });
+            this.httpResponse.Error(res, error.message || 'Error al crear corte');
         }
     };
 
@@ -89,12 +90,10 @@ export class CorteController {
         try {
             const id = parseInt(req.params.id);
             
-            // Preparar los datos de actualización (sin servicioIds)
             const updates: any = {
                 estilo: req.body.estilo
             };
             
-            // Si hay una nueva imagen, actualizar la URL
             if (req.file) {
                 updates.imagenUrl = `/uploads/${req.file.filename}`;
             }
@@ -102,16 +101,13 @@ export class CorteController {
             const corteData = new UpdateCorteDto(updates);
             const corte = await this.corteService.update(id, corteData);
             
-            res.status(200).json(corte);
+            this.httpResponse.OK(res, corte);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
-                res.status(404).json({ message: error.message });
+                this.httpResponse.NotFound(res, error.message);
             } else {
                 console.error('Error en update:', error);
-                res.status(500).json({ 
-                    message: 'Error al actualizar Corte',
-                    error: error.message
-                });
+                this.httpResponse.Error(res, 'Error al actualizar Corte');
             }
         }
     };
@@ -120,16 +116,13 @@ export class CorteController {
         try {
             const id = parseInt(req.params.id);
             await this.corteService.delete(id);
-            res.status(204).send();
+            this.httpResponse.NoContent(res);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
-                res.status(404).json({ message: error.message });
+                this.httpResponse.NotFound(res, error.message);
             } else {
                 console.error('Error en delete:', error);
-                res.status(500).json({ 
-                    message: 'Error al eliminar corte', 
-                    error: error.message 
-                });
+                this.httpResponse.Error(res, 'Error al eliminar corte');
             }
         }
     };

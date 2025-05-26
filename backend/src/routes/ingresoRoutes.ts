@@ -1,15 +1,39 @@
 import { Router } from 'express';
 import { IngresoController } from '../controllers/ingresoController';
+import { AuthMiddleware } from '../middleware/auth.middleware';
+import { RoleType } from '../types/auth.types';
 
 const router = Router();
 const controller = new IngresoController();
+const authMiddleware = new AuthMiddleware();
 
-// Rutas básicas
-router.get('/', controller.getAll);
-router.post('/', controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', controller.update);
-router.get('/arqueo/:arqueoId', controller.getByArqueoId);
+// Aplicar autenticación JWT a todas las rutas
+router.use(authMiddleware.passAuth('jwt'));
 
+// Rutas básicas - Solo ADMIN y EMPLEADO manejan ingresos
+router.get('/', 
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    controller.getAll
+);
+
+router.post('/', 
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    controller.create
+);
+
+router.get('/:id', 
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    controller.getById
+);
+
+router.put('/:id', 
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    controller.update
+);
+
+router.get('/arqueo/:arqueoId', 
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    controller.getByArqueoId
+);
 
 export default router;

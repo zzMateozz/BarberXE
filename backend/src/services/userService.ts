@@ -9,7 +9,8 @@ import { Empleado } from '../entity/empleado';
 import { Cliente } from '../entity/cliente';
 import { Cita } from '../entity/cita';
 import { ArqueoCaja } from '../entity/arqueoCaja';
-import * as bcrypt from 'bcryptjs';
+import { createHashValue, isValidPassword } from '../utils/hash';
+import { RoleType } from '../types/auth.types';
 
 export class UserService {
     private userRepository: Repository<User>;
@@ -26,7 +27,7 @@ export class UserService {
         });
     }
 
-    async findById(id: number): Promise<User> {  // Removemos el | null
+    async findById(id: number): Promise<User> {
         const user = await UserRepository.findOne({
             where: { idUser: id },
             relations: ['empleado', 'cliente']
@@ -38,10 +39,39 @@ export class UserService {
     }
 
     async findByUsername(username: string): Promise<User | null> {
-        return await UserRepository.findOne({
-            where: { usuario: username },
-            relations: ['empleado', 'cliente']
-        });
+        return await this.userRepository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.empleado', 'empleado')
+            .leftJoinAndSelect('user.cliente', 'cliente')
+            .where('user.usuario = :username', { username })
+            .getOne();
+    }
+
+    /**
+     * Encuentra un usuario por ID con un rol específico
+     */
+    async findUserWithRole(userId: string, role: RoleType): Promise<User | null> {
+        try {
+            const user = await this.findById(parseInt(userId));
+            const userRole = this.determineUserRole(user);
+            
+            return userRole === role ? user : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Determina el rol del usuario basado en sus relaciones
+     */
+    private determineUserRole(user: User): RoleType {
+        if (user.empleado) {
+            return RoleType.EMPLEADO;
+        } else if (user.cliente) {
+            return RoleType.CLIENTE;
+        } else {
+            return RoleType.ADMIN;
+        }
     }
 
     async create(userData: CreateUserDto): Promise<User> {
@@ -74,8 +104,8 @@ export class UserService {
             if (userData.empleado) {
                 empleado = new Empleado();
                 Object.assign(empleado, userData.empleado);
-                empleado.estado = empleado.estado || 'activo'; // Valor por defecto
-                empleado.cargo = empleado.cargo || 'Cajero'; // Valor por defecto
+                empleado.estado = empleado.estado || 'activo';
+                empleado.cargo = empleado.cargo || 'Cajero';
                 await queryRunner.manager.save(empleado);
             }
 
@@ -84,11 +114,10 @@ export class UserService {
                 throw new Error('El usuario debe tener asociado un cliente o un empleado');
             }
 
-            // Crear el usuario
+            // Crear el usuario con contraseña hasheada
             const user = new User();
             user.usuario = userData.usuario;
-            user.contraseña = userData.contraseña;
-            //user.contraseña = await bcrypt.hash(userData.contraseña, 10); // Encriptar contraseña
+            user.contraseña = await createHashValue(userData.contraseña); // Hash password
             if (cliente) user.cliente = cliente;
             if (empleado) user.empleado = empleado;
 
@@ -115,27 +144,14 @@ export class UserService {
     }
 
     async login(loginData: LoginUserDto): Promise<any> {
-        const user = await UserRepository.findOne({
-            where: {
-                usuario: loginData.usuario,
-                contraseña: loginData.contraseña
-            },
-            relations: ['empleado', 'cliente']
-        });
+        const user = await this.findByUsername(loginData.usuario);
 
-        if (!user) {
+        if (!user || !(await isValidPassword(loginData.contraseña, user.contraseña))) {
             throw new Error('Credenciales inválidas');
         }
 
         // Determinar el rol
-        let role: string;
-        if (user.empleado) {
-            role = 'empleado'; 
-        } else if (user.cliente) {
-            role = 'cliente';
-        } else {
-            role = 'admin'; // No tiene relaciones
-        }
+        const role = this.determineUserRole(user);
 
         // Eliminar datos sensibles
         const { contraseña, ...safeUser } = user;
@@ -145,6 +161,7 @@ export class UserService {
             role
         };
     }
+
     async update(id: number, userData: UpdateUserDto): Promise<User> {
         const queryRunner = UserRepository.manager.connection.createQueryRunner();
         await queryRunner.connect();
@@ -158,7 +175,9 @@ export class UserService {
 
             // Actualizar solo campos permitidos
             if (userData.usuario) user.usuario = userData.usuario;
-            if (userData.contraseña) user.contraseña = userData.contraseña;
+            if (userData.contraseña) {
+                user.contraseña = await createHashValue(userData.contraseña); // Hash new password
+            }
 
             await queryRunner.manager.save(user);
             await queryRunner.commitTransaction();
@@ -185,19 +204,16 @@ export class UserService {
 
             // 1. Eliminar citas asociadas al empleado (si existe)
             if (user.empleado) {
-                // Primero eliminar las relaciones many-to-many si existen
                 await queryRunner.manager.query(
                     `DELETE FROM cita_servicios_servicio WHERE citaIdCita IN 
                     (SELECT idCita FROM cita WHERE empleadoIdEmpleado = ?)`,
                     [user.empleado.idEmpleado]
                 );
 
-                // Luego eliminar las citas
                 await queryRunner.manager.delete(Cita, {
                     empleado: { idEmpleado: user.empleado.idEmpleado }
                 });
 
-                // Eliminar arqueos de caja asociados al empleado
                 await queryRunner.manager.delete(ArqueoCaja, {
                     empleado: { idEmpleado: user.empleado.idEmpleado }
                 });
@@ -205,14 +221,12 @@ export class UserService {
 
             // 2. Eliminar citas asociadas al cliente (si existe)
             if (user.cliente) {
-                // Primero eliminar las relaciones many-to-many si existen
                 await queryRunner.manager.query(
                     `DELETE FROM cita_servicios_servicio WHERE citaIdCita IN 
                     (SELECT idCita FROM cita WHERE clienteIdCliente = ?)`,
                     [user.cliente.idCliente]
                 );
 
-                // Luego eliminar las citas
                 await queryRunner.manager.delete(Cita, {
                     cliente: { idCliente: user.cliente.idCliente }
                 });
@@ -234,7 +248,6 @@ export class UserService {
         } catch (error) {
             await queryRunner.rollbackTransaction();
 
-            // Mejorar el mensaje de error para diagnóstico
             console.error('Error detallado al eliminar usuario:', {
                 userId: id,
                 error: error instanceof Error ? error.message : error,
