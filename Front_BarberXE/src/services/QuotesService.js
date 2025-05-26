@@ -35,6 +35,13 @@ export const fetchCitas = async () => {
   return handleResponse(response);
 };
 
+export const fetchCitasByClienteId = async (clienteId) => {
+  const response = await fetch(`${API_BASE_URL}/citas/cliente/${clienteId}`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
+};
+
 export const createCita = async (citaData) => {
   const response = await fetch(`${API_BASE_URL}/citas`, {
     method: 'POST',

@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useState } from "react";
-import { Bar, Line, Pie } from "react-chartjs-2";
+import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
 import { 
   Chart as ChartJS,
   Filler,
@@ -14,17 +14,14 @@ import {
   Tooltip, 
   Legend 
 } from 'chart.js';
-import { ArrowDown, ArrowUp } from "lucide-react"; 
+import { ArrowDown, ArrowUp, TrendingUp, Users, DollarSign, Scissors, Calendar, Activity } from "lucide-react"; 
 import {
   fetchAllIngresos,
   fetchAllegresos
 } from "@/services/ArqueoService";
 import { fetchClients } from "@/services/ClientService";
-// Asegúrate de que tu ServiceService contenga estas dos funciones:
-// fetchServices() para servicios generales y fetchAllCuts() para los cortes.
 import { fetchEmployees } from "@/services/EmployeeService";
 import { fetchServices, fetchAllCuts } from "@/services/ServiceService";
-
 
 // Registrar componentes de Chart.js
 ChartJS.register(
@@ -49,36 +46,48 @@ const ensureArray = (data) => {
     return [];
 };
 
-// Paleta de colores actualizada: Rojo más claro y Zinc-700
-const ZINC_700_RGBA = 'rgba(63, 63, 70, 0.8)'; // #3f3f46 con 0.8 de opacidad
-const ZINC_700_BORDER = '#3f3f46';
+// Paleta de colores rojo, negro y gris
+const GRADIENT_COLORS = {
+  primary: {
+    bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', // Rojo
+    light: 'rgba(239, 68, 68, 0.1)',
+    main: '#ef4444'
+  },
+  success: {
+    bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', // Rojo
+    light: 'rgba(239, 68, 68, 0.1)',
+    main: '#ef4444'
+  },
+  warning: {
+    bg: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)', // Negro
+    light: 'rgba(31, 41, 55, 0.1)',
+    main: '#1f2937'
+  },
+  info: {
+    bg: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)', // Gris
+    light: 'rgba(107, 114, 128, 0.1)',
+    main: '#6b7280'
+  }
+};
 
-const LIGHT_RED_RGBA = 'rgba(255, 1, 56, 0.8)'; // Un rojo más claro (similar a Chart.js default)
-const LIGHT_RED_BORDER = 'rgb(255, 99, 132)';
-
-const PASTEL_CHART_COLORS = [
-    LIGHT_RED_RGBA,             // Rojo más claro (para servicios, ingresos, activos empleados)
-    ZINC_700_RGBA,              // Zinc-700 (para cortes, egresos, inactivos empleados)
-    'rgba(255, 159, 64, 0.8)',  // Naranja
-    'rgba(75, 192, 192, 0.8)',  // Turquesa
-    'rgba(153, 102, 255, 0.8)', // Púrpura
-    'rgba(201, 203, 207, 0.8)', // Gris claro
+const CHART_COLORS = [
+    'rgba(239, 68, 68, 0.8)',   // Rojo
+    'rgba(31, 41, 55, 0.8)',    // Negro
+    'rgba(107, 114, 128, 0.8)', // Gris
+    'rgba(156, 163, 175, 0.8)', // Gris claro
+    'rgba(239, 68, 68, 0.6)',   // Rojo más claro
+    'rgba(31, 41, 55, 0.6)',    // Negro más claro
 ];
 
-const PASTEL_CHART_BORDERS = [
-    LIGHT_RED_BORDER,
-    ZINC_700_BORDER,
-    'rgb(255, 159, 64)',
-    'rgb(75, 192, 192)',
-    'rgb(153, 102, 255)',
-    'rgb(201, 203, 207)',
+const CHART_BORDERS = [
+    '#ef4444', '#1f2937', '#6b7280', '#9ca3af',
+    '#f87171', '#374151'
 ];
-
 
 const Home = () => { 
   const [stats, setStats] = useState({
-    ingresos: { current: 0, change: 0, previous: 0 },
-    egresos: { current: 0, change: 0, previous: 0 },
+    ingresos: { total: 0 },
+    egresos: { total: 0 },
     empleados: { total: 0, activos: 0, inactivos: 0 },
     clientes: { total: 0 }, 
     totalServices: 0,      
@@ -88,96 +97,108 @@ const Home = () => {
   const [ingresosData, setIngresosData] = useState(null);
   const [egresosData, setEgresosData] = useState(null);
   const [empleadosData, setEmpleadosData] = useState(null);
-  const [servicesAndCutsTotalChartData, setServicesAndCutsTotalChartData] = useState(null); 
+  const [ingresosEgresosChartData, setIngresosEgresosChartData] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Opciones comunes para gráficos
-  const chartOptions = {
+  // Opciones mejoradas para gráficos
+  const modernChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'top',
         labels: {
-          color: '#374151',
+          color: '#4B5563',
           font: {
-            size: 12
-          }
+            size: 12,
+            weight: '500'
+          },
+          usePointStyle: true,
+          padding: 20
         }
       },
       tooltip: {
-        backgroundColor: '#1F2937',
-        titleColor: '#F3F4F6',
-        bodyColor: '#F3F4F6',
-        borderColor: '#4B5563',
+        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+        titleColor: '#F9FAFB',
+        bodyColor: '#F9FAFB',
+        borderColor: '#374151',
         borderWidth: 1,
         padding: 12,
-        cornerRadius: 4
+        cornerRadius: 8,
+        displayColors: true,
+        callbacks: {
+          label: function(context) {
+            if (context.parsed.y !== null) {
+              return context.dataset.label + ': ' + new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                minimumFractionDigits: 0
+              }).format(context.parsed.y);
+            }
+            return '';
+          }
+        }
       }
     },
     scales: {
       x: {
         grid: {
-          color: '#E5E7EB',
+          display: false,
           borderColor: '#E5E7EB'
         },
         ticks: {
-          color: '#374151'
+          color: '#6B7280',
+          font: {
+            size: 11
+          }
         }
       },
       y: {
         beginAtZero: true,
         grid: {
-          color: '#E5E7EB',
+          color: 'rgba(229, 231, 235, 0.5)',
           borderColor: '#E5E7EB'
         },
         ticks: {
-          color: '#374151'
+          color: '#6B7280',
+          font: {
+            size: 11
+          }
         }
       }
     }
   };
 
-  // Opciones específicas para la gráfica de barras de Totales (Servicios y Cortes)
-  const totalBarChartOptions = {
+  // Opciones para gráficos de dona
+  const doughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    cutout: '65%',
     plugins: {
-        legend: {
-            display: true, 
-            position: 'top',
-            labels: {
-                color: '#374151',
-                font: { size: 12 }
-            }
-        },
-        tooltip: chartOptions.plugins.tooltip,
-    },
-    scales: {
-        x: {
-            grid: {
-                display: false, 
-                borderColor: '#E5E7EB'
-            },
-            ticks: {
-                color: '#374151'
-            }
-        },
-        y: {
-            beginAtZero: true,
-            grid: {
-                color: '#E5E7EB',
-                borderColor: '#E5E7EB'
-            },
-            ticks: {
-                color: '#374151',
-                stepSize: 1 
-            }
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#4B5563',
+          font: {
+            size: 11,
+            weight: '500'
+          },
+          usePointStyle: true,
+          padding: 15
         }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+        titleColor: '#F9FAFB',
+        bodyColor: '#F9FAFB',
+        borderColor: '#374151',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8
+      }
     }
   };
-
 
   // Formatear dinero
   const formatMoney = (amount) => {
@@ -197,14 +218,72 @@ const Home = () => {
     return parseFloat(change.toFixed(1));
   };
 
+  // Componente de tarjeta mejorada
+  const StatsCard = ({ title, value, change, previousValue, icon: Icon, gradient, subtitle }) => (
+    <div className="relative bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+      {/* Gradiente de fondo */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-1"
+        style={{ background: gradient }}
+      />
+      
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div 
+              className="p-3 rounded-xl"
+              style={{ background: gradient.replace('100%', '20%') }}
+            >
+              <Icon className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-gray-600 text-sm font-medium">{title}</h3>
+              <p className="text-gray-400 text-xs">{subtitle}</p>
+            </div>
+          </div>
+          
+          {change !== undefined && (
+            <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+              change >= 0 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-red-100 text-red-700'
+            }`}>
+              {change >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+              <span>{Math.abs(change)}%</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <div className="text-2xl font-bold text-gray-900">
+            {typeof value === 'number' && title.toLowerCase().includes('ingreso') || title.toLowerCase().includes('egreso') 
+              ? formatMoney(value) 
+              : value.toLocaleString()}
+          </div>
+          
+          {previousValue !== undefined && (
+            <p className="text-gray-500 text-sm">
+              Anterior: {typeof previousValue === 'number' && (title.toLowerCase().includes('ingreso') || title.toLowerCase().includes('egreso'))
+                ? formatMoney(previousValue)
+                : previousValue.toLocaleString()}
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {/* Decoración inferior */}
+      <div className="absolute bottom-0 right-0 w-20 h-20 opacity-5">
+        <Icon className="w-full h-full" />
+      </div>
+    </div>
+  );
 
-  // Cargar datos
+  // Cargar datos (misma lógica que antes)
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Obtener todos los datos en paralelo
         const [
           ingresosResRaw, 
           egresosResRaw, 
@@ -221,7 +300,6 @@ const Home = () => {
           fetchAllCuts(),  
         ]);
 
-        // Asegurarse de que las respuestas sean arrays
         const ingresosRes = ensureArray(ingresosResRaw);
         const egresosRes = ensureArray(egresosResRaw);
         const clientesRes = ensureArray(clientesResRaw);
@@ -229,52 +307,20 @@ const Home = () => {
         const serviciosRes = ensureArray(serviciosResRaw); 
         const cortesRes = ensureArray(cortesResRaw);       
 
-        // --- Procesamiento de Estadísticas ---
         const now = new Date(); 
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
 
-        // Ingresos (para tarjetas de estadísticas)
-        const ingresosMesActual = ingresosRes
-          .filter(i => new Date(i.fecha).getMonth() === currentMonth && new Date(i.fecha).getFullYear() === currentYear)
-          .reduce((sum, i) => sum + (Number(i.monto) || 0), 0);
+        // Calcular ingresos totales
+        const ingresosTotal = ingresosRes.reduce((sum, i) => sum + (Number(i.monto) || 0), 0);
         
-        const ingresosMesAnterior = ingresosRes
-          .filter(i => {
-            const fecha = new Date(i.fecha);
-            return fecha.getMonth() === (currentMonth === 0 ? 11 : currentMonth - 1) && 
-                   fecha.getFullYear() === (currentMonth === 0 ? currentYear - 1 : currentYear);
-          })
-          .reduce((sum, i) => sum + (Number(i.monto) || 0), 0);
+        // Calcular egresos totales
+        const egresosTotal = egresosRes.reduce((sum, e) => sum + (Number(e.monto) || 0), 0);
         
-        const cambioIngresos = calculateChangePercentage(ingresosMesActual, ingresosMesAnterior);
-
-        // Egresos (para tarjetas de estadísticas)
-        const egresosMesActual = egresosRes
-          .filter(e => new Date(e.fecha).getMonth() === currentMonth && new Date(e.fecha).getFullYear() === currentYear)
-          .reduce((sum, e) => sum + (Number(e.monto) || 0), 0);
-        
-        const egresosMesAnterior = egresosRes
-          .filter(e => {
-            const fecha = new Date(e.fecha);
-            return fecha.getMonth() === (currentMonth === 0 ? 11 : currentMonth - 1) && 
-                   fecha.getFullYear() === (currentMonth === 0 ? currentYear - 1 : currentYear);
-          })
-          .reduce((sum, e) => sum + (Number(e.monto) || 0), 0);
-        
-        const cambioEgresos = calculateChangePercentage(egresosMesActual, egresosMesAnterior);
-        
-        // Actualizar estado de las estadísticas
         setStats({
           ingresos: {
-            current: ingresosMesActual,
-            change: cambioIngresos,
-            previous: ingresosMesAnterior
+            total: ingresosTotal
           },
           egresos: {
-            current: egresosMesActual,
-            change: cambioEgresos,
-            previous: egresosMesAnterior
+            total: egresosTotal
           },
           empleados: {
             total: empleadosRes.length,
@@ -288,18 +334,8 @@ const Home = () => {
           totalCuts: cortesRes.length,       
         });
 
-        // --- Preparar datos para gráficos ---
-
-        // Gráfico de Ingresos Semanales
-        const dailyIngresos = {
-            0: 0, // Domingo
-            1: 0, // Lunes
-            2: 0, // Martes
-            3: 0, // Miércoles
-            4: 0, // Jueves
-            5: 0, // Viernes
-            6: 0, // Sábado
-        };
+        // Gráfico de Ingresos Semanales (con gradiente)
+        const dailyIngresos = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
         const dayLabelsOrdered = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
         const dayOfWeekToday = now.getDay(); 
@@ -324,6 +360,13 @@ const Home = () => {
             }
         });
 
+        // Crear gradiente para el gráfico de línea
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.05)');
+
         setIngresosData({
             labels: dayLabelsOrdered,
             datasets: [{
@@ -332,20 +375,20 @@ const Home = () => {
                     const dayIndex = (index + 1) % 7; 
                     return dailyIngresos[dayIndex];
                 }),
-                // Se elimina el 'backgroundColor' y se establece 'fill: false'
-                borderColor: PASTEL_CHART_BORDERS[0],
-                borderWidth: 2, // Un poco más gruesa para que se vea bien sin relleno
-                tension: 0.1,
-                fill: false, // ¡Cambio aquí para quitar el fondo!
-                pointRadius: 3, // Puntos visibles en la línea
-                pointBackgroundColor: PASTEL_CHART_BORDERS[0], // Color de los puntos
+                backgroundColor: gradient,
+                borderColor: GRADIENT_COLORS.primary.main,
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 6,
+                pointBackgroundColor: GRADIENT_COLORS.primary.main,
                 pointBorderColor: '#fff',
-                pointHoverRadius: 5,
+                pointBorderWidth: 2,
+                pointHoverRadius: 8,
             }]
         });
 
-
-        // Egresos por Categoría (dinámico)
+        // Egresos por Categoría
         const egresosPorCategoria = {};
         egresosRes.forEach(eg => {
             const categoria = eg.categoria || 'Sin categoría'; 
@@ -359,9 +402,10 @@ const Home = () => {
           datasets: [{
             label: 'Distribución de egresos',
             data: egresosValues,
-            backgroundColor: egresosLabels.map((_, i) => PASTEL_CHART_COLORS[i % PASTEL_CHART_COLORS.length]),
-            borderColor: egresosLabels.map((_, i) => PASTEL_CHART_BORDERS[i % PASTEL_CHART_BORDERS.length]),
-            borderWidth: 1
+            backgroundColor: egresosLabels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+            borderColor: egresosLabels.map((_, i) => CHART_BORDERS[i % CHART_BORDERS.length]),
+            borderWidth: 2,
+            hoverOffset: 8
           }]
         });
 
@@ -373,32 +417,26 @@ const Home = () => {
               empleadosRes.filter(e => (e.estado || '').toLowerCase() === 'activo').length,
               empleadosRes.filter(e => (e.estado || '').toLowerCase() !== 'activo').length
             ],
-            backgroundColor: [
-              PASTEL_CHART_COLORS[0], 
-              PASTEL_CHART_COLORS[1]  
-            ],
-            borderWidth: 1
+            backgroundColor: [CHART_COLORS[0], CHART_COLORS[1]],
+            borderColor: [CHART_BORDERS[0], CHART_BORDERS[1]],
+            borderWidth: 2,
+            hoverOffset: 8
           }]
         });
 
-        // Datos para la nueva gráfica de "Total de Servicios y Cortes"
-        setServicesAndCutsTotalChartData({
-            labels: ['Total Servicios', 'Total Cortes'],
+        // Gráfico de Ingresos vs Egresos Totales
+        setIngresosEgresosChartData({
+            labels: ['Ingresos Totales', 'Egresos Totales'],
             datasets: [{
-                label: 'Cantidad',
-                data: [serviciosRes.length, cortesRes.length],
-                backgroundColor: [
-                    PASTEL_CHART_COLORS[0], 
-                    PASTEL_CHART_COLORS[1], 
-                ],
-                borderColor: [
-                    PASTEL_CHART_BORDERS[0],
-                    PASTEL_CHART_BORDERS[1],
-                ],
-                borderWidth: 1,
+                label: 'Monto total',
+                data: [ingresosTotal, egresosTotal],
+                backgroundColor: [CHART_COLORS[0], CHART_COLORS[1]],
+                borderColor: [CHART_BORDERS[0], CHART_BORDERS[1]],
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false,
             }]
         });
-
 
       } catch (err) {
         console.error("Error fetching data:", err); 
@@ -412,93 +450,138 @@ const Home = () => {
   }, []);
 
   if (loading) return (
-    <div className="flex justify-center items-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      <p className="ml-4 text-gray-600">Cargando datos del dashboard...</p>
+    <div className="flex justify-center items-center h-screen bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+        <p className="text-gray-600 font-medium">Cargando dashboard...</p>
+        <p className="text-gray-400 text-sm">Obteniendo datos del sistema</p>
+      </div>
     </div>
   );
 
   if (error) return (
-    <div className="p-4 bg-red-100 text-red-700 rounded-md max-w-md mx-auto mt-8">
-      Error: {error}
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-red-200 max-w-md w-full text-center">
+        <div className="bg-red-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+          <Activity className="w-8 h-8 text-red-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Error al cargar datos</h3>
+        <p className="text-red-600 text-sm">{error}</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-sans">
-      {/* Primera fila - Estadísticas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"> 
-        {/* Ingresos */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-2">Ingresos (este mes)</h3>
-          <div className="flex items-end">
-            <span className="text-2xl font-bold text-gray-900">{formatMoney(stats.ingresos.current)}</span>
-            <span className={`flex items-center ml-2 text-sm ${stats.ingresos.change < 0 ? 'text-red-500' : 'text-green-500'}`}>
-              {stats.ingresos.change < 0 ? <ArrowDown size={16} /> : <ArrowUp size={16} />}
-              {Math.abs(stats.ingresos.change)}%
-            </span>
-          </div>
-          <p className="text-gray-500 text-sm mt-2">Mes anterior: {formatMoney(stats.ingresos.previous)}</p>
-        </div>
-
-        {/* Egresos */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-2">Egresos (este mes)</h3>
-          <div className="flex items-end">
-            <span className="text-2xl font-bold text-gray-900">{formatMoney(stats.egresos.current)}</span>
-            <span className={`flex items-center ml-2 text-sm ${stats.egresos.change < 0 ? 'text-red-500' : 'text-green-500'}`}>
-              {stats.egresos.change < 0 ? <ArrowDown size={16} /> : <ArrowUp size={16} />}
-              {Math.abs(stats.egresos.change)}%
-            </span>
-          </div>
-          <p className="text-gray-500 text-sm mt-2">Mes anterior: {formatMoney(stats.egresos.previous)}</p>
-        </div>
-
-        {/* Total de Clientes */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-2">Total de Clientes</h3>
-          <div className="flex items-end">
-            <span className="text-2xl font-bold text-gray-900">{stats.clientes.total}</span>
-          </div>
-          <p className="text-gray-500 text-sm mt-2">Clientes registrados en total</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      {/* Tarjetas de estadísticas principales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatsCard
+          title="Ingresos Totales"
+          subtitle="Total de todos los ingresos"
+          value={stats.ingresos.total}
+          icon={DollarSign}
+          gradient={GRADIENT_COLORS.success.bg}
+        />
+        
+        <StatsCard
+          title="Egresos Totales"
+          subtitle="Total de todos los egresos"
+          value={stats.egresos.total}
+          icon={TrendingUp}
+          gradient={GRADIENT_COLORS.warning.bg}
+        />
+        
+        <StatsCard
+          title="Total Clientes"
+          subtitle="Clientes registrados"
+          value={stats.clientes.total}
+          icon={Users}
+          gradient={GRADIENT_COLORS.info.bg}
+        />
+        
+        <StatsCard
+          title="Servicios Totales"
+          subtitle={`${stats.totalServices} servicios, ${stats.totalCuts} cortes`}
+          value={stats.totalServices + stats.totalCuts}
+          icon={Scissors}
+          gradient={GRADIENT_COLORS.primary.bg}
+        />
       </div>
 
-      {/* Segunda fila - Gráficos principales */}
+      {/* Gráficos principales */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Gráfico de ingresos */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-4">Ingresos semanales</h3>
-          <div className="h-64">
-            {ingresosData && <Line data={ingresosData} options={chartOptions} />}
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Ingresos Semanales</h3>
+              <p className="text-gray-500 text-sm">Tendencia de ingresos por día</p>
+            </div>
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Calendar className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <div className="h-80">
+            {ingresosData && <Line data={ingresosData} options={modernChartOptions} />}
           </div>
         </div>
 
         {/* Gráfico de distribución de egresos */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-4">Distribución de egresos</h3>
-          <div className="h-64">
-            {egresosData && <Pie data={egresosData} options={chartOptions} />}
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Distribución de Egresos</h3>
+              <p className="text-gray-500 text-sm">Por categorías de gastos</p>
+            </div>
+            <div className="p-2 bg-pink-50 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-pink-600" />
+            </div>
+          </div>
+          <div className="h-80">
+            {egresosData && <Doughnut data={egresosData} options={doughnutOptions} />}
           </div>
         </div>
       </div>
 
-      {/* Tercera fila - Gráfico de Totales de Servicios y Cortes, y Empleados */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8"> 
-        {/* Gráfico de Total de Servicios y Cortes (Nuevo) */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-4">Total de Servicios y Cortes</h3>
-          <div className="h-48">
-            {servicesAndCutsTotalChartData && <Bar data={servicesAndCutsTotalChartData} options={totalBarChartOptions} />}
+      {/* Fila inferior */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de ingresos vs egresos totales */}
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Ingresos vs Egresos</h3>
+              <p className="text-gray-500 text-sm">Comparación de totales</p>
+            </div>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <DollarSign className="w-5 h-5 text-red-600" />
+            </div>
           </div>
-          <p className="text-gray-500 text-sm mt-2">Servicios: {stats.totalServices} | Cortes: {stats.totalCuts}</p>
+          <div className="h-64">
+            {ingresosEgresosChartData && <Bar data={ingresosEgresosChartData} options={modernChartOptions} />}
+          </div>
+          <div className="flex justify-center space-x-6 mt-4 text-sm text-gray-600">
+            <span>Ingresos: <strong className="text-red-600">{formatMoney(stats.ingresos.total)}</strong></span>
+            <span>Egresos: <strong className="text-gray-800">{formatMoney(stats.egresos.total)}</strong></span>
+          </div>
         </div>
 
         {/* Gráfico de empleados */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-gray-500 text-sm font-medium mb-4">Estado de empleados</h3>
-          <div className="h-48">
-            {empleadosData && <Pie data={empleadosData} options={chartOptions} />}
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Estado de Empleados</h3>
+              <p className="text-gray-500 text-sm">Distribución por estado</p>
+            </div>
+            <div className="p-2 bg-gray-50 rounded-lg">
+              <Users className="w-5 h-5 text-gray-600" />
+            </div>
+          </div>
+          <div className="h-64">
+            {empleadosData && <Doughnut data={empleadosData} options={doughnutOptions} />}
+          </div>
+          <div className="flex justify-center space-x-6 mt-4 text-sm text-gray-600">
+            <span>Activos: <strong className="text-red-600">{stats.empleados.activos}</strong></span>
+            <span>Inactivos: <strong className="text-gray-800">{stats.empleados.inactivos}</strong></span>
           </div>
         </div>
       </div>

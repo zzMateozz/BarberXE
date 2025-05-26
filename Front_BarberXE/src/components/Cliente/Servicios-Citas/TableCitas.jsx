@@ -3,13 +3,12 @@ import React, { useState, useEffect } from "react";
 import { Pencil, Trash2, Search, Plus, Calendar, Clock, User, Users, Scissors, Check, X, Loader2 } from "lucide-react";
 import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
-    fetchCitas,
     createCita,
     updateCita,
     deleteCita,
-    fetchClientes,
     fetchEmpleados,
     fetchServicios,
+    fetchCitasByClienteId
 } from "../../../services/QuotesService.js";
 import { toast } from "react-toastify";
 import { format, parseISO } from "date-fns";
@@ -17,7 +16,6 @@ import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimeSelect } from "../Hora-Calendario/Hour.jsx";
 import { DatePicker } from "../Hora-Calendario/Calendar.jsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -33,6 +31,16 @@ const ValidationMessage = ({ message, isValid }) => {
 };
 
 const TableCitasCliente = ({ isCollapsed, currentUser }) => {
+    // Verificación inicial de currentUser
+    if (!currentUser || !currentUser.idCliente) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="animate-spin h-8 w-8 text-gray-500" />
+                <span className="ml-2">Cargando información del usuario...</span>
+            </div>
+        );
+    }
+
     const [citas, setCitas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -42,7 +50,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     const [currentStep, setCurrentStep] = useState("servicio");
 
     // Datos para el formulario
-    const [clientes, setClientes] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [servicios, setServicios] = useState([]);
     const [barberos, setBarberos] = useState([]);
@@ -51,7 +58,11 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     const [formData, setFormData] = useState({
         fecha: "",
         hora: "",
-        cliente: null,
+        cliente: {
+            idCliente: currentUser.idCliente,
+            nombre: currentUser.nombre,
+            apellido: currentUser.apellido
+        },
         empleado: null,
         servicios: [],
     });
@@ -85,7 +96,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
 
     // Función para crear una fecha local a partir de componentes
     const createLocalDate = (year, month, day, hours, minutes) => {
-        // Crear fecha en zona horaria local
         const date = new Date(year, month - 1, day, hours, minutes);
         return date;
     };
@@ -93,18 +103,15 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     // Función para formatear fecha en el resumen
     const formatDateForSummary = (dateString) => {
         try {
-            // Si ya es un objeto Date, usarlo directamente
             if (dateString instanceof Date) {
                 return format(dateString, "EEEE d 'de' MMMM", { locale: es });
             }
 
-            // Si es una cadena ISO (viene de la base de datos)
             if (typeof dateString === 'string' && dateString.includes('T')) {
                 const date = parseISO(dateString);
                 return format(date, "EEEE d 'de' MMMM", { locale: es });
             }
 
-            // Si es una cadena en formato YYYY-MM-DD (del date picker)
             if (typeof dateString === 'string' && dateString.includes('-')) {
                 const [year, month, day] = dateString.split('-').map(Number);
                 const date = new Date(year, month - 1, day);
@@ -123,47 +130,34 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const [citasData, clientesData, empleadosData, serviciosData] =
-                    await Promise.all([
-                        fetchCitas(),
-                        fetchClientes(),
-                        fetchEmpleados(),
-                        fetchServicios().then((servicios) =>
-                            servicios.map((s) => ({
-                                ...s,
-                                duracion: parseInt(s.duracion) || 0,
-                            }))
-                        ),
-                    ]);
+                
+                // Cargar citas del cliente
+                const citasData = await fetchCitasByClienteId(currentUser.idCliente);
 
-                // Filtrar citas para el cliente actual si es necesario
-                const citasFiltradas = currentUser?.idCliente
-                    ? citasData.filter(c => c.cliente?.idCliente === currentUser.idCliente)
-                    : citasData;
+                // Cargar otros datos necesarios
+                const [empleadosData, serviciosData] = await Promise.all([
+                    fetchEmpleados(),
+                    fetchServicios().then(servicios =>
+                        servicios.map(s => ({
+                            ...s,
+                            duracion: parseInt(s.duracion) || 0
+                        }))
+                    ),
+                ]);
 
-                setCitas(citasFiltradas);
-                setClientes(clientesData);
-                setEmpleados(empleadosData);
+                setCitas(citasData);
 
-                // Filtrar solo barberos activos
+                // Filtrar barberos activos
                 const barberosActivos = empleadosData.filter(
-                    e => e.cargo?.trim().toLowerCase() === "barbero" && e.estado?.trim().toLowerCase() === "activo"
+                    e => e.cargo?.toLowerCase() === "barbero" && e.estado?.toLowerCase() === "activo"
                 );
                 setBarberos(barberosActivos);
 
-                // Filtrar solo servicios activos
+                // Filtrar servicios activos
                 const serviciosActivos = serviciosData.filter(
-                    s => s.estado?.trim().toLowerCase() === "activo"
+                    s => s.estado?.toLowerCase() === "activo"
                 );
                 setServicios(serviciosActivos);
-
-                // Establecer cliente actual si existe
-                if (currentUser?.idCliente) {
-                    const clienteActual = clientesData.find(c => c.idCliente === currentUser.idCliente);
-                    if (clienteActual) {
-                        setFormData(prev => ({ ...prev, cliente: clienteActual }));
-                    }
-                }
 
                 setLoading(false);
             } catch (err) {
@@ -173,33 +167,32 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         };
 
         loadData();
-    }, [currentUser]);
+    }, [currentUser.idCliente]);
 
-    // Manejar búsqueda
+    // Manejar búsqueda por barbero
     useEffect(() => {
-        if (!currentUser?.idCliente && searchTerm) {
-            const filtered = citas.filter(
-                cita => cita.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    cita.cliente?.apellido?.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setCitas(filtered);
-            setCurrentPage(1);
-        } else if (!searchTerm) {
-            const reloadCitas = async () => {
-                try {
-                    const citasData = await fetchCitas();
-                    const citasFiltradas = currentUser?.idCliente
-                        ? citasData.filter(c => c.cliente?.idCliente === currentUser.idCliente)
-                        : citasData;
-                    setCitas(citasFiltradas);
-                    setCurrentPage(1);
-                } catch (err) {
-                    setError(err.message);
+        const loadFilteredCitas = async () => {
+            try {
+                const citasCliente = await fetchCitasByClienteId(currentUser.idCliente);
+
+                if (searchTerm) {
+                    const filtered = citasCliente.filter(cita =>
+                        cita.empleado?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        cita.empleado?.apellido?.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    setCitas(filtered);
+                } else {
+                    setCitas(citasCliente);
                 }
-            };
-            reloadCitas();
-        }
-    }, [searchTerm, currentUser]);
+
+                setCurrentPage(1);
+            } catch (err) {
+                setError(err.message);
+            }
+        };
+
+        loadFilteredCitas();
+    }, [searchTerm, currentUser.idCliente]);
 
     // Abrir modal para nueva/editar cita
     const openModal = (citaId = null) => {
@@ -211,14 +204,11 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             const citaToEdit = citas.find(c => c.idCita === citaId);
             if (citaToEdit) {
                 const fechaObj = new Date(citaToEdit.fecha);
-
-                // Convertir a fecha local
                 const year = fechaObj.getFullYear();
                 const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
                 const day = String(fechaObj.getDate()).padStart(2, '0');
                 const fecha = `${year}-${month}-${day}`;
 
-                // Obtener hora local
                 const hours = String(fechaObj.getHours()).padStart(2, '0');
                 const minutes = String(fechaObj.getMinutes()).padStart(2, '0');
                 const hora = `${hours}:${minutes}`;
@@ -235,8 +225,11 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             setFormData({
                 fecha: "",
                 hora: "",
-                cliente: currentUser?.idCliente ?
-                    clientes.find(c => c.idCliente === currentUser.idCliente) : null,
+                cliente: {
+                    idCliente: currentUser.idCliente,
+                    nombre: currentUser.nombre,
+                    apellido: currentUser.apellido
+                },
                 empleado: null,
                 servicios: [],
             });
@@ -281,22 +274,18 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             setHoraError("");
         }
 
-        // Validación de fecha y hora si ambos están presentes
         if (formData.fecha && formData.hora) {
             const [year, month, day] = formData.fecha.split('-').map(Number);
             const [hours, minutes] = formData.hora.split(':').map(Number);
 
-            // Crear objeto Date en hora local
             const fechaHoraCita = createLocalDate(year, month, day, hours, minutes);
             const ahora = new Date();
 
-            // Validar que no sea en el pasado
             if (fechaHoraCita < ahora) {
                 setFechaError("No puede agendar citas en el pasado");
                 isValid = false;
             }
 
-            // Validar anticipación mínima de 2 horas para citas el mismo día
             const dosHorasMs = 2 * 60 * 60 * 1000;
             const esMismoDia = (
                 fechaHoraCita.getDate() === ahora.getDate() &&
@@ -309,7 +298,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                 isValid = false;
             }
 
-            // Validar horario laboral (8:00 - 22:00)
             if (hours < 8 || hours >= 22 || (hours === 21 && minutes > 0)) {
                 setHoraError("Horario laboral: 8:00 - 22:00");
                 isValid = false;
@@ -341,11 +329,9 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             const [year, month, day] = formData.fecha.split('-').map(Number);
             const [hour, minute] = formData.hora.split(':').map(Number);
 
-            // Crear fecha en zona horaria local
             const fechaHoraLocal = createLocalDate(year, month, day, hour, minute);
-
-            // Validar nuevamente que la fecha no sea en el pasado
             const ahora = new Date();
+
             if (fechaHoraLocal < ahora) {
                 throw new Error("No se puede agendar una cita en el pasado");
             }
@@ -365,56 +351,18 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
 
             if (editingCitaId) {
                 await updateCita(editingCitaId, citaData);
-
-                // Mostrar resumen en el toast
-                toast.success(
-                    <div>
-                        <p>Cita actualizada correctamente</p>
-                        <p>
-                            Barbero: {formData.empleado.nombre} {formData.empleado.apellido}
-                        </p>
-                        <p>Servicios: {formData.servicios.map(s => s.nombre).join(', ')}</p>
-                        <p>Duración: {duracionTotal} minutos</p>
-                        <p>
-                            Horario: {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}
-                        </p>
-                        <p>Fecha: {formatDateForSummary(formData.fecha)}</p>
-                    </div>,
-                    { autoClose: 8000 }
-                );
+                toast.success("Cita actualizada correctamente");
             } else {
                 await createCita(citaData);
-
-                // Mostrar resumen en el toast
-                toast.success(
-                    <div>
-                        <p>Cita creada correctamente</p>
-                        <p>
-                            Barbero: {formData.empleado.nombre} {formData.empleado.apellido}
-                        </p>
-                        <p>Servicios: {formData.servicios.map(s => s.nombre).join(', ')}</p>
-                        <p>Duración: {duracionTotal} minutos</p>
-                        <p>
-                            Horario: {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}
-                        </p>
-                        <p>Fecha: {formatDateForSummary(formData.fecha)}</p>
-                    </div>,
-                    { autoClose: 8000 }
-                );
+                toast.success("Cita creada correctamente");
             }
 
-            // Recargar citas
-            const citasData = await fetchCitas();
-            const citasFiltradas = currentUser?.idCliente
-                ? citasData.filter(c => c.cliente?.idCliente === currentUser.idCliente)
-                : citasData;
-            setCitas(citasFiltradas);
-
+            const nuevasCitas = await fetchCitasByClienteId(currentUser.idCliente);
+            setCitas(nuevasCitas);
             closeModal();
         } catch (error) {
             console.error("Error al guardar cita:", error);
-
-            // Manejar errores de conflicto de horario
+            
             if (error.response?.status === 409 || error.message.includes("Conflicto")) {
                 const duracionTotal = formData.servicios.reduce(
                     (total, servicio) => total + (parseInt(servicio.duracion) || 30),
@@ -484,11 +432,7 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     const renderFormWithTabs = () => (
         <Tabs value={currentStep} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-8">
-                <TabsTrigger
-                    value="servicio"
-                    onClick={() => setCurrentStep("servicio")}
-                    className="text-sm"
-                >
+                <TabsTrigger value="servicio" onClick={() => setCurrentStep("servicio")} className="text-sm">
                     Servicio
                 </TabsTrigger>
                 <TabsTrigger
@@ -629,8 +573,8 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         <section className="py-8">
             <div className="container mx-auto px-4">
                 <div className="mb-8">
-                    <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Gestión de Citas</h1>
-                    <p className="text-zinc-500 text-sm">Administra las citas de tus clientes</p>
+                    <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Mis Citas</h1>
+                    <p className="text-zinc-500 text-sm">Administra tus citas programadas</p>
                 </div>
 
                 <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
@@ -641,20 +585,18 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                         <Plus size={18} /> Nueva Cita
                     </Button>
 
-                    {!currentUser?.idCliente && (
-                        <div className="relative w-full md:w-64">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search size={18} className="text-zinc-400" />
-                            </div>
-                            <Input
-                                type="text"
-                                placeholder="Buscar por cliente..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 w-full bg-white border border-zinc-300 text-zinc-900 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder-zinc-400"
-                            />
+                    <div className="relative w-full md:w-64">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search size={18} className="text-zinc-400" />
                         </div>
-                    )}
+                        <Input
+                            type="text"
+                            placeholder="Buscar por barbero..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 w-full bg-white border border-zinc-300 text-zinc-900 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder-zinc-400"
+                        />
+                    </div>
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
@@ -666,12 +608,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} className="text-zinc-400" />
                                             <span>Fecha y Hora</span>
-                                        </div>
-                                    </th>
-                                    <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
-                                        <div className="flex items-center gap-2">
-                                            <User size={14} className="text-zinc-400" />
-                                            <span>Cliente</span>
                                         </div>
                                     </th>
                                     <th className="py-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
@@ -694,7 +630,7 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                             <tbody className="divide-y divide-zinc-100">
                                 {citas.length === 0 ? (
                                     <tr>
-                                        <td colSpan="5" className="py-8 text-center text-zinc-500">
+                                        <td colSpan="4" className="py-8 text-center text-zinc-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Calendar size={24} className="text-zinc-300" />
                                                 <p>No se encontraron citas</p>
@@ -716,11 +652,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                                                     <Calendar size={14} className="text-zinc-400" />
                                                     {formatFechaHora(cita.fecha)}
                                                 </div>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-zinc-700">
-                                                {cita.cliente
-                                                    ? `${cita.cliente.nombre} ${cita.cliente.apellido}`
-                                                    : "Cliente no asignado"}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-zinc-700">
                                                 {cita.empleado?.nombre} {cita.empleado?.apellido}
@@ -763,7 +694,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                         </table>
                     </div>
 
-                    {/* Paginación */}
                     {citas.length > 0 && (
                         <div className="py-3 px-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
                             <div>

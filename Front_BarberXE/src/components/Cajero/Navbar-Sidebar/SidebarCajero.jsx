@@ -71,7 +71,7 @@ const SidebarCajero = ({ isCollapsed }) => {
         {/* Menú */}
         <nav className="mt-2 px-2 flex-1">
           <ul className="space-y-1">
-            <NavItem to="/cajero" icon={Home} label="Inicio" active={location.pathname === "/cajero"} />
+            <NavItem to="/cajero" icon={Home} label="Home" active={location.pathname === "/cajero"} />
             
             <NavItem
               icon={Calculator}
