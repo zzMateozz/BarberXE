@@ -1,63 +1,66 @@
 import { Request, Response } from 'express';
 import { ClienteService } from '../services/clienteService';
+import { HttpResponse } from '../shared/response/http.response';
 
 export class ClienteController {
     private clienteService: ClienteService;
+    private httpResponse: HttpResponse;
 
     constructor() {
         this.clienteService = new ClienteService();
+        this.httpResponse = new HttpResponse();
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
-        const clientes = await this.clienteService.findAll();
-        res.status(200).json(clientes);
+            const clientes = await this.clienteService.findAll();
+            this.httpResponse.OK(res, clientes);
         } catch (error) {
-        res.status(500).json({ message: 'Error al obtener clientes', error });
+            this.httpResponse.Error(res, 'Error al obtener clientes');
         }
     };
 
     getById = async (req: Request, res: Response): Promise<void> => {
         try {
-        const id = parseInt(req.params.id);
-        const cliente = await this.clienteService.findById(id);
-        
-        if (!cliente) {
-            res.status(404).json({ message: 'Cliente no encontrado' });
-            return;
-        }
-        
-        res.status(200).json(cliente);
+            const id = parseInt(req.params.id);
+            const cliente = await this.clienteService.findById(id);
+            
+            if (!cliente) {
+                this.httpResponse.NotFound(res, 'Cliente no encontrado');
+                return;
+            }
+            
+            this.httpResponse.OK(res, cliente);
         } catch (error) {
-        res.status(500).json({ message: 'Error al obtener cliente', error });
+            this.httpResponse.Error(res, 'Error al obtener cliente');
         }
     };
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-        const clienteData = req.body;
-        const cliente = await this.clienteService.create(clienteData);
-        res.status(201).json(cliente);
+            const clienteData = req.body;
+            const cliente = await this.clienteService.create(clienteData);
+            this.httpResponse.Created(res, cliente);
         } catch (error) {
-        res.status(500).json({ message: 'Error al crear cliente', error });
+            this.httpResponse.Error(res, 'Error al crear cliente');
         }
     };
 
     update = async (req: Request, res: Response): Promise<void> => {
         try {
-        const id = parseInt(req.params.id);
-        const clienteData = req.body;
-        
-        const cliente = await this.clienteService.update(id, clienteData);
-        
-        if (!cliente) {
-            res.status(404).json({ message: 'Cliente no encontrado' });
-            return;
-        }
-        
-        res.status(200).json(cliente);
+            const id = parseInt(req.params.id);
+            const clienteData = req.body;
+            
+            const cliente = await this.clienteService.update(id, clienteData);
+            
+            if (!cliente) {
+                this.httpResponse.NotFound(res, 'Cliente no encontrado');
+                return;
+            }
+            
+            this.httpResponse.OK(res, cliente);
         } catch (error) {
-        res.status(500).json({ message: 'Error al actualizar cliente', error });
+            this.httpResponse.Error(res, 'Error al actualizar cliente');
         }
     };
 
@@ -65,37 +68,34 @@ export class ClienteController {
         try {
             const id = parseInt(req.params.id);
             await this.clienteService.delete(id);
-            res.status(204).send();
+            this.httpResponse.NoContent(res);
         } catch (error: any) {
             console.error('Error en ClienteController.delete:', error);
             
-            const statusCode = error.message.includes('no encontrado') ? 404 : 500;
-            
-            res.status(statusCode).json({
-                message: 'Error al eliminar cliente',
-                error: process.env.NODE_ENV === 'development' 
-                    ? error.message 
-                    : 'Ocurrió un error al eliminar el cliente'
-            });
+            if (error.message.includes('no encontrado')) {
+                this.httpResponse.NotFound(res, 'Cliente no encontrado');
+            } else {
+                this.httpResponse.Error(res, 'Error al eliminar cliente');
+            }
         }
     };
 
     getByName = async (req: Request, res: Response): Promise<void> => {
         try {
-        const nombre = req.query.nombre as string;
-        const clientes = await this.clienteService.findByName(nombre);
-        res.status(200).json(clientes);
+            const nombre = req.query.nombre as string;
+            const clientes = await this.clienteService.findByName(nombre);
+            this.httpResponse.OK(res, clientes);
         } catch (error) {
-        res.status(500).json({ message: 'Error al buscar clientes por nombre', error });
+            this.httpResponse.Error(res, 'Error al buscar clientes por nombre');
         }
     };
 
     getWithCitas = async (req: Request, res: Response): Promise<void> => {
         try {
-        const clientes = await this.clienteService.findWithCitas();
-        res.status(200).json(clientes);
+            const clientes = await this.clienteService.findWithCitas();
+            this.httpResponse.OK(res, clientes);
         } catch (error) {
-        res.status(500).json({ message: 'Error al obtener clientes con citas', error });
+            this.httpResponse.Error(res, 'Error al obtener clientes con citas');
         }
     };
 }

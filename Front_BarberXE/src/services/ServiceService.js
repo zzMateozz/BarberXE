@@ -40,36 +40,32 @@ export const fetchServiceById = async (id) => {
     return handleResponse(response);
 };
 
-export const createService = async (formData) => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/servicios`, {
-            method: 'POST',
-            headers: {
-                // No incluyas 'Content-Type' para FormData
-                ...(localStorage.getItem('authToken') && {
-                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                })
-            },
-            body: formData
-        });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Error al crear servicio');
-        }
+// ServiceService.js
+export const createService = async (formDataToSend) => { // Recibir FormData directamente
+  try {
+    // Eliminar validación aquí (se hará en el componente)
+    const response = await fetch(`${API_BASE_URL}/servicios`, {
+      method: 'POST',
+      headers: {
+        ...(localStorage.getItem('authToken') && {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        })
+      },
+      body: formDataToSend // Usar FormData directamente
+    });
 
-        const result = await response.json();
-
-        if (result.imagenUrl) {
-            result.imagenUrl = `http://localhost:3000${result.imagenUrl}`;
-        }
-        return result;
-    } catch (error) {
-        console.error("Error en createService:", error);
-        throw error;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error al crear servicio');
     }
-};
 
+    return await response.json();
+  } catch (error) {
+    console.error("Error en createService:", error);
+    throw error;
+  }
+};
 export const updateService = async (id, formData) => {
     try {
         const response = await fetch(`${API_BASE_URL}/servicios/${id}`, {

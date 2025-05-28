@@ -4,20 +4,30 @@ import { UserService } from '../services/userService';
 import { CreateUserDto } from '../dtos/User/CreateUser.dto';
 import { LoginUserDto } from '../dtos/User/LoginUser.dto';
 import { UpdateUserDto } from '../dtos/User/UpdateUser.dto';
+import { HttpResponse } from '../shared/response/http.response'; // Asegúrate de tener esto
+import { AuthService } from '../services/auth.service';
+import { ClienteRepository } from '../repository/ClienteRepository';
+import { UserRepository } from '../repository/UserRepository';
+
 
 export class UserController {
     private userService: UserService;
+    private httpResponse: HttpResponse;
+
 
     constructor() {
         this.userService = new UserService(AppDataSource);
+        this.httpResponse = new HttpResponse();
     }
+
+    
 
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
             const users = await this.userService.findAll();
-            res.status(200).json(users);
+            this.httpResponse.OK(res, users);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener usuarios', error });
+            this.httpResponse.Error(res, 'Error al obtener usuarios');
         }
     };
 
@@ -27,13 +37,13 @@ export class UserController {
             const user = await this.userService.findById(id);
             
             if (!user) {
-                res.status(404).json({ message: 'Usuario no encontrado' });
+                this.httpResponse.NotFound(res, 'Usuario no encontrado');
                 return;
             }
             
-            res.status(200).json(user);
+            this.httpResponse.OK(res, user);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener usuario', error });
+            this.httpResponse.Error(res, 'Error al obtener usuario');
         }
     };
 
@@ -43,13 +53,13 @@ export class UserController {
             const user = await this.userService.findByUsername(username);
             
             if (!user) {
-                res.status(404).json({ message: 'Usuario no encontrado' });
+                this.httpResponse.NotFound(res, 'Usuario no encontrado');
                 return;
             }
             
-            res.status(200).json(user);
+            this.httpResponse.OK(res, user);
         } catch (error) {
-            res.status(500).json({ message: 'Error al buscar usuario por nombre de usuario', error });
+            this.httpResponse.Error(res, 'Error al buscar usuario');
         }
     };
 
@@ -57,15 +67,13 @@ export class UserController {
         try {
             const userData = new CreateUserDto(req.body);
             const user = await this.userService.create(userData);
-            res.status(201).json(user);
+            this.httpResponse.Created(res, user);
         } catch (error: any) {
-            console.error('Error detallado:', error);
-            res.status(400).json({
-                message: 'Error al crear usuario',
-                error: error.message
-            });
+            this.httpResponse.BadRequest(res, error.message);
         }
-    }
+    };
+
+    
 
     login = async (req: Request, res: Response): Promise<void> => {
         try {
@@ -73,13 +81,25 @@ export class UserController {
             const user = await this.userService.login(loginData);
             
             if (!user) {
-                res.status(401).json({ message: 'Credenciales inválidas' });
+                this.httpResponse.Unauthorized(res, 'Credenciales inválidas');
                 return;
             }
-            
-            res.status(200).json(user);
+
+            // Generate JWT token
+            const authService = new AuthService();
+            const authResponse = await authService.generateJwt(user);
+
+            // Return the structure frontend expects
+            this.httpResponse.OK(res, {
+                token: authResponse.accessToken,
+                user: {
+                    username: user.usuario,
+                    ...user
+                },
+                role: authResponse.user.role
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Error al iniciar sesión', error });
+            this.httpResponse.Error(res, 'Error en el login');
         }
     };
 
@@ -91,13 +111,13 @@ export class UserController {
             const user = await this.userService.update(id, userData);
             
             if (!user) {
-                res.status(404).json({ message: 'Usuario no encontrado' });
+                this.httpResponse.NotFound(res, 'Usuario no encontrado');
                 return;
             }
             
-            res.status(200).json(user);
+            this.httpResponse.OK(res, user);
         } catch (error) {
-            res.status(500).json({ message: 'Error al actualizar usuario', error });
+            this.httpResponse.Error(res, 'Error al actualizar');
         }
     };
 
@@ -105,9 +125,36 @@ export class UserController {
         try {
             const id = parseInt(req.params.id);
             await this.userService.delete(id);
-            res.status(204).send();
+            this.httpResponse.NoContent(res);
         } catch (error) {
-            res.status(500).json({ message: 'Error al eliminar usuario', error });
+            this.httpResponse.Error(res, 'Error al eliminar');
         }
     };
+getClientByUserId = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        // Usar QueryBuilder para forzar el JOIN correcto
+        const user = await UserRepository.createQueryBuilder("user")
+            .leftJoinAndSelect("user.cliente", "cliente") // Forzar relación
+            .where("user.idUser = :userId", { userId })
+            .getOne();
+
+        if (!user?.cliente) {
+            this.httpResponse.NotFound(res, 'Cliente no encontrado');
+            return;
+        }
+
+        // Respuesta estructurada
+        this.httpResponse.OK(res, {
+            idCliente: user.cliente.idCliente, // Asegurar que existe
+            nombre: user.cliente.nombre,
+            apellido: user.cliente.apellido,
+            telefono: user.cliente.telefono,
+            userId: userId
+        });
+    } catch (error) {
+        this.httpResponse.Error(res, 'Error al obtener cliente');
+    }
+}
 }

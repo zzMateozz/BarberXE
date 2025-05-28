@@ -1,5 +1,5 @@
 
-const API_BASE_URL = 'http://localhost:3000/api'; 
+const API_BASE_URL = 'http://localhost:3000/api';
 
 const handleResponse = async (response) => {
   if (!response.ok) {
@@ -16,13 +16,13 @@ const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
   };
-  
+
   // Si tenemos token de autenticación, lo añadimos
   const token = localStorage.getItem('authToken');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   return headers;
 };
 
@@ -42,25 +42,34 @@ export const loginUser = async (credentials) => {
   return handleResponse(response);
 };
 
+// ClientService.js (createUser actualizado)
 export const createUser = async (userData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users`,{
+    console.log('Enviando payload a /users:', userData);
+    const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
+      headers: getHeaders(), // Incluye Authorization si es necesario
+      body: JSON.stringify({
+        usuario: userData.usuario,  // Cambiar email -> usuario
+        contraseña: userData.contraseña,
+        cliente: {  // Cambiar client -> cliente
+          nombre: userData.cliente.nombre,  // Mantener nombres en español
+          apellido: userData.cliente.apellido,
+          telefono: userData.cliente.telefono
+        }
+      }),
     });
 
+    console.log('Respuesta HTTP:', response.status);
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Error del backend:', errorData);
+      console.error('Error detallado del backend:', errorData);
       throw new Error(errorData.message || 'Error al crear usuario');
     }
 
-    return response.json();
+    return await response.json();
   } catch (error) {
-    console.error('Error en createUser:', error);
+    console.error('Error completo en createUser:', error);
     throw error;
   }
 };
@@ -105,7 +114,7 @@ export const deleteClient = async (id) => {
     method: 'DELETE',
     headers: getHeaders(),
   });
-  
+
   if (response.status === 204) {
     return {};
   }

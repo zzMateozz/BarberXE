@@ -1,10 +1,9 @@
-// src/services/LoginService.js
-const API_BASE_URL = 'http://localhost:3000/api'; // Ajusta según tu configuración
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export const LoginService = {
-  async login(credentials) {
+   async login(credentials) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -17,73 +16,79 @@ export const LoginService = {
         throw new Error(errorData.message || 'Error en el inicio de sesión');
       }
 
-      const data = await response.json();
-      // Determinar el rol basado en las relaciones
-      let role = 'cliente'; // Por defecto
+      const { data } = await response.json(); // Destructure the nested data
       
-      if (data.empleado) {
-        role = 'empleado'; // Barbero o Cajero
-      } else if (data.cliente) {
-        role = 'cliente';
-      } else {
-        // Si no tiene ninguna relación, es admin
-        role = 'admin';
+      // Verify the response structure
+      if (!data.token || !data.user || !data.role) {
+        console.error('Invalid response structure:', data);
+        throw new Error('Estructura de respuesta inválida del servidor');
       }
-
-      return {
-        ...data,
-        role // Añadimos el rol determinado
-      };
+      
+      return data; // Return just the data part
     } catch (error) {
       console.error('Error en LoginService:', error);
       throw error;
     }
   },
 
-  async register(userData) {
+  async logout() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error en el registro');
+      const token = localStorage.getItem('authToken');
+      
+      if (token) {
+        // Llamar al endpoint de logout en el backend
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
       }
-
-      return await response.json();
+      
+      // Limpiar almacenamiento local
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('authData');
     } catch (error) {
-      console.error('Error en LoginService (register):', error);
+      console.error('Error al cerrar sesión:', error);
       throw error;
     }
   },
 
-  logout() {
-    // Limpiar datos de autenticación
-    localStorage.removeItem('authData');
+  async refreshToken() {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (!refreshToken) {
+        throw new Error('No hay refresh token disponible');
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al refrescar el token');
+      }
+      
+      const data = await response.json();
+      localStorage.setItem('authToken', data.token);
+      return data.token;
+    } catch (error) {
+      console.error('Error al refrescar token:', error);
+      throw error;
+    }
   },
 
-  getAuthData() {
-    const authData = localStorage.getItem('authData');
-    return authData ? JSON.parse(authData) : null;
+  getCurrentToken() {
+    return localStorage.getItem('authToken');
   },
 
   isAuthenticated() {
-    const authData = this.getAuthData();
-    return authData ? authData.isAuthenticated : false;
-  },
-
-  getCurrentUser() {
-    const authData = this.getAuthData();
-    return authData ? authData.user : null;
-  },
-
-  getCurrentRole() {
-    const authData = this.getAuthData();
-    return authData ? authData.role : null;
+    return !!localStorage.getItem('authToken');
   }
 };

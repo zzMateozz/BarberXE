@@ -7,39 +7,42 @@ import { EgresoService } from '../services/egresoService';
 import { CreateEgresoDto } from '../dtos/Egreso/CreateEgreso.dto';
 import { CreateIngresoDto } from '../dtos/Ingreso/CreateIngreso.dto';
 import { ArqueoCaja } from '../entity/arqueoCaja';
+import { HttpResponse } from '../shared/response/http.response';
 
 export class ArqueoCajaController {
     private arqueoCajaService: ArqueoCajaService;
     private ingresoService: IngresoService;
     private egresoService: EgresoService;
+    private httpResponse: HttpResponse;
 
     constructor() {
         this.arqueoCajaService = new ArqueoCajaService();
         this.ingresoService = new IngresoService();
         this.egresoService = new EgresoService();
+        this.httpResponse = new HttpResponse();
         this.close = this.close.bind(this);
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
             const arqueos = await this.arqueoCajaService.findAll();
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: arqueos
             });
-            } catch (error: unknown) {
+        } catch (error: unknown) {
             if (error instanceof Error) {
                 console.error('Error en getAll:', error.message);
-                res.status(500).json({
-                success: false,
-                message: 'Error al obtener arqueos de caja',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: 'Error al obtener arqueos de caja',
+                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
                 });
             } else {
                 console.error('Error en getAll:', error);
-                res.status(500).json({
-                success: false,
-                message: 'Error desconocido'
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: 'Error desconocido'
                 });
             }
         }
@@ -50,7 +53,7 @@ export class ArqueoCajaController {
             const id = parseInt(req.params.id);
             const arqueo = await this.arqueoCajaService.findById(id);
             
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     ...arqueo,
@@ -62,7 +65,7 @@ export class ArqueoCajaController {
                 }
             });
         } catch (error: any) {
-            res.status(404).json({
+            this.httpResponse.NotFound(res, {
                 success: false,
                 message: error.message
             });
@@ -108,7 +111,7 @@ export class ArqueoCajaController {
             });
     
             if (!arqueos || arqueos.length === 0) {
-                res.status(404).json({
+                this.httpResponse.NotFound(res, {
                     success: false,
                     message: 'No se encontraron arqueos para este empleado'
                 });
@@ -119,12 +122,12 @@ export class ArqueoCajaController {
                 ? arqueos.map(arqueo => this.formatDetailedArqueo(arqueo))
                 : arqueos.map(arqueo => this.formatBasicArqueo(arqueo));
     
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: responseData
             });
         } catch (error: any) {
-            res.status(500).json({
+            this.httpResponse.Error(res, {
                 success: false,
                 message: 'Error al obtener arqueos por empleado',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -136,22 +139,38 @@ export class ArqueoCajaController {
         try {
             const arqueoData = new CreateArqueoCajaDto(req.body);
             const arqueo = await this.arqueoCajaService.create(arqueoData);
-            res.status(201).json({
+            this.httpResponse.Created(res, {
                 success: true,
                 data: arqueo
             });
         } catch (error: any) {
-            console.error('Error en create:', error); // Debug detallado
+            console.error('Error en create:', error);
             
-            const status = error.message.includes('ID de empleado') ? 400 : 
-                            error.message.includes('ya tiene un arqueo') ? 409 : 
-                            error.message.includes('no encontrado') ? 404 : 500;
-            
-            res.status(status).json({
-                success: false,
-                message: error.message,
-                details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-            });
+            if (error.message.includes('ID de empleado')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
+            } else if (error.message.includes('ya tiene un arqueo')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
+            } else if (error.message.includes('no encontrado')) {
+                this.httpResponse.NotFound(res, {
+                    success: false,
+                    message: error.message,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
+            } else {
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: error.message,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
+            }
         }
     };
 
@@ -160,32 +179,43 @@ export class ArqueoCajaController {
             const id = parseInt(req.params.id);
             const closeData = new CloseArqueoCajaDto(req.body);
             
-            // Usar this.arqueoCajaService correctamente
             const arqueo = await this.arqueoCajaService.close(id, closeData);
             
-            res.status(200).json({
-            success: true,
-            data: {
-                ...arqueo,
-                diferencia: closeData.saldoFinal - (arqueo.saldoInicial + 
-                arqueo.ingresos.reduce((sum, i) => sum + i.monto, 0) - 
-                arqueo.egresos.reduce((sum, e) => sum + e.monto, 0))
-            }
+            this.httpResponse.OK(res, {
+                success: true,
+                data: {
+                    ...arqueo,
+                    diferencia: closeData.saldoFinal - (arqueo.saldoInicial + 
+                    arqueo.ingresos.reduce((sum, i) => sum + i.monto, 0) - 
+                    arqueo.egresos.reduce((sum, e) => sum + e.monto, 0))
+                }
             });
         } catch (error: any) {
             console.error('Error al cerrar arqueo:', error);
             
-            const status = error.message.includes('no encontrado') ? 404 : 
-                            error.message.includes('ya está cerrado') ? 400 : 
-                            error.message.includes('Discrepancia') ? 422 : 500;
-            
-            res.status(status).json({
-            success: false,
-            message: error.message
-            });
+            if (error.message.includes('no encontrado')) {
+                this.httpResponse.NotFound(res, {
+                    success: false,
+                    message: error.message
+                });
+            } else if (error.message.includes('ya está cerrado')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message
+                });
+            } else if (error.message.includes('Discrepancia')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message
+                });
+            } else {
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: error.message
+                });
+            }
         }
     }
-
 
     update = async (req: Request, res: Response): Promise<void> => {
         try {
@@ -195,13 +225,18 @@ export class ArqueoCajaController {
             const arqueo = await this.arqueoCajaService.update(id, arqueoData);
             
             if (!arqueo) {
-                res.status(404).json({ message: 'Arqueo de caja no encontrado' });
+                this.httpResponse.NotFound(res, {
+                    message: 'Arqueo de caja no encontrado'
+                });
                 return;
             }
             
-            res.status(200).json(arqueo);
+            this.httpResponse.OK(res, arqueo);
         } catch (error) {
-            res.status(500).json({ message: 'Error al actualizar arqueo de caja', error });
+            this.httpResponse.Error(res, {
+                message: 'Error al actualizar arqueo de caja',
+                error
+            });
         }
     };
 
@@ -210,28 +245,36 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const incomeData = new CreateIngresoDto(req.body);
             
-            // Validar que el arqueo existe y está abierto
             const arqueo = await this.arqueoCajaService.findById(arqueoId);
             if (arqueo.fechaCierre) {
-                throw new Error('No se pueden agregar ingresos a un arqueo cerrado');
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: 'No se pueden agregar ingresos a un arqueo cerrado'
+                });
+                return;
             }
 
-            // Crear el ingreso asociado al arqueo
             const ingreso = await this.ingresoService.create({
                 ...incomeData,
                 arqueoId
             });
 
-            res.status(201).json({
+            this.httpResponse.Created(res, {
                 success: true,
                 data: ingreso
             });
         } catch (error: any) {
-            const status = error.message.includes('No se pueden agregar') ? 400 : 500;
-            res.status(status).json({
-                success: false,
-                message: error.message
-            });
+            if (error.message.includes('No se pueden agregar')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message
+                });
+            } else {
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: error.message
+                });
+            }
         }
     }
 
@@ -240,28 +283,36 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const expenseData = new CreateEgresoDto(req.body);
             
-            // Validar que el arqueo existe y está abierto
             const arqueo = await this.arqueoCajaService.findById(arqueoId);
             if (arqueo.fechaCierre) {
-                throw new Error('No se pueden agregar egresos a un arqueo cerrado');
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: 'No se pueden agregar egresos a un arqueo cerrado'
+                });
+                return;
             }
 
-            // Crear el egreso asociado al arqueo
             const egreso = await this.egresoService.create({
                 ...expenseData,
                 arqueoId
             });
 
-            res.status(201).json({
+            this.httpResponse.Created(res, {
                 success: true,
                 data: egreso
             });
         } catch (error: any) {
-            const status = error.message.includes('No se pueden agregar') ? 400 : 500;
-            res.status(status).json({
-                success: false,
-                message: error.message
-            });
+            if (error.message.includes('No se pueden agregar')) {
+                this.httpResponse.BadRequest(res, {
+                    success: false,
+                    message: error.message
+                });
+            } else {
+                this.httpResponse.Error(res, {
+                    success: false,
+                    message: error.message
+                });
+            }
         }
     }
 
@@ -271,19 +322,19 @@ export class ArqueoCajaController {
             const arqueo = await this.arqueoCajaService.findOpenByEmpleado(empleadoId);
             
             if (!arqueo) {
-                res.status(404).json({
+                this.httpResponse.NotFound(res, {
                     success: false,
                     message: 'No hay arqueos abiertos para este empleado'
                 });
                 return;
             }
             
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: arqueo
             });
         } catch (error: any) {
-            res.status(500).json({
+            this.httpResponse.Error(res, {
                 success: false,
                 message: 'Error al obtener arqueo abierto',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -296,7 +347,7 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const ingresos = await this.ingresoService.findByArqueoId(arqueoId);
             
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     count: ingresos.length,
@@ -305,7 +356,7 @@ export class ArqueoCajaController {
                 }
             });
         } catch (error: any) {
-            res.status(500).json({
+            this.httpResponse.Error(res, {
                 success: false,
                 message: 'Error al obtener ingresos del arqueo',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -318,7 +369,7 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const egresos = await this.egresoService.findByArqueoId(arqueoId);
             
-            res.status(200).json({
+            this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     count: egresos.length,
@@ -327,7 +378,7 @@ export class ArqueoCajaController {
                 }
             });
         } catch (error: any) {
-            res.status(500).json({
+            this.httpResponse.Error(res, {
                 success: false,
                 message: 'Error al obtener egresos del arqueo',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined

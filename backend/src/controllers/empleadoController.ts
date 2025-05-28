@@ -2,32 +2,33 @@ import { Request, Response } from 'express';
 import { EmpleadoService } from '../services/empleadoService';
 import { UpdateEmpleadoDto } from '../dtos/Empleado/UpdateEmpleado.dto';
 import { CreateEmpleadoDto } from '../dtos/Empleado/CreateEmpleado.dto';
-import { uploadProfile } from '../middleware/upload';
+import { HttpResponse } from '../shared/response/http.response';
 
 export class EmpleadoController {
     private empleadoService: EmpleadoService;
+    private httpResponse: HttpResponse;
 
     constructor() {
         this.empleadoService = new EmpleadoService();
+        this.httpResponse = new HttpResponse();
     }
 
     getAll = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const empleados = await this.empleadoService.findAll();
-        
-        // Asegurar URLs absolutas para las imágenes
-        const empleadosConImagen = empleados.map(empleado => ({
-            ...empleado,
-            imagenPerfil: empleado.imagenPerfil 
-                ? `${req.protocol}://${req.get('host')}${empleado.imagenPerfil}`
-                : null
-        }));
-        
-        res.status(200).json(empleadosConImagen);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al obtener empleados', error });
-    }
-};
+        try {
+            const empleados = await this.empleadoService.findAll();
+            
+            const empleadosConImagen = empleados.map(empleado => ({
+                ...empleado,
+                imagenPerfil: empleado.imagenPerfil 
+                    ? `${req.protocol}://${req.get('host')}${empleado.imagenPerfil}`
+                    : null
+            }));
+            
+            this.httpResponse.OK(res, empleadosConImagen);
+        } catch (error) {
+            this.httpResponse.Error(res, 'Error al obtener empleados');
+        }
+    };
 
     getById = async (req: Request, res: Response): Promise<void> => {
         try {
@@ -35,30 +36,27 @@ export class EmpleadoController {
             const empleado = await this.empleadoService.findById(id);
             
             if (!empleado) {
-                res.status(404).json({ message: 'Empleado no encontrado' });
+                this.httpResponse.NotFound(res, 'Empleado no encontrado');
                 return;
             }
             
-            res.status(200).json(empleado);
+            this.httpResponse.OK(res, empleado);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener empleado', error });
+            this.httpResponse.Error(res, 'Error al obtener empleado');
         }
     };
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
             const empleadoData = new CreateEmpleadoDto({
-            ...req.body,
-            imagenPerfil: req.file ? `/uploads/profiles/${req.file.filename}` : undefined
+                ...req.body,
+                imagenPerfil: req.file ? `/uploads/profiles/${req.file.filename}` : undefined
             });
             
             const empleado = await this.empleadoService.create(empleadoData);
-            res.status(201).json(empleado);
+            this.httpResponse.Created(res, empleado);
         } catch (error) {
-            res.status(500).json({ 
-            message: 'Error al crear empleado',
-            error: error instanceof Error ? error.message : 'Error desconocido'
-            });
+            this.httpResponse.Error(res, error instanceof Error ? error.message : 'Error al crear empleado');
         }
     };
 
@@ -71,15 +69,12 @@ export class EmpleadoController {
             });
 
             const empleado = await this.empleadoService.update(id, empleadoData);
-            res.status(200).json(empleado);
+            this.httpResponse.OK(res, empleado);
         } catch (error: any) {
             if (error.message.includes('no encontrado')) {
-                res.status(404).json({ message: error.message });
+                this.httpResponse.NotFound(res, error.message);
             } else {
-                res.status(500).json({ 
-                    message: 'Error al actualizar empleado',
-                    error: error.message 
-                });
+                this.httpResponse.Error(res, 'Error al actualizar empleado');
             }
         }
     };
@@ -88,9 +83,9 @@ export class EmpleadoController {
         try {
             const id = parseInt(req.params.id);
             await this.empleadoService.delete(id);
-            res.status(204).send();
+            this.httpResponse.NoContent(res);
         } catch (error) {
-            res.status(500).json({ message: 'Error al eliminar empleado', error });
+            this.httpResponse.Error(res, 'Error al eliminar empleado');
         }
     };
 
@@ -98,27 +93,27 @@ export class EmpleadoController {
         try {
             const nombre = req.query.nombre as string;
             const empleados = await this.empleadoService.findByName(nombre);
-            res.status(200).json(empleados);
+            this.httpResponse.OK(res, empleados);
         } catch (error) {
-            res.status(500).json({ message: 'Error al buscar empleados por nombre', error });
+            this.httpResponse.Error(res, 'Error al buscar empleados por nombre');
         }
     };
 
     getWithCitas = async (req: Request, res: Response): Promise<void> => {
         try {
             const empleados = await this.empleadoService.findWithCitas();
-            res.status(200).json(empleados);
+            this.httpResponse.OK(res, empleados);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener empleados con citas', error });
+            this.httpResponse.Error(res, 'Error al obtener empleados con citas');
         }
     };
 
     getWithArqueos = async (req: Request, res: Response): Promise<void> => {
         try {
             const empleados = await this.empleadoService.findWithArqueos();
-            res.status(200).json(empleados);
+            this.httpResponse.OK(res, empleados);
         } catch (error) {
-            res.status(500).json({ message: 'Error al obtener empleados con arqueos', error });
+            this.httpResponse.Error(res, 'Error al obtener empleados con arqueos');
         }
     };
 }
