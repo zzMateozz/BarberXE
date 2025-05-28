@@ -6,6 +6,8 @@ import { LoginUserDto } from '../dtos/User/LoginUser.dto';
 import { UpdateUserDto } from '../dtos/User/UpdateUser.dto';
 import { HttpResponse } from '../shared/response/http.response'; // Asegúrate de tener esto
 import { AuthService } from '../services/auth.service';
+import { ClienteRepository } from '../repository/ClienteRepository';
+import { UserRepository } from '../repository/UserRepository';
 
 
 export class UserController {
@@ -128,4 +130,31 @@ export class UserController {
             this.httpResponse.Error(res, 'Error al eliminar');
         }
     };
+getClientByUserId = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        // Usar QueryBuilder para forzar el JOIN correcto
+        const user = await UserRepository.createQueryBuilder("user")
+            .leftJoinAndSelect("user.cliente", "cliente") // Forzar relación
+            .where("user.idUser = :userId", { userId })
+            .getOne();
+
+        if (!user?.cliente) {
+            this.httpResponse.NotFound(res, 'Cliente no encontrado');
+            return;
+        }
+
+        // Respuesta estructurada
+        this.httpResponse.OK(res, {
+            idCliente: user.cliente.idCliente, // Asegurar que existe
+            nombre: user.cliente.nombre,
+            apellido: user.cliente.apellido,
+            telefono: user.cliente.telefono,
+            userId: userId
+        });
+    } catch (error) {
+        this.httpResponse.Error(res, 'Error al obtener cliente');
+    }
+}
 }

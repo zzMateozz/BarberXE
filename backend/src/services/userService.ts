@@ -259,4 +259,15 @@ export class UserService {
             await queryRunner.release();
         }
     }
+
+    
+
+    async findClientByUserId(userId: number): Promise<Cliente | null> {
+    const user = await this.userRepository.findOne({
+        where: { idUser: userId },
+        relations: ['cliente'], // Cargar relación explícitamente
+    });
+    
+    return user?.cliente || null;
+}
 }

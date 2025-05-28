@@ -1,14 +1,15 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import { Pencil, Trash2, Search, Plus, Calendar, Clock, User, Users, Scissors, Check, X, Loader2 } from "lucide-react";
-import { PlusCircleIcon } from "@heroicons/react/24/outline";
 import {
     createCita,
     updateCita,
     deleteCita,
     fetchEmpleados,
     fetchServicios,
-    fetchCitasByClienteId
+    fetchCitasByClienteId,
+    fetchClienteByUserId,
+    fetchCitas
 } from "../../../services/QuotesService.js";
 import { toast } from "react-toastify";
 import { format, parseISO } from "date-fns";
@@ -31,18 +32,11 @@ const ValidationMessage = ({ message, isValid }) => {
 };
 
 const TableCitasCliente = ({ isCollapsed, currentUser }) => {
-    // Verificación inicial de currentUser
-    if (!currentUser || !currentUser.idCliente) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin h-8 w-8 text-gray-500" />
-                <span className="ml-2">Cargando información del usuario...</span>
-            </div>
-        );
-    }
-
+    // Estados principales
     const [citas, setCitas] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [userLoading, setUserLoading] = useState(true);
+    const [todasLasCitas, setTodasLasCitas] = useState([]);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [showModal, setShowModal] = useState(false);
@@ -54,15 +48,14 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     const [servicios, setServicios] = useState([]);
     const [barberos, setBarberos] = useState([]);
 
+    // Estado del usuario procesado
+    const [clienteInfo, setClienteInfo] = useState(null);
+
     // Formulario
     const [formData, setFormData] = useState({
         fecha: "",
         hora: "",
-        cliente: {
-            idCliente: currentUser.idCliente,
-            nombre: currentUser.nombre,
-            apellido: currentUser.apellido
-        },
+        cliente: null,
         empleado: null,
         servicios: [],
     });
@@ -79,8 +72,9 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     const itemsPerPage = 5;
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = citas.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(citas.length / itemsPerPage);
+    // CORRECCIÓN: Verificar que citas sea un array antes de usar slice
+    const currentItems = Array.isArray(citas) ? citas.slice(indexOfFirstItem, indexOfLastItem) : [];
+    const totalPages = Math.ceil((Array.isArray(citas) ? citas.length : 0) / itemsPerPage);
 
     const nextPage = () => {
         if (currentPage < totalPages) {
@@ -93,6 +87,177 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             setCurrentPage(currentPage - 1);
         }
     };
+
+    // Función mejorada para obtener usuario desde localStorage
+    const getUserFromStorage = () => {
+        try {
+            // Intentar diferentes claves de localStorage y sessionStorage
+            const possibleKeys = ['user', 'currentUser', 'authUser', 'authData', 'userData'];
+            const storages = [localStorage, sessionStorage];
+
+            for (const storage of storages) {
+                for (const key of possibleKeys) {
+                    try {
+                        const storedData = storage.getItem(key);
+                        if (storedData) {
+                            const parsed = JSON.parse(storedData);
+                            console.log(`Datos encontrados en ${storage === localStorage ? 'localStorage' : 'sessionStorage'}.${key}:`, parsed);
+
+                            // Si el objeto tiene una propiedad user, devolverla
+                            if (parsed.user) {
+                                return parsed.user;
+                            }
+
+                            // Si el objeto parece ser un usuario directamente
+                            if (parsed.id || parsed.idCliente || parsed.username || parsed.email || parsed.nombre) {
+                                return parsed;
+                            }
+
+                            // Si tiene una propiedad cliente
+                            if (parsed.cliente) {
+                                return parsed.cliente;
+                            }
+                        }
+                    } catch (parseError) {
+                        console.warn(`Error parseando ${key} desde storage:`, parseError);
+                    }
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error("Error obteniendo user desde storage:", error);
+            return null;
+        }
+    };
+
+    // 2. Reemplazar la función processUserInfo
+    const processUserInfo = async (userObj) => {
+        if (!userObj) {
+            console.log("No se recibió objeto de usuario");
+            return null;
+        }
+
+        console.log("Procesando información del usuario:", userObj);
+
+        // Extraer userId (no clienteId directamente)
+        let userId = null;
+
+        const possibleUserIds = [
+            userObj.id,
+            userObj.idUser,
+            userObj.userId,
+            userObj.user?.id,
+            userObj.user?.idUser
+        ];
+
+        userId = possibleUserIds.find(id => id != null);
+
+        if (!userId) {
+            console.error("No se pudo extraer el userId:", userObj);
+            return null;
+        }
+
+        console.log("UserId extraído:", userId);
+
+        try {
+            console.log("Obteniendo información del cliente desde API usando userId:", userId);
+            const clienteResponse = await fetchClienteByUserId(userId);
+
+            console.log("Respuesta del cliente:", clienteResponse);
+
+            if (clienteResponse && clienteResponse.data) {
+                const clienteData = clienteResponse.data;
+
+                return {
+                    idCliente: clienteData.idCliente || clienteData.id,
+                    userId: userId,
+                    nombre: clienteData.nombre || clienteData.firstName || userObj.nombre || userObj.firstName || 'Usuario',
+                    apellido: clienteData.apellido || clienteData.lastName || userObj.apellido || userObj.lastName || '',
+                    email: clienteData.email || userObj.email || '',
+                    telefono: clienteData.telefono || clienteData.phone || userObj.telefono || userObj.phone || ''
+                };
+            } else {
+                console.error("No se recibió información válida del cliente");
+                return null;
+            }
+        } catch (error) {
+            console.error("Error obteniendo información del cliente desde API:", error);
+
+            // Si la API falla, intentar usar la información disponible
+            // pero advertir que puede no ser correcta
+            console.warn("Usando información de fallback - puede no tener el clienteId correcto");
+            return {
+                idCliente: null, // No tenemos el clienteId correcto
+                userId: userId,
+                nombre: userObj.nombre || userObj.firstName || userObj.name || 'Usuario',
+                apellido: userObj.apellido || userObj.lastName || userObj.surname || '',
+                email: userObj.email || '',
+                telefono: userObj.telefono || userObj.phone || '',
+                error: "No se pudo obtener el clienteId correcto"
+            };
+        }
+    };
+
+    // 3. Actualizar el useEffect que procesa la información del usuario
+    useEffect(() => {
+        const processUser = async () => {
+            console.log("Current user recibido:", currentUser);
+
+            let userToProcess = currentUser;
+
+            // Si no viene currentUser por props, intentar obtenerlo del storage
+            if (!userToProcess) {
+                console.log("No se recibió currentUser, intentando obtener del storage...");
+                userToProcess = getUserFromStorage();
+            }
+
+            if (userToProcess) {
+                try {
+                    const clienteData = await processUserInfo(userToProcess);
+                    console.log("Cliente procesado:", clienteData);
+
+                    if (clienteData && clienteData.idCliente) {
+                        setClienteInfo(clienteData);
+                        setUserLoading(false);
+                    } else {
+                        console.error("No se pudo extraer la información del cliente:", userToProcess);
+                        setError("No se pudo cargar la información del usuario. Estructura de datos no reconocida.");
+                        setUserLoading(false);
+                    }
+                } catch (error) {
+                    console.error("Error procesando usuario:", error);
+                    setError("Error al cargar la información del usuario.");
+                    setUserLoading(false);
+                }
+            } else {
+                console.log("Esperando currentUser o datos en storage...");
+                // Dar tiempo para que el usuario se cargue
+                const timeout = setTimeout(async () => {
+                    const fallbackUser = getUserFromStorage();
+                    if (fallbackUser) {
+                        try {
+                            const clienteData = await processUserInfo(fallbackUser);
+                            if (clienteData && clienteData.idCliente) {
+                                setClienteInfo(clienteData);
+                                setUserLoading(false);
+                                return;
+                            }
+                        } catch (error) {
+                            console.error("Error procesando fallback user:", error);
+                        }
+                    }
+
+                    setError("No se pudo cargar la información del usuario. Por favor, inicie sesión nuevamente.");
+                    setUserLoading(false);
+                }, 3000);
+
+                return () => clearTimeout(timeout);
+            }
+        };
+
+        processUser();
+    }, [currentUser]);
 
     // Función para crear una fecha local a partir de componentes
     const createLocalDate = (year, month, day, hours, minutes) => {
@@ -124,56 +289,111 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             return "Fecha no válida";
         }
     };
+    
+// CORRECCIÓN: Función para normalizar datos de la API
+    const normalizeApiResponse = (data) => {
+        // Si data es undefined o null, devolver array vacío
+        if (!data) {
+            return [];
+        }
 
-    // Cargar datos iniciales
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                setLoading(true);
-                
-                // Cargar citas del cliente
-                const citasData = await fetchCitasByClienteId(currentUser.idCliente);
+        // Si data ya es un array, devolverlo
+        if (Array.isArray(data)) {
+            return data;
+        }
 
-                // Cargar otros datos necesarios
-                const [empleadosData, serviciosData] = await Promise.all([
-                    fetchEmpleados(),
-                    fetchServicios().then(servicios =>
-                        servicios.map(s => ({
-                            ...s,
-                            duracion: parseInt(s.duracion) || 0
-                        }))
-                    ),
-                ]);
+        // Si data es un objeto con propiedad data que es array
+        if (data.data && Array.isArray(data.data)) {
+            return data.data;
+        }
 
-                setCitas(citasData);
-
-                // Filtrar barberos activos
-                const barberosActivos = empleadosData.filter(
-                    e => e.cargo?.toLowerCase() === "barbero" && e.estado?.toLowerCase() === "activo"
-                );
-                setBarberos(barberosActivos);
-
-                // Filtrar servicios activos
-                const serviciosActivos = serviciosData.filter(
-                    s => s.estado?.toLowerCase() === "activo"
-                );
-                setServicios(serviciosActivos);
-
-                setLoading(false);
-            } catch (err) {
-                setError(err.message);
-                setLoading(false);
+        // Si data es un objeto con propiedades que parecen ser arrays
+        if (typeof data === 'object') {
+            // Buscar propiedades que sean arrays
+            const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]));
+            if (arrayKeys.length > 0) {
+                return data[arrayKeys[0]];
             }
-        };
+        }
 
-        loadData();
-    }, [currentUser.idCliente]);
+        // Si nada de lo anterior funciona, devolver array vacío
+        console.warn("Formato de datos no reconocido:", data);
+        return [];
+    };
+
+    // 3. Actualizar el useEffect para cargar datos
+   // Función actualizada para cargar datos
+useEffect(() => {
+    const loadData = async () => {
+        if (!clienteInfo) {
+            return; // Esperar a que clienteInfo se cargue
+        }
+
+        // Verificar que tenemos el clienteId correcto
+        if (!clienteInfo.idCliente) {
+            console.error("No se tiene clienteId válido:", clienteInfo);
+            setError("No se pudo determinar el ID del cliente correctamente");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            console.log("Cargando datos para clienteId:", clienteInfo.idCliente);
+
+            // CAMBIO: Cargar tanto las citas del cliente como todas las citas
+            const [citasClienteResponse, todasCitasResponse, empleadosResponse, serviciosResponse] = await Promise.all([
+                fetchCitasByClienteId(clienteInfo.idCliente), // Citas del cliente
+                fetchCitas(), // NUEVO: Todas las citas para validar horarios
+                fetchEmpleados(),
+                fetchServicios()
+            ]);
+
+            console.log("Respuesta de citas del cliente:", citasClienteResponse);
+            console.log("Respuesta de todas las citas:", todasCitasResponse);
+
+            const citasClienteData = normalizeApiResponse(citasClienteResponse);
+            const todasCitasData = normalizeApiResponse(todasCitasResponse); // NUEVO
+            const empleadosData = normalizeApiResponse(empleadosResponse);
+            const serviciosData = normalizeApiResponse(serviciosResponse).map(s => ({
+                ...s,
+                duracion: parseInt(s.duracion) || 0
+            }));
+
+            setCitas(citasClienteData); // Solo citas del cliente para la tabla
+            setTodasLasCitas(todasCitasData); // NUEVO: Todas las citas para validaciones
+
+            // Filtrar barberos activos
+            const barberosActivos = empleadosData.filter(
+                e => e.cargo?.toLowerCase() === "barbero" && e.estado?.toLowerCase() === "activo"
+            );
+            setBarberos(barberosActivos);
+
+            // Filtrar servicios activos
+            const serviciosActivos = serviciosData.filter(
+                s => s.estado?.toLowerCase() === "activo"
+            );
+            setServicios(serviciosActivos);
+
+            setLoading(false);
+        } catch (err) {
+            console.error("Error cargando datos:", err);
+            setError(err.message || "Error al cargar los datos");
+            setLoading(false);
+        }
+    };
+
+    loadData();
+}, [clienteInfo]);
 
     // Manejar búsqueda por barbero
     useEffect(() => {
         const loadFilteredCitas = async () => {
+            if (!clienteInfo || !clienteInfo.idCliente) return;
+
             try {
-                const citasCliente = await fetchCitasByClienteId(currentUser.idCliente);
+                const citasResponse = await fetchCitasByClienteId(clienteInfo.idCliente);
+                const citasCliente = normalizeApiResponse(citasResponse);
 
                 if (searchTerm) {
                     const filtered = citasCliente.filter(cita =>
@@ -187,15 +407,21 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
 
                 setCurrentPage(1);
             } catch (err) {
+                console.error("Error filtrando citas:", err);
                 setError(err.message);
             }
         };
 
         loadFilteredCitas();
-    }, [searchTerm, currentUser.idCliente]);
+    }, [searchTerm, clienteInfo]);
 
     // Abrir modal para nueva/editar cita
     const openModal = (citaId = null) => {
+        if (!clienteInfo) {
+            toast.error("No se pudo cargar la información del usuario");
+            return;
+        }
+
         setShowModal(true);
         setEditingCitaId(citaId);
         setCurrentStep("servicio");
@@ -216,24 +442,118 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                 setFormData({
                     fecha,
                     hora,
-                    cliente: citaToEdit.cliente,
+                    cliente: clienteInfo,
                     empleado: citaToEdit.empleado,
-                    servicios: citaToEdit.servicios,
+                    servicios: citaToEdit.servicios || [],
                 });
             }
         } else {
             setFormData({
                 fecha: "",
                 hora: "",
-                cliente: {
-                    idCliente: currentUser.idCliente,
-                    nombre: currentUser.nombre,
-                    apellido: currentUser.apellido
-                },
+                cliente: clienteInfo,
                 empleado: null,
                 servicios: [],
             });
         }
+    };
+
+    // ✅ Función mejorada para detectar conflictos de horario
+    const detectarConflictoHorario = (error) => {
+        const errorMessage = error.response?.data?.message ||
+            error.response?.data?.error ||
+            error.message ||
+            String(error);
+
+        // Patrones para detectar conflictos de horario
+        const patronesConflicto = [
+            /empleado.*ocupado/i,
+            /horario.*ocupado/i,
+            /cita.*existente/i,
+            /conflicto.*horario/i,
+            /already.*booked/i,
+            /schedule.*conflict/i,
+            /time.*overlap/i,
+            /solapamiento/i,
+            /disponible/i,
+            /busy/i,
+            /occupied/i
+        ];
+
+        return patronesConflicto.some(patron => patron.test(errorMessage));
+    };
+
+
+    const extraerInfoConflicto = (errorMessage) => {
+        const info = {
+            horarioOcupado: null,
+            duracionOcupada: null,
+            empleadoOcupado: null,
+            citaExistente: null
+        };
+
+        // Extraer rango de horas (múltiples formatos)
+        const patronesHorario = [
+            /(\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?)\s*[-–—]\s*(\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?)/gi,
+            /desde\s+las?\s+(\d{1,2}:\d{2})\s+hasta\s+las?\s+(\d{1,2}:\d{2})/gi,
+            /entre\s+las?\s+(\d{1,2}:\d{2})\s+y\s+las?\s+(\d{1,2}:\d{2})/gi,
+            /de\s+(\d{1,2}:\d{2})\s+a\s+(\d{1,2}:\d{2})/gi,
+            /(\d{1,2}:\d{2})\s*a\s*(\d{1,2}:\d{2})/gi
+        ];
+
+        for (const patron of patronesHorario) {
+            const match = errorMessage.match(patron);
+            if (match) {
+                info.horarioOcupado = match[0];
+                break;
+            }
+        }
+
+        // Si no encontró rango, buscar hora individual
+        if (!info.horarioOcupado) {
+            const horaIndividual = errorMessage.match(/(\d{1,2}:\d{2})/g);
+            if (horaIndividual && horaIndividual.length >= 1) {
+                info.horarioOcupado = horaIndividual[0];
+            }
+        }
+
+        // Extraer duración
+        const patronesDuracion = [
+            /(\d+)\s*(?:minutos?|mins?|min)/gi,
+            /(\d+)\s*(?:horas?|hrs?|h)/gi,
+            /duración?\s*:?\s*(\d+)/gi
+        ];
+
+        for (const patron of patronesDuracion) {
+            const match = errorMessage.match(patron);
+            if (match) {
+                info.duracionOcupada = match[0];
+                break;
+            }
+        }
+
+        // Extraer nombre del empleado
+        const patronesEmpleado = [
+            /empleado\s+([a-záéíóúñ\s]+)/gi,
+            /barbero\s+([a-záéíóúñ\s]+)/gi,
+            /(?:el|la)\s+([a-záéíóúñ\s]+)\s+(?:está|tiene)/gi
+        ];
+
+        for (const patron of patronesEmpleado) {
+            const match = errorMessage.match(patron);
+            if (match && match[1]) {
+                info.empleadoOcupado = match[1].trim();
+                break;
+            }
+        }
+
+        // Extraer información de cita existente
+        const patronCitaExistente = /cita\s+(?:existente|programada|agendada)/gi;
+        if (patronCitaExistente.test(errorMessage)) {
+            info.citaExistente = true;
+        }
+
+        return info;
     };
 
     // Cerrar modal
@@ -241,6 +561,11 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         setShowModal(false);
         setEditingCitaId(null);
         setError(null);
+        // Limpiar errores
+        setFechaError("");
+        setHoraError("");
+        setEmpleadoError("");
+        setServiciosError("");
     };
 
     const validateForm = () => {
@@ -315,97 +640,359 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         return endDate.toTimeString().substring(0, 5);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
+const obtenerCitasOcupadasEmpleado = (empleadoId, fecha) => {
+    if (!empleadoId || !fecha || !Array.isArray(todasLasCitas)) { // CAMBIO: usar todasLasCitas
+        console.log("Parámetros faltantes para obtener citas ocupadas:", { empleadoId, fecha, todasLasCitas: !!todasLasCitas });
+        return [];
+    }
+    
+    console.log("Buscando citas ocupadas para empleado:", empleadoId, "en fecha:", fecha);
+    console.log("Total de citas disponibles:", todasLasCitas.length);
+    
+    // 1. Filtrar citas del empleado en la fecha seleccionada
+    const citasEmpleado = todasLasCitas.filter(cita => {
+        const citaEmpleadoId = cita.empleado?.idEmpleado;
+        const citaFecha = new Date(cita.fecha).toISOString().split('T')[0];
+        
+        const coincide = citaEmpleadoId === empleadoId && citaFecha === fecha;
+        
+        if (coincide) {
+            console.log("Cita encontrada:", {
+                citaId: cita.idCita,
+                empleado: cita.empleado?.nombre,
+                fecha: citaFecha,
+                hora: new Date(cita.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+            });
+        }
+        
+        return coincide;
+    });
 
-        if (!validateForm()) {
-            toast.error("Por favor complete todos los campos requeridos");
-            setSubmitting(false);
-            return;
+    console.log(`Encontradas ${citasEmpleado.length} citas para el empleado ${empleadoId} en ${fecha}`);
+
+    // 2. Mapear horarios ocupados
+    return citasEmpleado.map(cita => {
+        const inicio = new Date(cita.fecha);
+        const duracionMinutos = cita.duracionTotal || 
+                              (cita.servicios && Array.isArray(cita.servicios) 
+                                  ? cita.servicios.reduce((total, s) => total + (parseInt(s.duracion) || 30), 0)
+                                  : 30);
+        
+        const fin = new Date(inicio.getTime() + duracionMinutos * 60000);
+        
+        const horarioFormateado = `${inicio.getHours().toString().padStart(2, '0')}:${inicio.getMinutes().toString().padStart(2, '0')} - ${fin.getHours().toString().padStart(2, '0')}:${fin.getMinutes().toString().padStart(2, '0')}`;
+        
+        const serviciosTexto = cita.servicios && Array.isArray(cita.servicios) 
+            ? cita.servicios.map(s => s.nombre || s.titulo || 'Servicio').join(', ')
+            : 'Sin servicios especificados';
+
+        const esTuCita = cita.cliente?.idCliente === clienteInfo?.idCliente;
+        
+        console.log("Procesando cita:", {
+            id: cita.idCita,
+            horario: horarioFormateado,
+            duracion: duracionMinutos,
+            servicios: serviciosTexto,
+            esTuCita
+        });
+
+        return {
+            idCita: cita.idCita,
+            horario: horarioFormateado,
+            duracion: duracionMinutos,
+            servicios: serviciosTexto,
+            esTuCita,
+            cliente: esTuCita ? 'Tu cita' : (cita.cliente?.nombre || 'Cliente')
+        };
+    }).sort((a, b) => {
+        // Ordenar por hora de inicio
+        const horaA = a.horario.split(' - ')[0];
+        const horaB = b.horario.split(' - ')[0];
+        return horaA.localeCompare(horaB);
+    });
+};
+
+const MostrarHorariosOcupados = ({ empleado, fecha }) => {
+    if (!empleado || !fecha) return null;
+
+    const citasOcupadas = obtenerCitasOcupadasEmpleado(empleado.idEmpleado, fecha);
+
+    if (citasOcupadas.length === 0) {
+        return (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-green-700">
+                    <Check className="w-4 h-4" />
+                    <span className="font-medium">¡Excelente! {empleado.nombre} está completamente disponible este día.</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-yellow-600" />
+                <h4 className="font-medium text-yellow-800">
+                    Horarios ocupados - {empleado.nombre} {empleado.apellido}
+                </h4>
+            </div>
+            
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+                {citasOcupadas.map((cita, index) => (
+                    <div 
+                        key={`${cita.idCita}-${index}`}
+                        className={`p-2 rounded-md text-sm ${
+                            cita.esTuCita 
+                                ? 'bg-blue-100 border border-blue-300' 
+                                : 'bg-white border border-gray-200'
+                        }`}
+                    >
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <div className={`font-mono font-medium ${
+                                    cita.esTuCita ? 'text-blue-700' : 'text-gray-700'
+                                }`}>
+                                    {cita.horario}
+                                </div>
+                                <div className={`text-xs mt-1 ${
+                                    cita.esTuCita ? 'text-blue-600' : 'text-gray-500'
+                                }`}>
+                                    {cita.servicios} ({cita.duracion} min)
+                                </div>
+                            </div>
+                            {cita.esTuCita && (
+                                <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
+                                    Tu cita
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-3 text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
+                💡 <strong>Tip:</strong> Elige un horario que no se superponga con los mostrados arriba.
+            </div>
+        </div>
+    );
+};
+
+const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+        toast.error("Por favor complete todos los campos requeridos")
+        return
+    }
+
+    setSubmitting(true)
+    const timeoutId = setTimeout(() => {
+        setSubmitting(false)
+        toast.warning("La operación está tardando más de lo esperado")
+    }, 10000)
+
+    try {
+        setError(null)
+        const fechaSolo = formData.fecha?.split("T")[0]
+        const hora = formData.hora
+
+        if (!fechaSolo || !hora) throw new Error("Fecha u hora incompleta")
+
+        const [year, month, day] = fechaSolo.split("-").map(Number)
+        const [hour, minute] = hora.split(":").map(Number)
+
+        const fechaHora = new Date(year, month - 1, day, hour, minute)
+
+        if (isNaN(fechaHora.getTime())) {
+            throw new Error("Fecha y hora inválidas")
         }
 
-        try {
-            const [year, month, day] = formData.fecha.split('-').map(Number);
-            const [hour, minute] = formData.hora.split(':').map(Number);
+        const duracionTotal = formData.servicios.reduce(
+            (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+            0
+        )
 
-            const fechaHoraLocal = createLocalDate(year, month, day, hour, minute);
-            const ahora = new Date();
+        const citaData = {
+            fecha: fechaHora.toISOString(),
+            clienteId: clienteInfo.idCliente,
+            empleadoId: formData.empleado.idEmpleado,
+            servicioIds: formData.servicios.map((s) => s.idServicio),
+            duracionTotal,
+        }
 
-            if (fechaHoraLocal < ahora) {
-                throw new Error("No se puede agendar una cita en el pasado");
-            }
+        if (editingCitaId) {
+            await updateCita(editingCitaId, citaData)
+            toast.success(
+                <div>
+                    <p>✅ Cita actualizada correctamente</p>
+                    <p><strong>Empleado:</strong> {formData.empleado.nombre} {formData.empleado.apellido}</p>
+                    <p><strong>Duración:</strong> {duracionTotal} minutos</p>
+                    <p><strong>Horario:</strong> {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}</p>
+                </div>,
+                { autoClose: 8000 }
+            )
+        } else {
+            await createCita(citaData)
+            toast.success(
+                <div>
+                    <p>✅ Cita creada correctamente</p>
+                    <p><strong>Empleado:</strong> {formData.empleado.nombre} {formData.empleado.apellido}</p>
+                    <p><strong>Duración:</strong> {duracionTotal} minutos</p>
+                    <p><strong>Horario:</strong> {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}</p>
+                </div>,
+                { autoClose: 8000 }
+            )
+        }
 
-            const duracionTotal = formData.servicios.reduce(
-                (total, servicio) => total + (parseInt(servicio.duracion) || 30),
-                0
+        // Recargar datos - ACTUALIZADO para recargar ambos conjuntos de datos
+        const [citasClienteActualizadas, todasCitasActualizadas] = await Promise.all([
+            fetchCitasByClienteId(clienteInfo.idCliente),
+            fetchCitas()
+        ]);
+        
+        setCitas(normalizeApiResponse(citasClienteActualizadas));
+        setTodasLasCitas(normalizeApiResponse(todasCitasActualizadas));
+        closeModal()
+
+    } catch (error) {
+        console.error("Error al guardar cita:", error)
+
+        const duracionTotal = formData.servicios.reduce(
+            (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+            0
+        )
+
+        // ✅ Manejo mejorado de errores de conflicto
+        const statusCode = error.response?.status;
+        const isConflictoHorario = statusCode === 409 ||
+            statusCode === 400 ||
+            detectarConflictoHorario(error);
+
+        if (isConflictoHorario) {
+            const errorMessage = error.response?.data?.message ||
+                error.response?.data?.error ||
+                error.message;
+
+            const infoConflicto = extraerInfoConflicto(errorMessage);
+
+            // CAMBIO: Usar todasLasCitas en lugar de citas
+            const citasOcupadas = obtenerCitasOcupadasEmpleado(
+                formData.empleado.idEmpleado,
+                formData.fecha
             );
 
-            const citaData = {
-                fecha: fechaHoraLocal.toISOString(),
-                clienteId: formData.cliente.idCliente,
-                empleadoId: formData.empleado.idEmpleado,
-                servicioIds: formData.servicios.map(s => s.idServicio),
-                duracionTotal,
-            };
+            toast.error(
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">⚠️</span>
+                        <strong className="text-red-700">Horario No Disponible</strong>
+                    </div>
 
-            if (editingCitaId) {
-                await updateCita(editingCitaId, citaData);
-                toast.success("Cita actualizada correctamente");
-            } else {
-                await createCita(citaData);
-                toast.success("Cita creada correctamente");
-            }
+                    <div className="text-sm space-y-2">
+                        <p>El empleado <strong>{formData.empleado.nombre} {formData.empleado.apellido}</strong> ya está ocupado.</p>
 
-            const nuevasCitas = await fetchCitasByClienteId(currentUser.idCliente);
-            setCitas(nuevasCitas);
-            closeModal();
-        } catch (error) {
-            console.error("Error al guardar cita:", error);
-            
-            if (error.response?.status === 409 || error.message.includes("Conflicto")) {
-                const duracionTotal = formData.servicios.reduce(
-                    (total, servicio) => total + (parseInt(servicio.duracion) || 30),
-                    0
-                );
+                        <div className="bg-red-50 border-l-4 border-red-400 p-2 rounded">
+                            <p className="text-red-800 font-medium">🚫 Intento de reserva:</p>
+                            <p className="text-red-700 text-xs">
+                                {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)} ({duracionTotal} min)
+                            </p>
+                        </div>
 
-                toast.error(
-                    <div>
-                        <strong>No se puede agendar:</strong>
-                        <p>
-                            El barbero {formData.empleado.nombre} {formData.empleado.apellido} ya tiene una cita programada
-                        </p>
-                        <p>
-                            Intento de reserva: {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}
-                        </p>
-                        <p>Fecha: {formatDateForSummary(formData.fecha)}</p>
-                    </div>,
-                    { autoClose: 10000 }
-                );
-            } else {
-                toast.error(
-                    <div>
-                        <strong>
-                            Error al {editingCitaId ? "actualizar" : "crear"} la cita:
-                        </strong>
-                        <p>{error.response?.data?.message || error.message}</p>
-                    </div>,
-                    { autoClose: 5000 }
-                );
-            }
-        } finally {
-            setSubmitting(false);
+                       <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                            <div className="mb-3 flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-red-600" />
+                                <h3 className="text-red-800 font-semibold">
+                                    Horarios ocupados para {formData.empleado.nombre}
+                                </h3>
+                            </div>
+
+                            {citasOcupadas.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+                                    {citasOcupadas.map((cita, index) => (
+                                        <div key={`error-${cita.idCita}-${index}`} className={`p-3 rounded-md shadow-xs border ${
+                                            cita.esTuCita 
+                                                ? 'bg-blue-50 border-blue-200' 
+                                                : 'bg-white border-red-100'
+                                        }`}>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className={`font-mono text-sm font-medium ${
+                                                        cita.esTuCita ? 'text-blue-700' : 'text-red-700'
+                                                    }`}>
+                                                        {cita.horario}
+                                                    </div>
+                                                    <div className={`text-xs mt-1 ${
+                                                        cita.esTuCita ? 'text-blue-600' : 'text-red-500'
+                                                    }`}>
+                                                        ({cita.duracion} min)
+                                                    </div>
+                                                    <div className={`text-xs ${
+                                                        cita.esTuCita ? 'text-blue-500' : 'text-gray-500'
+                                                    }`}>
+                                                    </div>
+                                                </div>
+                                                {cita.esTuCita && (
+                                                    <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
+                                                        Tu cita
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-red-600 text-sm">
+                                    No se encontraron citas registradas (pero el horario está ocupado)
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                            <p className="text-yellow-800 font-medium">💡 Sugerencias:</p>
+                            <ul className="text-yellow-700 text-xs list-disc list-inside space-y-1">
+                                <li>Elija otro horario disponible</li>
+                                <li>Seleccione un empleado diferente</li>
+                                <li>Verifique los horarios ocupados mostrados arriba</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>,
+                {
+                    autoClose: 15000,
+                    className: "toast-conflict"
+                }
+            )
+        } else {
+            // Error general
+            toast.error(
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xl">❌</span>
+                        <strong>Error al {editingCitaId ? "actualizar" : "crear"} la cita</strong>
+                    </div>
+                    <p className="text-sm">{error.response?.data?.message || error.message}</p>
+                    {error.response?.status && (
+                        <p className="text-xs text-gray-600 mt-1">Código de error: {error.response.status}</p>
+                    )}
+                </div>,
+                { autoClose: 8000 }
+            )
         }
-    };
+    } finally {
+        setSubmitting(false)
+        clearTimeout(timeoutId)
+    }
+}
 
     // Eliminar cita
     const handleDelete = async (citaId) => {
         if (window.confirm("¿Está seguro que desea eliminar esta cita?")) {
             try {
                 await deleteCita(citaId);
-                setCitas(prev => prev.filter(c => c.idCita !== citaId));
+                setCitas(prev => Array.isArray(prev) ? prev.filter(c => c.idCita !== citaId) : []);
                 toast.success("Cita eliminada con éxito");
             } catch (err) {
+                console.error("Error eliminando cita:", err);
                 toast.error(err.message || "Error al eliminar la cita");
             }
         }
@@ -550,6 +1137,39 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         </Tabs>
     );
 
+    // Mostrar loading mientras se carga el usuario
+    if (userLoading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="animate-spin h-8 w-8 text-gray-500" />
+                <span className="ml-2">Cargando información del usuario...</span>
+            </div>
+        );
+    }
+
+    // Mostrar error si no se pudo cargar el usuario
+    if (!clienteInfo) {
+        return (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md mb-6">
+                <div className="flex items-center">
+                    <X className="h-5 w-5 text-red-500 mr-2" />
+                    <div>
+                        <h3 className="text-red-800 font-medium">Error de usuario</h3>
+                        <p className="text-red-700 text-sm mt-1">
+                            {error || "No se pudo cargar la información del usuario. Por favor, inicie sesión nuevamente."}
+                        </p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-2 text-sm bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                        >
+                            Recargar página
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -558,7 +1178,7 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
         );
     }
 
-    if (error) {
+    if (error && clienteInfo) {
         return (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md mb-6">
                 <div className="flex items-center">
@@ -574,7 +1194,9 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             <div className="container mx-auto px-4">
                 <div className="mb-8">
                     <h1 className="text-2xl font-semibold text-zinc-800 mb-2">Mis Citas</h1>
-                    <p className="text-zinc-500 text-sm">Administra tus citas programadas</p>
+                    <p className="text-zinc-500 text-sm">
+                        Administra tus citas programadas - {clienteInfo.nombre} {clienteInfo.apellido}
+                    </p>
                 </div>
 
                 <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
@@ -598,7 +1220,6 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                         />
                     </div>
                 </div>
-
                 <div className="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">

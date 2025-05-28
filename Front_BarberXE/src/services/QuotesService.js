@@ -27,6 +27,7 @@ const getHeaders = () => {
   return headers;
 };
 
+
 // ------------------ Citas ------------------
 export const fetchCitas = async () => {
   const response = await fetch(`${API_BASE_URL}/citas`, {
@@ -35,8 +36,24 @@ export const fetchCitas = async () => {
   return handleResponse(response);
 };
 
+// En QuotesService.js - Corregir URL
+export const fetchClienteByUserId = async (userId) => {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/client`, { // Ruta corregida
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
+};
+// Método para obtener citas por clienteId (no userId)
 export const fetchCitasByClienteId = async (clienteId) => {
   const response = await fetch(`${API_BASE_URL}/citas/cliente/${clienteId}`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(response);
+};
+
+// Método alternativo si necesitas buscar cliente por nombre o email
+export const fetchClienteBySearch = async (searchTerm) => {
+  const response = await fetch(`${API_BASE_URL}/clientes/search?q=${encodeURIComponent(searchTerm)}`, {
     headers: getHeaders(),
   });
   return handleResponse(response);

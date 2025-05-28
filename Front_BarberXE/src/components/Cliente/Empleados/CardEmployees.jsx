@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Phone, User, Loader2 } from "lucide-react";
 
-
 const IMAGE_BASE_URL = "http://localhost:3000";
 
 const BarberosCards = ({ isCollapsed }) => {
@@ -22,23 +21,74 @@ const BarberosCards = ({ isCollapsed }) => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [imageVersion, setImageVersion] = useState(0); // Control de versiones de imagen
+  const [imageVersion, setImageVersion] = useState(0);
+
+  // Función para validar y normalizar los datos
+  const normalizeEmployeeData = (data) => {
+    // Si data es null o undefined, devolver array vacío
+    if (!data) {
+      console.warn("Employee data is null or undefined");
+      return [];
+    }
+
+    // Si data ya es un array, usarlo directamente
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    // Si data tiene una propiedad que contiene el array (ej: data.employees, data.data, etc.)
+    if (data.employees && Array.isArray(data.employees)) {
+      return data.employees;
+    }
+    if (data.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    if (data.results && Array.isArray(data.results)) {
+      return data.results;
+    }
+
+    // Si data es un objeto único, convertirlo en array
+    if (typeof data === 'object') {
+      return [data];
+    }
+
+    // Si nada de lo anterior funciona, devolver array vacío
+    console.warn("Unable to normalize employee data:", data);
+    return [];
+  };
+
+  // Función para filtrar barberos
+  const filterBarberos = (employees) => {
+    const normalizedEmployees = normalizeEmployeeData(employees);
+    return normalizedEmployees.filter(emp => 
+      emp && // Verificar que el empleado existe
+      (emp.cargo === "Barbero" || !emp.cargo) && 
+      emp.estado === "activo"
+    );
+  };
 
   // Cargar barberos al montar el componente
   useEffect(() => {
     const loadBarberos = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        
         const data = await fetchEmployees();
-        const filteredData = data.filter(emp =>
-          (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
-        );
+        console.log("Raw fetchEmployees data:", data); // Debug log
+        
+        const filteredData = filterBarberos(data);
+        console.log("Filtered barberos:", filteredData); // Debug log
+        
         setBarberos(filteredData);
       } catch (err) {
-        setError(err.message);
+        console.error("Error loading barberos:", err);
+        setError(err.message || "Error al cargar los barberos");
       } finally {
         setLoading(false);
       }
     };
+    
     loadBarberos();
   }, []);
 
@@ -48,14 +98,17 @@ const BarberosCards = ({ isCollapsed }) => {
       const loadAllBarberos = async () => {
         try {
           setIsSearching(true);
+          setError(null);
+          
           const data = await fetchEmployees();
-          const filteredData = data.filter(emp =>
-            (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
-          );
+          console.log("Raw fetchEmployees data (search):", data); // Debug log
+          
+          const filteredData = filterBarberos(data);
           setBarberos(filteredData);
-          setImageVersion(prev => prev + 1); // Incrementar versión de imágenes
+          setImageVersion(prev => prev + 1);
         } catch (err) {
-          setError(err.message);
+          console.error("Error loading all barberos:", err);
+          setError(err.message || "Error al cargar los barberos");
         } finally {
           setIsSearching(false);
         }
@@ -67,14 +120,17 @@ const BarberosCards = ({ isCollapsed }) => {
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
+        setError(null);
+        
         const results = await searchEmployeesByName(searchTerm);
-        const filteredResults = results.filter(emp =>
-          (emp.cargo === "Barbero" || !emp.cargo) && emp.estado === "activo"
-        );
+        console.log("Raw searchEmployeesByName data:", results); // Debug log
+        
+        const filteredResults = filterBarberos(results);
         setBarberos(filteredResults);
-        setImageVersion(prev => prev + 1); // Incrementar versión de imágenes
+        setImageVersion(prev => prev + 1);
       } catch (err) {
-        setError(err.message);
+        console.error("Error searching barberos:", err);
+        setError(err.message || "Error al buscar barberos");
       } finally {
         setIsSearching(false);
       }
@@ -95,8 +151,6 @@ const BarberosCards = ({ isCollapsed }) => {
     const cleanUrl = url.replace(/^\/+/, "");
     return `${IMAGE_BASE_URL}/${cleanUrl}?v=${imageVersion}`;
   };
-
-
 
   if (loading) {
     return (
@@ -120,6 +174,14 @@ const BarberosCards = ({ isCollapsed }) => {
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
         <strong className="font-bold">Error!</strong>
         <span className="block sm:inline"> {error}</span>
+        <div className="mt-2">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+          >
+            Recargar página
+          </button>
+        </div>
       </div>
     );
   }

@@ -10,7 +10,6 @@ import ProtectedRoute from './pages/ProtectedRoute'; // Componente para proteger
 
 function App() {
     return (
-        <Router>
         <div className="App">
             <Routes>
             {/* Ruta pública de login */}
@@ -63,7 +62,6 @@ function App() {
             pauseOnHover
             />
         </div>
-        </Router>
     );
 }
 

@@ -16,8 +16,8 @@ import { Button } from "@/components/ui/button"
 const IMAGE_BASE_URL = "http://localhost:3000"
 
 const TableServices = () => {
-  const [services, setServices] = useState([])
-  const [allCuts, setAllCuts] = useState([])
+  const [services, setServices] = useState([]) // Initialize as empty array
+  const [allCuts, setAllCuts] = useState([]) // Initialize as empty array
   const [searchTerm, setSearchTerm] = useState("")
   const [showModal, setShowModal] = useState(false)
   const [showCutsModal, setShowCutsModal] = useState(false)
@@ -36,32 +36,101 @@ const TableServices = () => {
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Función auxiliar para validar y convertir datos a array   
+  const ensureArray = (data, fallback = []) => {
+    if (!data) return fallback;
+    if (Array.isArray(data)) return data;
+
+    // Si es un objeto, intentar extraer el array de diferentes propiedades comunes
+    if (typeof data === 'object') {
+      // Intentar diferentes nombres de propiedades
+      const possibleArrays = [
+        data.data,
+        data.services,
+        data.items,
+        data.results,
+        data.records,
+        data.list
+      ];
+
+      for (const arr of possibleArrays) {
+        if (Array.isArray(arr)) {
+          return arr;
+        }
+      }
+
+      // Si el objeto tiene propiedades que parecen ser elementos de un array
+      const keys = Object.keys(data);
+      if (keys.length > 0 && keys.every(key => !isNaN(key))) {
+        // Convertir objeto indexado a array
+        return Object.values(data);
+      }
+    }
+
+    console.warn('Unexpected data format:', data);
+    console.warn('Data keys:', typeof data === 'object' ? Object.keys(data) : 'Not an object');
+    return fallback;
+  };
+
   // Cargar datos iniciales
   useEffect(() => {
     const loadInitialData = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
         const [servicesData, cutsData] = await Promise.all([
           fetchServices(),
           fetchAllCuts(),
-        ])
+        ]);
 
-        const processedData = servicesData.map((service) => ({
-          ...service,
-          imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
-          cortes: service.cortes || [],
-        }))
+        console.log('Raw servicesData:', servicesData);
+        console.log('Raw cutsData:', cutsData);
 
-        setServices(processedData)
-        setAllCuts(cutsData)
+        // Asegurar que servicesData sea un array usando la función auxiliar
+        const servicesArray = ensureArray(servicesData);
+        console.log('Processed servicesArray:', servicesArray);
+
+        // Validar que servicesArray realmente sea un array antes de usar map
+        if (!Array.isArray(servicesArray)) {
+          console.error('Services data is not an array after processing:', servicesArray);
+          setServices([]); // Set empty array as fallback
+          setAllCuts(ensureArray(cutsData));
+          setError('Error: Unable to load services data');
+          return;
+        }
+
+        const processedData = servicesArray.map((service) => {
+          // Validar que service sea un objeto
+          if (!service || typeof service !== 'object') {
+            console.warn('Invalid service object:', service);
+            return null;
+          }
+
+          return {
+            ...service,
+            imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+            cortes: service.cortes || [],
+          };
+        }).filter(Boolean); // Filtrar elementos null
+
+        // Asegurar que cutsData también sea un array
+        const cutsArray = ensureArray(cutsData);
+
+        setServices(processedData);
+        setAllCuts(cutsArray);
+        setError(null); // Clear any previous errors
       } catch (err) {
-        setError(err.message)
+        console.error('Error loading initial data:', err);
+        setError(err.message || 'Error loading data');
+        // Establecer arrays vacíos como fallback
+        setServices([]);
+        setAllCuts([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    loadInitialData()
-  }, [])
+    };
+
+    loadInitialData();
+  }, []);
 
   // Abrir modal de servicio
   const openModal = (serviceId = null) => {
@@ -169,85 +238,243 @@ const TableServices = () => {
     setPreviewImage(null)
   }
 
-  // Enviar formulario
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    const timeoutId = setTimeout(() => {
-      setSubmitting(false);
-      toast.warning("La operación está tardando más de lo esperado");
-    }, 10000);
+  // Validaciones iniciales
+  if (!formData.nombre || !formData.precio || !formData.duracion) {
+    toast.error("Nombre, precio y duración son obligatorios");
+    return;
+  }
 
+  // Validar imagen solo para creación
+  if (editingServiceId === null && !formData.imagen) {
+    toast.error("Debes seleccionar una imagen");
+    return;
+  }
+  
+  // Construir FormData
+  const formDataToSend = new FormData();
+  
+  // Campos básicos
+  formDataToSend.append("nombre", formData.nombre);
+  formDataToSend.append("precio", formData.precio);
+  formDataToSend.append("duracion", formData.duracion);
+  formDataToSend.append("estado", formData.estado);
+
+  // CORREGIDO: Usar formData.corteIds en lugar de selectedCuts
+  // También validar que corteIds exista y sea un array
+  const corteIds = formData.corteIds || [];
+  
+  formDataToSend.append("corteIds", JSON.stringify(corteIds));
+
+  // Debug: Verificar qué se está enviando
+  console.log("Corte IDs a enviar:", corteIds);
+  console.log("Selected cuts:", selectedCuts);
+  console.log("FormData corteIds:", formData.corteIds);
+
+  // Imagen (solo si existe y es File)
+  if (formData.imagen instanceof File) {
+    formDataToSend.append("imagen", formData.imagen, formData.imagen.name);
+  }
+
+  // Debug: Mostrar todo el contenido del FormData
+  console.log("FormData contents:");
+  for (let [key, value] of formDataToSend.entries()) {
+    console.log(key, value);
+  }
+
+  const timeoutId = setTimeout(() => {
+    setSubmitting(false);
+    toast.warning("La operación está tardando más de lo esperado");
+  }, 10000);
+
+  try {
+    setSubmitting(true);
+    setError(null);
+    let response;
+
+if (editingServiceId !== null) {
+  
+  response = await updateService(editingServiceId, formDataToSend);
+  // Verificar diferentes posibles estructuras de respuesta
+  let serviceData = null;
+  
+  if (response.idServicio) {
+    // Respuesta directa con el servicio
+    serviceData = response;
+  } else if (response.data && response.data.idServicio) {
+    // Respuesta encapsulada en 'data'
+    serviceData = response.data;
+  } else if (response.service && response.service.idServicio) {
+    // Respuesta encapsulada en 'service'
+    serviceData = response.service;
+  } else if (response.success) {
+    
+    const serviciosActualizados = await fetchServices();
+    const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+      ...service,
+      imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+      cortes: service.cortes || [],
+    }));
+    setServices(processedServices);
+    toast.success("Servicio actualizado correctamente");
+    closeModal();
+    return;
+  } else {
+    // Estructura desconocida, intentar recargar datos
+    console.warn("Estructura de respuesta desconocida, recargando datos...");
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append("nombre", formData.nombre)
-      formDataToSend.append("precio", formData.precio)
-      formDataToSend.append("duracion", formData.duracion)
-      formDataToSend.append("estado", formData.estado)
-
-      if (formData.imagen instanceof File) {
-        formDataToSend.append("imagen", formData.imagen)
-      }
-
-      if (selectedCuts.length > 0) {
-        formDataToSend.append("corteIds", JSON.stringify(selectedCuts.map((c) => c.idCorte)))
-      }
-
-      if (editingServiceId !== null) {
-        const updatedService = await updateService(editingServiceId, formDataToSend)
-
-        let newImageUrl = services.find(s => s.idServicio === editingServiceId).imagen
-        if (formData.imagen instanceof File) {
-          newImageUrl = URL.createObjectURL(formData.imagen)
-        } else if (updatedService.imagenUrl) {
-          newImageUrl = `${IMAGE_BASE_URL}${updatedService.imagenUrl}`
-        }
-
-        setServices((prev) =>
-          prev.map((service) =>
-            service.idServicio === editingServiceId
-              ? {
-                ...updatedService,
-                imagen: newImageUrl,
-                cortes: selectedCuts,
-              }
-              : service
-          )
-        )
-        toast.success("Servicio actualizado con éxito")
-      } else {
-        const newService = await createService(formDataToSend)
-
-        let newImageUrl = null
-        if (formData.imagen instanceof File) {
-          newImageUrl = URL.createObjectURL(formData.imagen)
-        } else if (newService.imagenUrl) {
-          newImageUrl = `${IMAGE_BASE_URL}${newService.imagenUrl}`
-        }
-
-        setServices((prev) => [
-          ...prev,
-          {
-            ...newService,
-            imagen: newImageUrl,
-            cortes: selectedCuts,
-          },
-        ])
-        toast.success("Servicio creado con éxito")
-      }
-      closeModal()
-    } catch (err) {
-      console.error("Error al guardar el servicio:", err)
-      setError(err.message || "Error al guardar el servicio")
-      toast.error(err.message || "Error al guardar el servicio")
-    } finally {
-      setSubmitting(false)
-      clearTimeout(timeoutId);
+      const serviciosActualizados = await fetchServices();
+      const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+        ...service,
+        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+        cortes: service.cortes || [],
+      }));
+      setServices(processedServices);
+      toast.success("Servicio actualizado - Lista recargada");
+      closeModal();
+      return;
+    } catch (reloadErr) {
+      console.error("Error al recargar datos:", reloadErr);
+      throw new Error("No se pudo confirmar la actualización");
     }
   }
 
-  // Eliminar servicio
+  if (serviceData) {
+    console.log("Datos del servicio actualizado:", serviceData);
+    
+    setServices(prev => 
+      prev.map(service => 
+        service.idServicio === editingServiceId
+          ? {
+              ...serviceData,
+              imagen: serviceData.imagenUrl 
+                ? `${IMAGE_BASE_URL}${serviceData.imagenUrl}`
+                : service.imagen,
+              cortes: selectedCuts, 
+            }
+          : service
+      )
+    );
+    toast.success("Servicio actualizado correctamente");
+  }
+  
+} else {
+  // Creación
+  console.log("Enviando creación de nuevo servicio");
+  
+  try {
+    response = await createService(formDataToSend);
+    
+    // DEBUG: Ver qué devuelve el servidor
+    console.log("Respuesta completa del servidor (creación):", response);
+    console.log("Tipo de respuesta:", typeof response);
+    console.log("Propiedades de la respuesta:", Object.keys(response));
+    
+    let serviceData = null;
+    
+    if (response.idServicio) {
+      serviceData = response;
+    } else if (response.data && response.data.idServicio) {
+      serviceData = response.data;
+    } else if (response.service && response.service.idServicio) {
+      serviceData = response.service;
+    } else if (response.success || response.message) {
+      // Solo confirmación de éxito, recargar datos
+      console.log("Creación exitosa, recargando datos del servidor...");
+      const serviciosActualizados = await fetchServices();
+      const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+        ...service,
+        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+        cortes: service.cortes || [],
+      }));
+      setServices(processedServices);
+      toast.success("Servicio creado correctamente");
+      closeModal();
+      return;
+    }
+    
+    if (serviceData) {
+      const newService = {
+        ...serviceData,
+        imagen: serviceData.imagenUrl 
+          ? `${IMAGE_BASE_URL}${serviceData.imagenUrl}`
+          : null,
+        cortes: selectedCuts,
+      };
+      setServices(prev => [...prev, newService]);
+      toast.success("Servicio creado correctamente");
+    } else {
+      // Fallback: recargar todos los datos
+      console.log("Estructura desconocida en creación, recargando...");
+      const serviciosActualizados = await fetchServices();
+      const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+        ...service,
+        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+        cortes: service.cortes || [],
+      }));
+      setServices(processedServices);
+      toast.success("Servicio creado - Lista actualizada");
+    }
+    
+  } catch (err) {
+    console.error("Error en creación:", err);
+    
+    // Intentar recargar datos como fallback
+    try {
+      console.log("Error en creación, intentando recargar datos...");
+      const serviciosActualizados = await fetchServices();
+      const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+        ...service,
+        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+        cortes: service.cortes || [],
+      }));
+      setServices(processedServices);
+      toast.success("Servicio procesado - Lista actualizada");
+      closeModal();
+      return;
+    } catch (reloadErr) {
+      console.error("Error al recargar después de fallo:", reloadErr);
+      throw err; // Re-lanzar el error original
+    }
+  }
+}
+
+closeModal();
+  } catch (err) {
+    console.error('Error completo:', err);
+    
+    // Manejo adicional si falla
+    try {
+      const serviciosActualizados = await fetchServices();
+      const processedServices = ensureArray(serviciosActualizados).map((service) => ({
+        ...service,
+        imagen: service.imagenUrl ? `${IMAGE_BASE_URL}${service.imagenUrl}` : null,
+        cortes: service.cortes || [],
+      }));
+      setServices(processedServices);
+      toast.success("Servicio procesado - Lista actualizada");
+      closeModal(); // Cerrar modal si la actualización fue exitosa
+    } catch (refreshErr) {
+      console.error('Error al actualizar lista:', refreshErr);
+    }
+    
+    let errorMessage = 'Error al guardar';
+    if (err.response?.data?.message) {
+      errorMessage = err.response.data.message;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    toast.error(errorMessage);
+    setError(errorMessage);
+  } finally {
+    setSubmitting(false);
+    clearTimeout(timeoutId);
+  }
+};
+
   const handleDelete = async (serviceId) => {
     try {
       await deleteService(serviceId)
@@ -259,10 +486,12 @@ const TableServices = () => {
     }
   }
 
-  // Filtrar servicios por término de búsqueda
-  const filteredServices = services.filter((service) =>
-    service.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filtrar servicios por término de búsqueda - Add safety check
+  const filteredServices = Array.isArray(services) 
+    ? services.filter((service) =>
+        service?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
 
   // Mostrar loading
   if (loading) {
@@ -337,8 +566,8 @@ const TableServices = () => {
                   <div className="absolute top-2 right-2">
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${service.estado === "activo"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                         }`}
                     >
                       {service.estado === "activo" ? "Activo" : "Inactivo"}
@@ -668,16 +897,16 @@ const TableServices = () => {
                       <div
                         key={corte.idCorte}
                         className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedCuts.some((c) => c.idCorte === corte.idCorte)
-                            ? "bg-zinc-100 border-zinc-300"
-                            : "bg-white border-zinc-200 hover:bg-zinc-50"
+                          ? "bg-zinc-100 border-zinc-300"
+                          : "bg-white border-zinc-200 hover:bg-zinc-50"
                           }`}
                         onClick={() => toggleCutSelection(corte)}
                       >
                         <div className="flex items-center">
                           <div
                             className={`h-4 w-4 rounded border flex items-center justify-center mr-3 ${selectedCuts.some((c) => c.idCorte === corte.idCorte)
-                                ? "bg-zinc-800 border-zinc-800"
-                                : "border-zinc-300"
+                              ? "bg-zinc-800 border-zinc-800"
+                              : "border-zinc-300"
                               }`}
                           >
                             {selectedCuts.some((c) => c.idCorte === corte.idCorte) && (

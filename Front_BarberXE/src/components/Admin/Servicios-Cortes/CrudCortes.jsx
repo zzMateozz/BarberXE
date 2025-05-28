@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 const IMAGE_BASE_URL = 'http://localhost:3000'
 
 const TableCortes = () => {
-  const [cortes, setCortes] = useState([])
+  const [cortes, setCortes] = useState([]) // Initialize as empty array
   const [searchTerm, setSearchTerm] = useState("")
   const [showModal, setShowModal] = useState(false)
   const [formData, setFormData] = useState({
@@ -28,24 +28,91 @@ const TableCortes = () => {
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    const loadCortes = async () => {
-      setLoading(true)
-      try {
-        const data = await fetchCuts()
-        const cortesConImagenes = data.map(corte => ({
-          ...corte,
-          imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null
-        }))
-        setCortes(cortesConImagenes)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
+  // Función auxiliar para validar y convertir datos a array   
+  const ensureArray = (data, fallback = []) => {
+    if (!data) return fallback;
+    if (Array.isArray(data)) return data;
+
+    // Si es un objeto, intentar extraer el array de diferentes propiedades comunes
+    if (typeof data === 'object') {
+      // Intentar diferentes nombres de propiedades
+      const possibleArrays = [
+        data.data,
+        data.cortes,
+        data.cuts,
+        data.items,
+        data.results,
+        data.records,
+        data.list
+      ];
+
+      for (const arr of possibleArrays) {
+        if (Array.isArray(arr)) {
+          return arr;
+        }
+      }
+
+      // Si el objeto tiene propiedades que parecen ser elementos de un array
+      const keys = Object.keys(data);
+      if (keys.length > 0 && keys.every(key => !isNaN(key))) {
+        // Convertir objeto indexado a array
+        return Object.values(data);
       }
     }
-    loadCortes()
-  }, [])
+
+    console.warn('Unexpected data format:', data);
+    console.warn('Data keys:', typeof data === 'object' ? Object.keys(data) : 'Not an object');
+    return fallback;
+  };
+
+  useEffect(() => {
+    const loadCortes = async () => {
+      setLoading(true);
+      try {
+        const response = await fetchCuts();
+        
+        console.log('Raw response:', response);
+        
+        // Asegurar que sea array usando la función auxiliar
+        const data = ensureArray(response);
+        console.log('Processed data:', data);
+        
+        // Validar que data realmente sea un array antes de usar map
+        if (!Array.isArray(data)) {
+          console.error('Cuts data is not an array after processing:', data);
+          setCortes([]); // Set empty array as fallback
+          setError('Error: Unable to load cuts data');
+          return;
+        }
+        
+        const cortesConImagenes = data.map(corte => {
+          // Validar que corte sea un objeto válido
+          if (!corte || typeof corte !== 'object') {
+            console.warn('Invalid corte object:', corte);
+            return null;
+          }
+
+          return {
+            ...corte,
+            imagenUrl: corte.imagenUrl 
+              ? `${IMAGE_BASE_URL}${corte.imagenUrl}` 
+              : null
+          };
+        }).filter(Boolean); // Filtrar elementos null
+        
+        setCortes(cortesConImagenes);
+        setError(null); // Clear any previous errors
+      } catch (err) {
+        console.error('Error loading cuts:', err);
+        setError(err.message || 'Error loading cuts');
+        // Establecer array vacío como fallback
+        setCortes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCortes();
+  }, []);
 
   const openModal = (cutId = null) => {
     setShowModal(true)
@@ -55,7 +122,7 @@ const TableCortes = () => {
       const corte = cortes.find(c => c.idCorte === cutId)
       if (corte) {
         setFormData({
-          estilo: corte.estilo,
+          estilo: corte.estilo || "",
           imagen: null
         })
         setPreviewImage(corte.imagenUrl)
@@ -85,13 +152,28 @@ const TableCortes = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validaciones iniciales
+    if (!formData.estilo) {
+      toast.error("El estilo es obligatorio");
+      return;
+    }
+
+    // Validar imagen solo para creación
+    if (editingCutId === null && !formData.imagen) {
+      toast.error("Debes seleccionar una imagen");
+      return;
+    }
+    
     setSubmitting(true)
     
-     const timeoutId = setTimeout(() => {
-          setSubmitting(false);
-          toast.warning("La operación está tardando más de lo esperado");
-        }, 10000);
+    const timeoutId = setTimeout(() => {
+      setSubmitting(false);
+      toast.warning("La operación está tardando más de lo esperado");
+    }, 10000);
+
     try {
+      setError(null);
       const formDataToSend = new FormData()
       formDataToSend.append('estilo', formData.estilo)
       
@@ -101,45 +183,175 @@ const TableCortes = () => {
 
       let response
       if (editingCutId !== null) {
+        // Actualización
         response = await updateCut(editingCutId, formDataToSend)
         
-        let newImageUrl = cortes.find(c => c.idCorte === editingCutId).imagenUrl
-        if (formData.imagen instanceof File) {
-          newImageUrl = URL.createObjectURL(formData.imagen)
-        } else if (response.imagenUrl) {
-          newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`
-        }
-
-        setCortes(prev => prev.map(item => 
-          item.idCorte === editingCutId ? {
-            ...response,
-            imagenUrl: newImageUrl
-          } : item
-        ))
-        toast.success("Corte actualizado con éxito")
-      } else {
-        response = await createCut(formDataToSend)
+        console.log('Update response:', response);
         
-        let newImageUrl = null
-        if (formData.imagen instanceof File) {
-          newImageUrl = URL.createObjectURL(formData.imagen)
-        } else if (response.imagenUrl) {
-          newImageUrl = `${IMAGE_BASE_URL}${response.imagenUrl}`
+        // Verificar diferentes posibles estructuras de respuesta
+        let cutData = null;
+        
+        if (response.idCorte) {
+          // Respuesta directa con el corte
+          cutData = response;
+        } else if (response.data && response.data.idCorte) {
+          // Respuesta encapsulada en 'data'
+          cutData = response.data;
+        } else if (response.cut && response.cut.idCorte) {
+          // Respuesta encapsulada en 'cut'
+          cutData = response.cut;
+        } else if (response.success) {
+          // Solo confirmación de éxito, recargar datos
+          console.log("Actualización exitosa, recargando datos del servidor...");
+          const cortesActualizados = await fetchCuts();
+          const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+            ...corte,
+            imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+          }));
+          setCortes(processedCuts);
+          toast.success("Corte actualizado correctamente");
+          closeModal();
+          return;
+        } else {
+          // Estructura desconocida, intentar recargar datos
+          console.warn("Estructura de respuesta desconocida, recargando datos...");
+          try {
+            const cortesActualizados = await fetchCuts();
+            const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+              ...corte,
+              imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+            }));
+            setCortes(processedCuts);
+            toast.success("Corte actualizado - Lista recargada");
+            closeModal();
+            return;
+          } catch (reloadErr) {
+            console.error("Error al recargar datos:", reloadErr);
+            throw new Error("No se pudo confirmar la actualización");
+          }
         }
 
-        setCortes(prev => [...prev, {
-          ...response,
-          imagenUrl: newImageUrl
-        }])
-        toast.success("Corte creado con éxito")
+        if (cutData) {
+          let newImageUrl = cortes.find(c => c.idCorte === editingCutId)?.imagenUrl;
+          if (formData.imagen instanceof File) {
+            newImageUrl = URL.createObjectURL(formData.imagen);
+          } else if (cutData.imagenUrl) {
+            newImageUrl = `${IMAGE_BASE_URL}${cutData.imagenUrl}`;
+          }
+
+          setCortes(prev => prev.map(item => 
+            item.idCorte === editingCutId ? {
+              ...cutData,
+              imagenUrl: newImageUrl
+            } : item
+          ));
+          toast.success("Corte actualizado correctamente");
+        }
+      } else {
+        // Creación
+        console.log("Enviando creación de nuevo corte");
+        
+        try {
+          response = await createCut(formDataToSend)
+          
+          console.log('Create response:', response);
+          
+          let cutData = null;
+          
+          if (response.idCorte) {
+            cutData = response;
+          } else if (response.data && response.data.idCorte) {
+            cutData = response.data;
+          } else if (response.cut && response.cut.idCorte) {
+            cutData = response.cut;
+          } else if (response.success || response.message) {
+            // Solo confirmación de éxito, recargar datos
+            console.log("Creación exitosa, recargando datos del servidor...");
+            const cortesActualizados = await fetchCuts();
+            const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+              ...corte,
+              imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+            }));
+            setCortes(processedCuts);
+            toast.success("Corte creado correctamente");
+            closeModal();
+            return;
+          }
+          
+          if (cutData) {
+            let newImageUrl = null;
+            if (formData.imagen instanceof File) {
+              newImageUrl = URL.createObjectURL(formData.imagen);
+            } else if (cutData.imagenUrl) {
+              newImageUrl = `${IMAGE_BASE_URL}${cutData.imagenUrl}`;
+            }
+
+            setCortes(prev => [...prev, {
+              ...cutData,
+              imagenUrl: newImageUrl
+            }]);
+            toast.success("Corte creado correctamente");
+          } else {
+            // Fallback: recargar todos los datos
+            console.log("Estructura desconocida en creación, recargando...");
+            const cortesActualizados = await fetchCuts();
+            const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+              ...corte,
+              imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+            }));
+            setCortes(processedCuts);
+            toast.success("Corte creado - Lista actualizada");
+          }
+          
+        } catch (err) {
+          console.error("Error en creación:", err);
+          
+          // Intentar recargar datos como fallback
+          try {
+            console.log("Error en creación, intentando recargar datos...");
+            const cortesActualizados = await fetchCuts();
+            const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+              ...corte,
+              imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+            }));
+            setCortes(processedCuts);
+            toast.success("Corte procesado - Lista actualizada");
+            closeModal();
+            return;
+          } catch (reloadErr) {
+            console.error("Error al recargar después de fallo:", reloadErr);
+            throw err; // Re-lanzar el error original
+          }
+        }
       }
 
-      
       closeModal()
     } catch (err) {
-      console.error("Error al enviar datos:", err)
-      setError(err.message || "Error al guardar el corte")
-      toast.error(err.message || "Error al guardar el corte")
+      console.error('Error completo:', err);
+      
+      // Manejo adicional si falla
+      try {
+        const cortesActualizados = await fetchCuts();
+        const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
+          ...corte,
+          imagenUrl: corte.imagenUrl ? `${IMAGE_BASE_URL}${corte.imagenUrl}` : null,
+        }));
+        setCortes(processedCuts);
+        toast.success("Corte procesado - Lista actualizada");
+        closeModal(); // Cerrar modal si la actualización fue exitosa
+      } catch (refreshErr) {
+        console.error('Error al actualizar lista:', refreshErr);
+      }
+      
+      let errorMessage = 'Error al guardar';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setSubmitting(false)
       clearTimeout(timeoutId); 
@@ -173,13 +385,17 @@ const TableCortes = () => {
       setCortes((prev) => prev.filter(c => c.idCorte !== cutId))
       toast.success("Corte eliminado con éxito")
     } catch (err) {
+      console.error("Error al eliminar el corte:", err)
       toast.error(err.message || "Error al eliminar el corte")
     }
   }
 
-  const filteredCortes = cortes.filter((corte) =>
-    corte.estilo.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filtrar cortes por término de búsqueda - Add safety check
+  const filteredCortes = Array.isArray(cortes) 
+    ? cortes.filter((corte) =>
+        corte?.estilo?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
 
   if (loading) {
     return (
@@ -238,7 +454,7 @@ const TableCortes = () => {
                 <div className="relative h-48 overflow-hidden">
                   <img
                     src={corte.imagenUrl || "https://via.placeholder.com/300x200?text=Sin+imagen"}
-                    alt={`Corte ${corte.estilo}`}
+                    alt={`Corte ${corte.estilo || 'Sin nombre'}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       e.target.onerror = null
@@ -249,7 +465,7 @@ const TableCortes = () => {
 
                 <div className="p-4">
                   <h3 className="text-lg font-semibold text-zinc-800 text-center">
-                    {corte.estilo}
+                    {corte.estilo || 'Sin nombre'}
                   </h3>
 
                   <div className="flex justify-center gap-4 mt-4">

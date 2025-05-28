@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PlusCircle, Trash2, Edit, Check, X, ArrowDownCircle } from 'lucide-react'; // ArrowDownCircle como ejemplo para egresos
+import { PlusCircle, Trash2, Edit, Check, X, ArrowDownCircle } from 'lucide-react';
 import {
   addEgreso,
   fetchEgresosByArqueo,
   getOpenArqueo,
-  // Asumimos que tienes o crearás estas funciones en ArqueoService:
-  updateEgreso, // Necesaria para actualizar
+  updateEgreso,
+  deleteEgreso
 } from '../../../services/ArqueoService';
 
-// Función para formatear moneda (similar a CrudIncome)
+// Función para formatear moneda
 const formatCurrency = (value) => {
   const numericValue = Number(value) || 0;
-  return numericValue.toLocaleString('es-ES', { // Ajusta 'es-ES' y 'COP' si es necesario
+  return numericValue.toLocaleString('es-CO', {
     style: 'currency',
-    currency: 'COP', // Cambia a la moneda que uses, ej: 'USD', 'EUR'
-    minimumFractionDigits: 2
+    currency: 'COP',
+    minimumFractionDigits: 0
   });
 };
 
@@ -22,8 +22,6 @@ function CrudEgresos() {
   // Estados
   const [egresos, setEgresos] = useState([]);
   const [arqueoActual, setArqueoActual] = useState(null);
-  // eslint-disable-next-line no-unused-vars
-  const [arqueoCajaId, setArqueoCajaId] = useState(null); // Mantener por consistencia si se usa
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,7 +31,7 @@ function CrudEgresos() {
   const [formData, setFormData] = useState({
     monto: '',
     descripcion: '',
-    categoria: 'Gastos Operativos', // Valor por defecto
+    categoria: 'Gastos Operativos',
     justificacion: ''
   });
 
@@ -42,7 +40,7 @@ function CrudEgresos() {
     "Compra de Insumos",
     "Pago de Servicios",
     "Sueldos y comisiones",
-    "Publicidad ",
+    "Publicidad",
     "Mantenimiento",
     "Otros"
   ];
@@ -50,12 +48,19 @@ function CrudEgresos() {
   // Estado para edición
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
-    idEgreso: null,
     monto: '',
     descripcion: '',
     categoria: '',
     justificacion: ''
   });
+
+  // Función para limpiar mensajes después de un tiempo
+  const clearMessages = () => {
+    setTimeout(() => {
+      setError(null);
+      setSuccess(null);
+    }, 3000);
+  };
 
   // Cargar datos iniciales (arqueo y egresos)
   const cargarDatosIniciales = useCallback(async () => {
@@ -67,7 +72,6 @@ function CrudEgresos() {
       const empleadoIdActual = localStorage.getItem('currentEmpleadoIdForArqueo');
       if (!empleadoIdActual) {
         setError("No se encontró un empleado asociado al arqueo.");
-        setLoading(false);
         return;
       }
 
@@ -75,21 +79,21 @@ function CrudEgresos() {
 
       if (exists && arqueo) {
         setArqueoActual(arqueo);
-        setArqueoCajaId(arqueo.idArqueo);
 
         const egresosData = await fetchEgresosByArqueo(arqueo.idArqueo);
         setEgresos(Array.isArray(egresosData) ? egresosData : []);
       } else {
         setError("Debe abrir un arqueo de caja primero para gestionar egresos.");
-        setArqueoActual(null); // Asegurarse que no hay arqueo actual
-        setEgresos([]); // Limpiar egresos si no hay arqueo
+        setArqueoActual(null);
+        setEgresos([]);
       }
     } catch (err) {
+      console.error("Error cargando datos:", err);
       setError(err.message || "Error al cargar datos de egresos");
     } finally {
       setLoading(false);
     }
-  }, []); // useCallback para evitar re-creaciones innecesarias
+  }, []);
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -98,39 +102,40 @@ function CrudEgresos() {
   // Manejar cambios en el formulario principal
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
   // Manejar cambios en el formulario de edición
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    setEditForm({
-      ...editForm,
+    setEditForm(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
   // Agregar nuevo egreso
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    if (!arqueoActual?.idArqueo) {
-      setError("Debe existir un arqueo abierto para registrar un egreso.");
-      return;
-    }
-
-    if (!formData.monto || !formData.descripcion || !formData.categoria) {
-      setError("Monto, descripción y categoría son requeridos para el egreso.");
-      return;
-    }
-
+    
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      if (!arqueoActual?.idArqueo) {
+        setError("Debe existir un arqueo abierto para registrar un egreso.");
+        return;
+      }
+
+      if (!formData.monto || !formData.descripcion || !formData.categoria) {
+        setError("Monto, descripción y categoría son requeridos para el egreso.");
+        return;
+      }
+
       const nuevoEgresoData = {
         monto: Number(formData.monto),
         descripcion: formData.descripcion.trim(),
@@ -140,15 +145,25 @@ function CrudEgresos() {
       };
 
       const egresoAgregado = await addEgreso(nuevoEgresoData);
-      // Asumimos que addEgreso devuelve el objeto egreso completo con su ID
-      setEgresos([...egresos, egresoAgregado]);
-      setFormData({ monto: "", descripcion: "", categoria: "Gastos Operativos", justificacion: "" });
+      
+      // Actualizar estado local
+      setEgresos(prev => [...prev, egresoAgregado]);
+      
+      // Limpiar formulario
+      setFormData({ 
+        monto: "", 
+        descripcion: "", 
+        categoria: "Gastos Operativos", 
+        justificacion: "" 
+      });
+      
       setSuccess("Egreso registrado exitosamente.");
-      setTimeout(() => setSuccess(null), 3000);
+      clearMessages();
+      
     } catch (err) {
       console.error("Error al registrar egreso:", err);
       setError(err.message || "Error al registrar el egreso");
-      setTimeout(() => setError(null), 5000);
+      clearMessages();
     } finally {
       setLoading(false);
     }
@@ -158,51 +173,62 @@ function CrudEgresos() {
   const handleStartEdit = (egreso) => {
     setEditingId(egreso.idEgreso);
     setEditForm({
-      idEgreso: egreso.idEgreso,
       monto: egreso.monto,
       descripcion: egreso.descripcion || '',
       categoria: egreso.categoria || 'Gastos Operativos',
       justificacion: egreso.justificacion || ''
     });
-    setError(null); // Limpiar errores al iniciar edición
-    setSuccess(null); // Limpiar mensajes de éxito
+    setError(null);
+    setSuccess(null);
   };
 
   // Cancelar edición
   const handleCancelEdit = () => {
     setEditingId(null);
+    setEditForm({
+      monto: '',
+      descripcion: '',
+      categoria: '',
+      justificacion: ''
+    });
   };
 
   // Guardar cambios de edición
   const handleSaveEdit = async (id) => {
-    setError(null);
-    setSuccess(null);
-
-    if (!editForm.monto || !editForm.descripcion || !editForm.categoria) {
-      setError("Monto, descripción y categoría son requeridos para actualizar el egreso.");
-      return;
-    }
-
     try {
       setLoading(true);
-      // Asegúrate de que updateEgreso existe y funciona como se espera en ArqueoService
-      const egresoActualizado = await updateEgreso(id, {
+      setError(null);
+      setSuccess(null);
+
+      if (!editForm.monto || !editForm.descripcion || !editForm.categoria) {
+        setError("Monto, descripción y categoría son requeridos para actualizar el egreso.");
+        return;
+      }
+
+      const datosActualizados = {
         monto: Number(editForm.monto),
         descripcion: editForm.descripcion.trim(),
         categoria: editForm.categoria,
-        justificacion: editForm.justificacion.trim(),
-        // No es necesario enviar arqueoId si el backend no lo requiere para actualizar
-      });
+        justificacion: editForm.justificacion.trim()
+      };
+
+      const egresoActualizado = await updateEgreso(id, datosActualizados);
 
       // Actualizar el estado local de egresos
-      setEgresos(egresos.map(egr => egr.idEgreso === id ? egresoActualizado : egr));
+      setEgresos(prev => 
+        prev.map(egr => 
+          egr.idEgreso === id ? { ...egr, ...egresoActualizado } : egr
+        )
+      );
+      
       setEditingId(null);
       setSuccess("Egreso actualizado correctamente.");
-      setTimeout(() => setSuccess(null), 3000);
+      clearMessages();
+      
     } catch (err) {
       console.error("Error actualizando egreso:", err);
       setError(err.message || "Error al actualizar el egreso");
-      setTimeout(() => setError(null), 5000);
+      clearMessages();
     } finally {
       setLoading(false);
     }
@@ -210,22 +236,27 @@ function CrudEgresos() {
 
   // Eliminar un egreso
   const handleDelete = async (id) => {
-    if (!confirm("¿Está seguro de eliminar este egreso?")) {
+    if (!window.confirm("¿Está seguro de eliminar este egreso?")) {
       return;
     }
-    setError(null);
-    setSuccess(null);
-
+    
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      await deleteEgreso(id);
+      
       // Actualizar el estado local de egresos
-      setEgresos(egresos.filter(egr => egr.idEgreso !== id));
+      setEgresos(prev => prev.filter(egr => egr.idEgreso !== id));
+      
       setSuccess("Egreso eliminado correctamente.");
-      setTimeout(() => setSuccess(null), 3000);
+      clearMessages();
+      
     } catch (err) {
       console.error("Error eliminando egreso:", err);
       setError(err.message || "Error al eliminar el egreso");
-      setTimeout(() => setError(null), 5000);
+      clearMessages();
     } finally {
       setLoading(false);
     }
@@ -241,7 +272,7 @@ function CrudEgresos() {
     <div className="min-h-[70vh] bg-gray-50 p-3">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6 flex items-center">
-          <ArrowDownCircle className="mr-2 text-black-600" />
+          <ArrowDownCircle className="mr-2 text-red-600" />
           Gestión de Egresos
         </h1>
 
@@ -256,7 +287,6 @@ function CrudEgresos() {
             {success}
           </div>
         )}
-
         {!arqueoActual ? (
           <div className="bg-yellow-50 border border-yellow-300 p-4 rounded-md text-yellow-700">
             <p className="font-medium">No hay un arqueo abierto actualmente.</p>

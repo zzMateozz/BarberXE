@@ -1,3 +1,4 @@
+
 "use client"
 import React, { useState, useEffect } from "react"
 import { Pencil, Trash2, Search, Plus, Calendar, Clock, User, Users, Scissors, Check, X, Loader2 } from "lucide-react"
@@ -36,6 +37,7 @@ const ValidationMessage = ({ message, isValid }) => {
 
 const TableCitas = ({ isCollapsed }) => {
   const [citas, setCitas] = useState([])
+  const [filteredCitas, setFilteredCitas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -63,33 +65,34 @@ const TableCitas = ({ isCollapsed }) => {
   const [clienteError, setClienteError] = useState("")
   const [empleadoError, setEmpleadoError] = useState("")
   const [serviciosError, setServiciosError] = useState("")
-  const [setDisponibilidadError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
-  // Agrega estos estados al inicio del componente
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Puedes ajustar este número según prefieras
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 5
+
+  // Asegurar que siempre trabajemos con arrays
+  const citasArray = Array.isArray(citas) ? citas : []
+  const filteredCitasArray = Array.isArray(filteredCitas) ? filteredCitas : citasArray
 
   // Calcula los elementos para la paginación
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = citas.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(citas.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = filteredCitasArray.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredCitasArray.length / itemsPerPage)
 
   // Funciones para cambiar de página
   const nextPage = () => {
     if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+      setCurrentPage(currentPage + 1)
     }
-  };
+  }
 
   const prevPage = () => {
     if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+      setCurrentPage(currentPage - 1)
     }
-  };
-
-
+  }
 
   // Generar horas disponibles (8:00 AM - 10:00 PM cada 30 minutos)
   const horasDisponibles = Array.from({ length: 28 }, (_, i) => {
@@ -98,130 +101,126 @@ const TableCitas = ({ isCollapsed }) => {
     return `${hour.toString().padStart(2, "0")}:${minute}`
   })
 
-  // Cargar datos iniciales
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true)
-        const [citasData, clientesData, empleadosData, serviciosData] =
+        setLoading(true);
+        const [citasResponse, clientesResponse, empleadosResponse, serviciosResponse] =
           await Promise.all([
             fetchCitas(),
             fetchClientes(),
             fetchEmpleados(),
-            fetchServicios().then((servicios) =>
-              servicios.map((s) => ({
-                ...s,
-                duracion: parseInt(s.duracion) || 0,
-              }))
-            ),
-          ])
+            fetchServicios()
+          ]);
 
-        setCitas(citasData)
-        setClientes(clientesData)
-        setEmpleados(empleadosData)
+        // Extraer datos de cada respuesta
+        const citasData = citasResponse.data || [];
+        const clientesData = clientesResponse.data || [];
+        const empleadosData = empleadosResponse.data || [];
+        const serviciosData = serviciosResponse.data || [];
+
+        // Actualizar estados
+        setCitas(citasData);
+        setClientes(clientesData);
+        setEmpleados(empleadosData);
+
+        // Filtrar barberos
         setBarberos(
-          empleadosData.filter(
-            (e) =>
-              e.cargo.trim().toLowerCase() === "barbero" &&
-              e.estado?.trim().toLowerCase() === "activo"
+          empleadosData.filter(empleado =>
+            empleado.cargo?.toLowerCase() === "barbero" &&
+            empleado.estado?.toLowerCase() === "activo"
           )
-        )
-        setServicios(
-          serviciosData.filter(
-            (s) => s.estado?.trim().toLowerCase() === "activo"
-          )
-        )
-        setLoading(false)
-      } catch (err) {
-        setError(err.message)
-        setLoading(false)
-      }
-    }
+        );
 
-    loadData()
-  }, [])
+        // Procesar servicios
+        const serviciosProcesados = Array.isArray(serviciosData)
+          ? serviciosData
+            .filter(s => s.estado?.trim().toLowerCase() === "activo")
+            .map(s => ({ ...s, duracion: parseInt(s.duracion) || 0 }))
+          : [];
+
+        setServicios(serviciosProcesados);
+
+      } catch (err) {
+        console.error("Error loading data:", err);
+        setError("Error al cargar datos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Buscar citas por cliente
   useEffect(() => {
-    if (searchTerm) {
+    if (!Array.isArray(citas)) return
+
+    if (searchTerm.trim()) {
       const filtered = citas.filter(
         (cita) =>
-          cita.cliente.nombre
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          cita.cliente.apellido.toLowerCase().includes(searchTerm.toLowerCase())
+          cita.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          cita.cliente?.apellido?.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      setCitas(filtered)
-      setCurrentPage(1);
+      setFilteredCitas(filtered)
+      setCurrentPage(1)
     } else {
-      const reloadCitas = async () => {
-        try {
-          const citasData = await fetchCitas()
-          setCitas(citasData)
-          setCurrentPage(1);
-        } catch (err) {
-          setError(err.message)
-        }
+      setFilteredCitas(citas)
+      setCurrentPage(1)
+    }
+  }, [searchTerm, citas])
+
+  const openModal = (citaId = null) => {
+    setShowModal(true)
+    setEditingCitaId(citaId)
+
+    if (citaId !== null) {
+      const citaToEdit = citasArray.find((c) => c.idCita === citaId)
+      if (citaToEdit) {
+        const fechaFromDB = citaToEdit.fecha
+
+        // Crear objeto Date directamente desde la cadena ISO
+        const fechaUTC = new Date(fechaFromDB)
+
+        // Obtener componentes de fecha LOCAL
+        const fechaLocal = new Date(fechaUTC.getTime())
+
+        // Formatear fecha para el datepicker (YYYY-MM-DD)
+        const year = fechaLocal.getFullYear()
+        const month = (fechaLocal.getMonth() + 1).toString().padStart(2, '0')
+        const day = fechaLocal.getDate().toString().padStart(2, '0')
+        const fechaParaDatePicker = `${year}-${month}-${day}`
+
+        // Formatear hora (HH:mm)
+        const hours = fechaLocal.getHours().toString().padStart(2, '0')
+        const minutes = fechaLocal.getMinutes().toString().padStart(2, '0')
+        const horaParaInput = `${hours}:${minutes}`
+
+        setFormData({
+          fecha: fechaParaDatePicker,
+          hora: horaParaInput,
+          cliente: citaToEdit.cliente,
+          empleado: citaToEdit.empleado,
+          servicios: Array.isArray(citaToEdit.servicios) ? citaToEdit.servicios : [],
+        })
       }
-      reloadCitas()
-    }
-  }, [searchTerm])
-
-const openModal = (citaId = null) => {
-  setShowModal(true);
-  setEditingCitaId(citaId);
-
-  if (citaId !== null) {
-    const citaToEdit = citas.find((c) => c.idCita === citaId);
-    if (citaToEdit) {
-      const fechaFromDB = citaToEdit.fecha; // "2025-05-25T15:30:00.000Z"
-      
-      // Crear objeto Date directamente desde la cadena ISO
-      const fechaUTC = new Date(fechaFromDB);
-      
-      // Obtener componentes de fecha LOCAL (para mostrarse al usuario)
-      const fechaLocal = new Date(fechaUTC.getTime());
-      
-      // Formatear fecha para el datepicker (YYYY-MM-DD)
-      const year = fechaLocal.getFullYear();
-      const month = (fechaLocal.getMonth() + 1).toString().padStart(2, '0');
-      const day = fechaLocal.getDate().toString().padStart(2, '0');
-      const fechaParaDatePicker = `${year}-${month}-${day}`;
-      
-      // Formatear hora (HH:mm)
-      const hours = fechaLocal.getHours().toString().padStart(2, '0');
-      const minutes = fechaLocal.getMinutes().toString().padStart(2, '0');
-      const horaParaInput = `${hours}:${minutes}`;
-
-      console.log("Original en BD:", fechaFromDB);
-      console.log("Fecha para DatePicker:", fechaParaDatePicker);
-      console.log("Hora para input:", horaParaInput);
-
+    } else {
       setFormData({
-        fecha: fechaParaDatePicker,
-        hora: horaParaInput,
-        cliente: citaToEdit.cliente,
-        empleado: citaToEdit.empleado,
-        servicios: citaToEdit.servicios,
-      });
+        fecha: "",
+        hora: "",
+        cliente: null,
+        empleado: null,
+        servicios: [],
+      })
     }
-  } else {
-    setFormData({
-      fecha: "",
-      hora: "",
-      cliente: null,
-      empleado: null,
-      servicios: [],
-    });
-  }
 
-  // Restablecer errores
-  setFechaError("");
-  setHoraError("");
-  setClienteError("");
-  setEmpleadoError("");
-  setServiciosError("");
-};
+    // Restablecer errores
+    setFechaError("")
+    setHoraError("")
+    setClienteError("")
+    setEmpleadoError("")
+    setServiciosError("")
+  }
 
   const closeModal = () => {
     setShowModal(false)
@@ -272,82 +271,231 @@ const openModal = (citaId = null) => {
       setEmpleadoError("")
     }
 
-    if (formData.servicios.length === 0) {
+    if (!Array.isArray(formData.servicios) || formData.servicios.length === 0) {
       setServiciosError("Seleccione al menos un servicio")
       isValid = false
     } else {
       setServiciosError("")
     }
 
-  // Validación de fecha y hora
-  if (formData.fecha && formData.hora) {
-    const [year, month, day] = formData.fecha.split('-').map(Number);
-    const [hours, minutes] = formData.hora.split(':').map(Number);
-    
-    // Crear objeto Date en hora local
-    const fechaHoraCita = new Date(year, month - 1, day, hours, minutes);
-    const ahora = new Date();
-    
-    // Calcular diferencia en milisegundos
-    const diferenciaMs = fechaHoraCita.getTime() - ahora.getTime();
-    const dosHorasMs = 2 * 60 * 60 * 1000;
+    // Validación de fecha y hora
+    if (formData.fecha && formData.hora && formData.servicios.length > 0) {
+      const [year, month, day] = formData.fecha.split('-').map(Number)
+      const [hours, minutes] = formData.hora.split(':').map(Number)
 
-    // Verificar si es el mismo día
-    const mismoDia = (
-      fechaHoraCita.getDate() === ahora.getDate() &&
-      fechaHoraCita.getMonth() === ahora.getMonth() &&
-      fechaHoraCita.getFullYear() === ahora.getFullYear()
-    );
+      // Crear objeto Date en hora local
+      const fechaHoraCita = new Date(year, month - 1, day, hours, minutes)
+      const ahora = new Date()
 
-    if (fechaHoraCita < ahora) {
-      setFechaError("No puede agendar citas en el pasado");
-      isValid = false;
-    } else if (mismoDia && diferenciaMs < dosHorasMs) {
-      setFechaError("Debe agendar con al menos 2 horas de anticipación");
-      isValid = false;
+      // Calcular diferencia en milisegundos
+      const diferenciaMs = fechaHoraCita.getTime() - ahora.getTime()
+      const dosHorasMs = 2 * 60 * 60 * 1000
+
+      // Verificar si es el mismo día
+      const mismoDia = (
+        fechaHoraCita.getDate() === ahora.getDate() &&
+        fechaHoraCita.getMonth() === ahora.getMonth() &&
+        fechaHoraCita.getFullYear() === ahora.getFullYear()
+      )
+
+      if (fechaHoraCita < ahora) {
+        setFechaError("No puede agendar citas en el pasado")
+        isValid = false
+      } else if (mismoDia && diferenciaMs < dosHorasMs) {
+        setFechaError("Debe agendar con al menos 2 horas de anticipación")
+        isValid = false
+      }
+
+      // Validación de horario laboral (8:00 - 22:00)
+      if (hours < 8 || hours >= 22 || (hours === 21 && minutes > 0)) {
+        setHoraError("Horario laboral: 8:00 - 22:00")
+        isValid = false
+      }
+
+      // Verificar que la cita termine antes de las 22:00
+      const duracionTotal = formData.servicios.reduce(
+        (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
+        0
+      )
+      
+      const horaFin = new Date(fechaHoraCita.getTime() + duracionTotal * 60000)
+      const horaLimite = new Date(year, month - 1, day, 22, 0) // 22:00 del mismo día
+
+      if (horaFin > horaLimite) {
+        const horaFinStr = `${horaFin.getHours().toString().padStart(2, '0')}:${horaFin.getMinutes().toString().padStart(2, '0')}`
+        setHoraError(`La cita terminaría a las ${horaFinStr}. Debe terminar antes de las 22:00`)
+        isValid = false
+      }
     }
-
-    // Validación de horario laboral (8:00 - 22:00)
-    if (hours < 8 || hours >= 22 || (hours === 21 && minutes > 0)) {
-      setHoraError("Horario laboral: 8:00 - 22:00");
-      isValid = false;
-    }
-  }
+    
     return isValid
   }
 
+  // ✅ Función mejorada para detectar conflictos de horario
+  const detectarConflictoHorario = (error) => {
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        String(error);
+
+    // Patrones para detectar conflictos de horario
+    const patronesConflicto = [
+      /empleado.*ocupado/i,
+      /horario.*ocupado/i,
+      /cita.*existente/i,
+      /conflicto.*horario/i,
+      /already.*booked/i,
+      /schedule.*conflict/i,
+      /time.*overlap/i,
+      /solapamiento/i,
+      /disponible/i,
+      /busy/i,
+      /occupied/i
+    ];
+
+    return patronesConflicto.some(patron => patron.test(errorMessage));
+  };
+
+  // ✅ Función mejorada para extraer información del conflicto
+  const extraerInfoConflicto = (errorMessage) => {
+    const info = {
+      horarioOcupado: null,
+      duracionOcupada: null,
+      empleadoOcupado: null,
+      citaExistente: null
+    };
+
+    // Extraer rango de horas (múltiples formatos)
+    const patronesHorario = [
+      /(\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?)\s*[-–—]\s*(\d{1,2}:\d{2}(?:\s*[ap]\.?\s*m\.?)?)/gi,
+      /desde\s+las?\s+(\d{1,2}:\d{2})\s+hasta\s+las?\s+(\d{1,2}:\d{2})/gi,
+      /entre\s+las?\s+(\d{1,2}:\d{2})\s+y\s+las?\s+(\d{1,2}:\d{2})/gi,
+      /de\s+(\d{1,2}:\d{2})\s+a\s+(\d{1,2}:\d{2})/gi,
+      /(\d{1,2}:\d{2})\s*a\s*(\d{1,2}:\d{2})/gi
+    ];
+
+    for (const patron of patronesHorario) {
+      const match = errorMessage.match(patron);
+      if (match) {
+        info.horarioOcupado = match[0];
+        break;
+      }
+    }
+
+    // Si no encontró rango, buscar hora individual
+    if (!info.horarioOcupado) {
+      const horaIndividual = errorMessage.match(/(\d{1,2}:\d{2})/g);
+      if (horaIndividual && horaIndividual.length >= 1) {
+        info.horarioOcupado = horaIndividual[0];
+      }
+    }
+
+    // Extraer duración
+    const patronesDuracion = [
+      /(\d+)\s*(?:minutos?|mins?|min)/gi,
+      /(\d+)\s*(?:horas?|hrs?|h)/gi,
+      /duración?\s*:?\s*(\d+)/gi
+    ];
+
+    for (const patron of patronesDuracion) {
+      const match = errorMessage.match(patron);
+      if (match) {
+        info.duracionOcupada = match[0];
+        break;
+      }
+    }
+
+    // Extraer nombre del empleado
+    const patronesEmpleado = [
+      /empleado\s+([a-záéíóúñ\s]+)/gi,
+      /barbero\s+([a-záéíóúñ\s]+)/gi,
+      /(?:el|la)\s+([a-záéíóúñ\s]+)\s+(?:está|tiene)/gi
+    ];
+
+    for (const patron of patronesEmpleado) {
+      const match = errorMessage.match(patron);
+      if (match && match[1]) {
+        info.empleadoOcupado = match[1].trim();
+        break;
+      }
+    }
+
+    // Extraer información de cita existente
+    const patronCitaExistente = /cita\s+(?:existente|programada|agendada)/gi;
+    if (patronCitaExistente.test(errorMessage)) {
+      info.citaExistente = true;
+    }
+
+    return info;
+  };
+
+  // ✅ Función para obtener citas ocupadas del empleado en esa fecha
+  const obtenerCitasOcupadasEmpleado = (empleadoId, fecha) => {
+    if (!Array.isArray(citas) || !empleadoId || !fecha) return [];
+
+    const [year, month, day] = fecha.split('-').map(Number);
+    const fechaBuscada = new Date(year, month - 1, day);
+
+    return citas.filter(cita => {
+      if (cita.empleado?.idEmpleado !== empleadoId) return false;
+      
+      const fechaCita = new Date(cita.fecha);
+      return (
+        fechaCita.getFullYear() === fechaBuscada.getFullYear() &&
+        fechaCita.getMonth() === fechaBuscada.getMonth() &&
+        fechaCita.getDate() === fechaBuscada.getDate()
+      );
+    }).map(cita => {
+      const fechaCita = new Date(cita.fecha);
+      const horaInicio = `${fechaCita.getHours().toString().padStart(2, '0')}:${fechaCita.getMinutes().toString().padStart(2, '0')}`;
+      
+      // Calcular duración total de la cita
+      const duracionTotal = Array.isArray(cita.servicios) 
+        ? cita.servicios.reduce((total, servicio) => total + (parseInt(servicio?.duracion) || 30), 0)
+        : 30;
+      
+      const fechaFin = new Date(fechaCita.getTime() + duracionTotal * 60000);
+      const horaFin = `${fechaFin.getHours().toString().padStart(2, '0')}:${fechaFin.getMinutes().toString().padStart(2, '0')}`;
+      
+      return {
+        id: cita.idCita,
+        horario: `${horaInicio} - ${horaFin}`,
+        duracion: duracionTotal,
+        cliente: `${cita.cliente?.nombre || ''} ${cita.cliente?.apellido || ''}`.trim(),
+        servicios: Array.isArray(cita.servicios) ? cita.servicios.map(s => s.nombre).join(', ') : ''
+      };
+    }).sort((a, b) => a.horario.localeCompare(b.horario));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
 
     if (!validateForm()) {
       toast.error("Por favor complete todos los campos requeridos")
-      setSubmitting(false)
       return
     }
 
+    setSubmitting(true)
     const timeoutId = setTimeout(() => {
-        setSubmitting(false);
-        toast.warning("La operación está tardando más de lo esperado");
-      }, 10000); // 10 segundos
+      setSubmitting(false)
+      toast.warning("La operación está tardando más de lo esperado")
+    }, 10000)
 
     try {
-      setSubmitting(true)
-      setError(null); // Limpiar errores previos
-      const fechaSolo = formData.fecha?.split("T")[0]; // obtiene solo "YYYY-MM-DD"
-      const hora = formData.hora; // "HH:mm"
+      setError(null)
+      const fechaSolo = formData.fecha?.split("T")[0]
+      const hora = formData.hora
 
-      if (!fechaSolo || !hora) throw new Error("Fecha u hora incompleta");
+      if (!fechaSolo || !hora) throw new Error("Fecha u hora incompleta")
 
-      const [year, month, day] = fechaSolo.split("-").map(Number);
-      const [hour, minute] = hora.split(":").map(Number);
+      const [year, month, day] = fechaSolo.split("-").map(Number)
+      const [hour, minute] = hora.split(":").map(Number)
 
-      const fechaHora = new Date(year, month - 1, day, hour, minute);
+      const fechaHora = new Date(year, month - 1, day, hour, minute)
 
       if (isNaN(fechaHora.getTime())) {
-        throw new Error("Fecha y hora inválidas");
+        throw new Error("Fecha y hora inválidas")
       }
-
 
       const duracionTotal = formData.servicios.reduce(
         (total, servicio) => total + (parseInt(servicio?.duracion) || 30),
@@ -366,39 +514,33 @@ const openModal = (citaId = null) => {
         await updateCita(editingCitaId, citaData)
         toast.success(
           <div>
-            <p>Cita actualizada correctamente</p>
-            <p>
-              Empleado: {formData.empleado.nombre} {formData.empleado.apellido}
-            </p>
-            <p>Duración: {duracionTotal} minutos</p>
-            <p>
-              Horario: {formData.hora} -{" "}
-              {calculateEndTime(formData.hora, duracionTotal)}
-            </p>
+            <p>✅ Cita actualizada correctamente</p>
+            <p><strong>Empleado:</strong> {formData.empleado.nombre} {formData.empleado.apellido}</p>
+            <p><strong>Duración:</strong> {duracionTotal} minutos</p>
+            <p><strong>Horario:</strong> {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}</p>
           </div>,
           { autoClose: 8000 }
         )
       } else {
-        const nuevaCita = await createCita(citaData)
+        await createCita(citaData)
         toast.success(
           <div>
-            <p>Cita creada correctamente</p>
-            <p>
-              Empleado: {formData.empleado.nombre} {formData.empleado.apellido}
-            </p>
-            <p>Duración: {duracionTotal} minutos</p>
-            <p>
-              Horario: {formData.hora} -{" "}
-              {calculateEndTime(formData.hora, duracionTotal)}
-            </p>
+            <p>✅ Cita creada correctamente</p>
+            <p><strong>Empleado:</strong> {formData.empleado.nombre} {formData.empleado.apellido}</p>
+            <p><strong>Duración:</strong> {duracionTotal} minutos</p>
+            <p><strong>Horario:</strong> {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)}</p>
           </div>,
           { autoClose: 8000 }
         )
       }
 
-      const citasActualizadas = await fetchCitas()
+      // Recargar datos
+      const citasActualizadasResponse = await fetchCitas()
+      const citasActualizadas = citasActualizadasResponse.data || []
       setCitas(citasActualizadas)
+      setFilteredCitas(citasActualizadas)
       closeModal()
+
     } catch (error) {
       console.error("Error al guardar cita:", error)
 
@@ -407,82 +549,113 @@ const openModal = (citaId = null) => {
         0
       )
 
-      if (error.response?.status === 409 || error.message.includes("Conflicto")) {
-        const rawMessage = error.response?.data?.error || error.message
-        const horarioOcupado = extractTimeRange(rawMessage) || "Horario no disponible"
-        const duracionOcupada = extractDuration(rawMessage) || "No especificada"
+      // ✅ Manejo mejorado de errores de conflicto
+      const statusCode = error.response?.status;
+      const isConflictoHorario = statusCode === 409 || 
+                                statusCode === 400 || 
+                                detectarConflictoHorario(error);
 
+      if (isConflictoHorario) {
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            error.message;
+        
+        const infoConflicto = extraerInfoConflicto(errorMessage);
+        
+        // Obtener citas ocupadas del empleado en esa fecha
+        const citasOcupadas = obtenerCitasOcupadasEmpleado(
+          formData.empleado?.idEmpleado, 
+          formData.fecha
+        );
+        
         toast.error(
-          <div>
-            <strong>No se puede agendar:</strong>
-            <p>
-              El empleado {formData.empleado.nombre}{" "}
-              {formData.empleado.apellido} ya tiene:
-            </p>
-            <p>• Cita programada: {horarioOcupado}</p>
-            <p>
-              • Duración ocupada: {duracionOcupada || "No especificada"} minutos
-            </p>
-            <p>
-              • Intento de reserva: {formData.hora} -{" "}
-              {calculateEndTime(formData.hora, duracionTotal)}
-            </p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              <strong className="text-red-700">Horario No Disponible</strong>
+            </div>
+            
+            <div className="text-sm space-y-2">
+              <p>El empleado <strong>{formData.empleado.nombre} {formData.empleado.apellido}</strong> ya está ocupado.</p>
+              
+              <div className="bg-red-50 border-l-4 border-red-400 p-2 rounded">
+                <p className="text-red-800 font-medium">🚫 Intento de reserva:</p>
+                <p className="text-red-700 text-xs">
+                  {formData.hora} - {calculateEndTime(formData.hora, duracionTotal)} ({duracionTotal} min)
+                </p>
+              </div>
+
+              {/* Mostrar información del conflicto extraída del error */}
+              {infoConflicto.horarioOcupado && (
+                <div className="bg-orange-50 border-l-4 border-orange-400 p-2 rounded">
+                  <p className="text-orange-800 font-medium">🕒 Horario ocupado detectado:</p>
+                  <p className="text-orange-700 text-xs">{infoConflicto.horarioOcupado}</p>
+                  {infoConflicto.duracionOcupada && (
+                    <p className="text-orange-700 text-xs">Duración: {infoConflicto.duracionOcupada}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Mostrar todas las citas del empleado en esa fecha */}
+              {citasOcupadas.length > 0 && (
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-2 rounded">
+                  <p className="text-blue-800 font-medium">📅 Citas del empleado hoy:</p>
+                  <div className="space-y-1 mt-1">
+                    {citasOcupadas.map((cita, index) => (
+                      <div key={cita.id} className="text-blue-700 text-xs bg-white p-1 rounded">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-medium">{cita.horario}</span>
+                            <span className="text-blue-600"> ({cita.duracion} min)</span>
+                          </div>
+                        </div>
+                        {cita.cliente && (
+                          <div className="text-blue-600">Cliente: {cita.cliente}</div>
+                        )}
+                        {cita.servicios && (
+                          <div className="text-blue-600">Servicios: {cita.servicios}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                <p className="text-yellow-800 font-medium">💡 Sugerencias:</p>
+                <ul className="text-yellow-700 text-xs list-disc list-inside space-y-1">
+                  <li>Elija otro horario disponible</li>
+                  <li>Seleccione un empleado diferente</li>
+                  <li>Verifique los horarios ocupados mostrados arriba</li>
+                </ul>
+              </div>
+            </div>
           </div>,
-          { autoClose: 10000 }
+          { 
+            autoClose: 15000,
+            className: "toast-conflict"
+          }
         )
       } else {
+        // Error general
         toast.error(
           <div>
-            <strong>
-              Error al {editingCitaId ? "actualizar" : "crear"} la cita:
-            </strong>
-            <p>{error.response?.data?.message || error.message}</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">❌</span>
+              <strong>Error al {editingCitaId ? "actualizar" : "crear"} la cita</strong>
+            </div>
+            <p className="text-sm">{error.response?.data?.message || error.message}</p>
+            {error.response?.status && (
+              <p className="text-xs text-gray-600 mt-1">Código de error: {error.response.status}</p>
+            )}
           </div>,
-          { autoClose: 5000 }
+          { autoClose: 8000 }
         )
       }
     } finally {
       setSubmitting(false)
-      clearTimeout(timeoutId); 
+      clearTimeout(timeoutId)
     }
-  }
-
-  const extractTimeRange = (message) => {
-    const timeRegex =
-      /(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?\s*[-a]\s*(\d{1,2}:\d{2})(:\d{2})?\s*(a\. m\.|p\. m\.)?/i
-    const match = message.match(timeRegex)
-    if (!match) return null
-
-    const start = match[1]
-    const end = match[4]
-
-    return `${cleanTime(start, match[3])} - ${cleanTime(end, match[6])}`
-  }
-
-  const cleanTime = (timeStr, ampm) => {
-    const [hour, minute] = timeStr.split(":").map(Number)
-
-    let adjustedHour = hour
-
-    if (ampm) {
-      if (ampm.toLowerCase().includes("a\. m\.") && hour === 12) {
-        adjustedHour = 0
-      } else if (ampm.toLowerCase().includes("p\. m\.") && hour !== 12) {
-        adjustedHour += 12
-      }
-    }
-
-    if (adjustedHour >= 22) {
-      adjustedHour = 22
-    }
-
-    return `${adjustedHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-  }
-
-  const extractDuration = (message) => {
-    const durationRegex = /una cita de (\d+) minutos/i
-    const match = message.match(durationRegex)
-    return match ? match[1] : null
   }
 
   const calculateEndTime = (startTime, durationMinutes) => {
@@ -498,7 +671,9 @@ const openModal = (citaId = null) => {
     if (window.confirm("¿Está seguro que desea eliminar esta cita?")) {
       try {
         await deleteCita(citaId)
-        setCitas((prev) => prev.filter((c) => c.idCita !== citaId))
+        const citasActualizadas = citasArray.filter((c) => c.idCita !== citaId)
+        setCitas(citasActualizadas)
+        setFilteredCitas(citasActualizadas)
         toast.success("Cita eliminada con éxito")
       } catch (err) {
         toast.error(err.message || "Error al eliminar la cita")
@@ -601,7 +776,7 @@ const openModal = (citaId = null) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {citas.length === 0 ? (
+                {currentItems.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-8 text-center text-zinc-500">
                       <div className="flex flex-col items-center gap-2">
@@ -636,7 +811,7 @@ const openModal = (citaId = null) => {
                       </td>
                       <td className="py-3 px-4 text-sm text-zinc-700">
                         <div className="flex flex-wrap gap-1">
-                          {cita.servicios.map((s) => (
+                          {Array.isArray(cita.servicios) && cita.servicios.map((s) => (
                             <Button key={s.idServicio} variant="outline" className="text-xs">
                               {s.nombre}
                             </Button>
@@ -673,14 +848,14 @@ const openModal = (citaId = null) => {
           </div>
 
           {/* Paginación */}
-          {citas.length > 0 && (
+          {filteredCitasArray.length > 0 && (
             <div className="py-3 px-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
               <div>
                 Mostrando{" "}
                 <span className="font-medium">
-                  {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, citas.length)}
+                  {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredCitasArray.length)}
                 </span>{" "}
-                de <span className="font-medium">{citas.length}</span> citas
+                de <span className="font-medium">{filteredCitasArray.length}</span> citas
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -738,7 +913,6 @@ const openModal = (citaId = null) => {
                     : "Complete el formulario para registrar una nueva cita"}
                 </p>
               </div>
-
               <div className="p-6 space-y-6 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
                 {error && (
                   <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r-md">

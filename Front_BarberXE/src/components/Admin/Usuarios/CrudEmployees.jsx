@@ -1,14 +1,13 @@
-"use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Pencil, Trash2, Search, Plus, Eye, EyeOff, X, Check, Loader2, Mail, User, Phone, Lock, Calendar as CalendarIcon, Image as ImageIcon } from "lucide-react"
 import { PlusCircleIcon } from "@heroicons/react/24/outline"
 import {
   fetchEmployees,
   createEmployee,
+  createUser,
   updateEmployee,
   deleteEmployee,
   searchEmployeesByName,
-  createUser,
 } from "../../../services/EmployeeService.js"
 import { toast } from "react-toastify"
 import { Input } from "@/components/ui/input"
@@ -49,8 +48,15 @@ const TableEmployees = ({ isCollapsed }) => {
   // Calcular empleados para la página actual
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentItems = employees.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(employees.length / itemsPerPage)
+
+  const currentItems = useMemo(() =>
+    Array.isArray(employees)
+      ? employees.slice(indexOfFirstItem, indexOfLastItem)
+      : [],
+    [employees, indexOfFirstItem, indexOfLastItem]
+  );
+
+  const totalPages = Math.ceil((employees?.length || 0) / itemsPerPage)
 
   // Funciones para cambiar de página
   const nextPage = () => {
@@ -62,6 +68,26 @@ const TableEmployees = ({ isCollapsed }) => {
   const prevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Función para recargar empleados desde el servidor
+  const reloadEmployees = async () => {
+    try {
+      const response = await fetchEmployees();
+      const data = Array.isArray(response) ? response : (response?.data ? response.data : []);
+
+      const formattedData = data.map(emp => ({
+        ...emp,
+        imagenPerfil: emp.imagenPerfil && !emp.imagenPerfil.startsWith('http')
+          ? `${IMAGE_BASE_URL}${emp.imagenPerfil}`
+          : emp.imagenPerfil
+      }));
+
+      setEmployees(formattedData);
+    } catch (err) {
+      console.error('Error reloading employees:', err);
+      setError(err.message || 'Error al cargar empleados');
     }
   };
 
@@ -129,7 +155,6 @@ const TableEmployees = ({ isCollapsed }) => {
 
   useEffect(() => {
     if (formData.contraseña) {
-      // Validación de longitud
       if (formData.contraseña.length < 8) {
         setContraseñaError("La contraseña debe tener al menos 8 caracteres");
         return;
@@ -138,13 +163,11 @@ const TableEmployees = ({ isCollapsed }) => {
         return;
       }
 
-      // Validación de caracteres permitidos (letras, números y caracteres especiales comunes)
       if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.contraseña)) {
         setContraseñaError("La contraseña contiene caracteres no permitidos");
         return;
       }
 
-      // Validación de requisitos adicionales
       let errorMessages = [];
 
       if (!/[A-Z]/.test(formData.contraseña)) {
@@ -169,106 +192,139 @@ const TableEmployees = ({ isCollapsed }) => {
     }
   }, [formData.contraseña]);
 
-  // Cargar empleados al montar el componente
+  // Cargar empleados inicialmente
   useEffect(() => {
+    let isMounted = true;
+
     const loadEmployees = async () => {
       try {
-        const data = await fetchEmployees()
-        const formattedData = data.map((emp) => ({
-          ...emp,
-          cargo: emp.cargo || "Barbero",
-        }))
-        setEmployees(formattedData)
-        setLoading(false)
+        setLoading(true);
+        setError(null);
+        await reloadEmployees();
       } catch (err) {
-        setError(err.message)
-        setLoading(false)
-      }
-    }
-    loadEmployees()
-  }, [])
-
-  // Buscar empleados por nombre
-  // Buscar empleados por nombre
-  useEffect(() => {
-    if (searchTerm) {
-      const searchEmployees = async () => {
-        try {
-          const results = await searchEmployeesByName(searchTerm)
-          setEmployees(results)
-          setCurrentPage(1) // Resetear a la primera página al buscar
-        } catch (err) {
-          setError(err.message)
+        console.error('Error loading employees:', err);
+        if (isMounted) {
+          setError(err.message || 'Error al cargar empleados');
+          setEmployees([]);
         }
-      }
-
-      const timer = setTimeout(() => {
-        searchEmployees()
-      }, 500)
-
-      return () => clearTimeout(timer)
-    } else {
-      const reloadEmployees = async () => {
-        try {
-          const data = await fetchEmployees()
-          setEmployees(data)
-          setCurrentPage(1) // Resetear a la primera página al recargar
-        } catch (err) {
-          setError(err.message)
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
-      }
-      reloadEmployees()
-    }
-  }, [searchTerm])
-
-  useEffect(() => {
-    return () => {
-      // Limpiar URLs de imágenes creadas con URL.createObjectURL()
-      if (selectedImage) {
-        URL.revokeObjectURL(selectedImage);
       }
     };
-  }, [selectedImage]);
+
+    loadEmployees();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Búsqueda de empleados
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const searchEmployees = async () => {
+        try {
+          setError(null);
+          const response = await searchEmployeesByName(searchTerm);
+
+          // Manejar diferentes estructuras de respuesta
+          let data = [];
+          if (Array.isArray(response)) {
+            data = response;
+          } else if (response?.data && Array.isArray(response.data)) {
+            data = response.data;
+          } else if (response?.employees && Array.isArray(response.employees)) {
+            data = response.employees;
+          }
+
+          const formattedData = data.map(emp => ({
+            ...emp,
+            imagenPerfil: emp.imagenPerfil && !emp.imagenPerfil.startsWith('http')
+              ? `${IMAGE_BASE_URL}${emp.imagenPerfil}`
+              : emp.imagenPerfil
+          }));
+
+          setEmployees(formattedData);
+          setCurrentPage(1); // Resetear paginación
+        } catch (err) {
+          console.error('Error searching employees:', err);
+          setError(err.message || 'Error en la búsqueda');
+          setEmployees([]);
+        }
+      };
+
+      const timer = setTimeout(searchEmployees, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // Recargar todos los empleados cuando no hay búsqueda
+      reloadEmployees();
+      setCurrentPage(1);
+    }
+  }, [searchTerm]);
+
+  // Limpiar URLs de imágenes al desmontar
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const openModal = (employeeId = null) => {
     setShowModal(true);
     setEditingEmployeeId(employeeId);
+    setError(null);
 
     if (employeeId !== null) {
       const employee = employees.find((emp) => emp.idEmpleado === employeeId);
       if (employee) {
         setFormData({
-          nombre: employee.nombre,
-          apellido: employee.apellido,
-          telefono: employee.telefono,
-          estado: employee.estado,
+          nombre: employee.nombre || "",
+          apellido: employee.apellido || "",
+          telefono: employee.telefono || "",
+          estado: employee.estado || "activo",
           cargo: employee.cargo || "Barbero",
-          imagenPerfil: null,
-          usuario: "",
+          usuario: "", // No mostrar datos sensibles en edición
           contraseña: "",
         });
-       setImagePreview(employee.imagenPerfil)
-    } 
-  } else {
+        setImagePreview(employee.imagenPerfil || null);
+      }
+    } else {
+      // Resetear formulario para nuevo empleado
       setFormData({
         nombre: "",
         apellido: "",
         telefono: "",
         estado: "activo",
         cargo: "Barbero",
-        imagen: null,
         usuario: "",
         contraseña: "",
       });
-      setImagePreview(null)
+      setImagePreview(null);
+      setSelectedImage(null);
     }
-    setError(null)
+
+    // Limpiar errores
+    setNombreError("");
+    setApellidoError("");
+    setTelefonoError("");
+    setUsuarioError("");
+    setContraseñaError("");
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validar tamaño (ejemplo: máximo 5MB)
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        toast.error("Por favor selecciona un archivo de imagen válido");
+        return;
+      }
+
+      // Validar tamaño (máximo 5MB)
       const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         toast.error("La imagen es demasiado grande. El tamaño máximo permitido es 5MB");
@@ -281,6 +337,9 @@ const TableEmployees = ({ isCollapsed }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
+      };
+      reader.onerror = () => {
+        toast.error("Error al leer el archivo de imagen");
       };
       reader.readAsDataURL(file);
     }
@@ -302,171 +361,195 @@ const TableEmployees = ({ isCollapsed }) => {
     setImagePreview(null);
     setError(null);
     setSubmitting(false);
+    setShowPassword(false);
+
+    // Limpiar errores
+    setNombreError("");
+    setApellidoError("");
+    setTelefonoError("");
+    setUsuarioError("");
+    setContraseñaError("");
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
 
-    let processedValue = value
+    let processedValue = value;
     if (name === "telefono") {
-      processedValue = value.replace(/\D/g, "")
+      // Solo permitir números
+      processedValue = value.replace(/\D/g, "");
     }
 
     setFormData((prev) => ({
       ...prev,
       [name]: processedValue,
-      ...(name === "cargo" &&
-        value === "Barbero" && {
+      // Limpiar usuario y contraseña cuando se cambia a Barbero
+      ...(name === "cargo" && value === "Barbero" && {
         usuario: "",
         contraseña: "",
       }),
-    }))
-  }
+    }));
+  };
+
+  const validateForm = () => {
+    const isCajero = formData.cargo === 'Cajero';
+    const isEditing = editingEmployeeId !== null;
+
+    // Validaciones básicas
+    if (!formData.nombre.trim()) {
+      setError("El nombre es requerido");
+      return false;
+    }
+    if (!formData.apellido.trim()) {
+      setError("El apellido es requerido");
+      return false;
+    }
+    if (!formData.telefono.trim()) {
+      setError("El teléfono es requerido");
+      return false;
+    }
+
+    // Validaciones para errores
+    if (nombreError || apellidoError || telefonoError) {
+      setError("Por favor corrige los errores en el formulario");
+      return false;
+    }
+
+    // Validaciones específicas para cajeros nuevos
+    if (isCajero && !isEditing) {
+      if (!formData.usuario.trim()) {
+        setError("El correo electrónico es requerido para cajeros");
+        return false;
+      }
+      if (!formData.contraseña.trim()) {
+        setError("La contraseña es requerida para cajeros");
+        return false;
+      }
+      if (usuarioError || contraseñaError) {
+        setError("Por favor corrige los errores en los datos de acceso");
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
 
-    // Validaciones básicas
-    if (nombreError || apellidoError || telefonoError) {
-      toast.error("Por favor corrija los errores en el formulario");
-      return;
-    }
-
-    if (!formData.nombre || !formData.apellido || !formData.telefono) {
-      toast.error("Los campos nombre, apellido y teléfono son obligatorios");
-      return;
-    }
-
-    // Validaciones para Cajeros
-    if (
-      editingEmployeeId === null &&
-      formData.cargo === "Cajero" &&
-      (usuarioError || contraseñaError || !formData.usuario || !formData.contraseña)
-    ) {
-      toast.error("Para cajeros, usuario y contraseña son obligatorios y deben ser válidos");
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      setSubmitting(false);
-      toast.warning("La operación está tardando más de lo esperado");
-    }, 10000);
+    setSubmitting(true);
+    setError(null);
 
     try {
-      setSubmitting(true);
-
-      const formDataToSend = new FormData();
-      formDataToSend.append('nombre', formData.nombre);
-      formDataToSend.append('apellido', formData.apellido);
-      formDataToSend.append('telefono', formData.telefono);
-      formDataToSend.append('estado', formData.estado);
-      formDataToSend.append('cargo', formData.cargo);
-
-      if (selectedImage) {
-        formDataToSend.append('imagenPerfil', selectedImage);
-      }
-
       if (editingEmployeeId !== null) {
-        const updatedEmployee = await updateEmployee(editingEmployeeId, formDataToSend);
+        // Por esta:
+        const updateData = {
+          nombre: formData.nombre.trim(),
+          apellido: formData.apellido.trim(),
+          telefono: formData.telefono.trim(),
+          estado: formData.estado,
+          ...(selectedImage && { imagen: selectedImage })
+        };
 
-        // Actualizar el estado local con la nueva imagen
-        setEmployees(prev => prev.map(emp => {
-          if (emp.idEmpleado === editingEmployeeId) {
-            // Si hay una nueva imagen, crear una URL temporal
-            let newImageUrl = emp.imagenPerfil;
-            if (selectedImage) {
-              newImageUrl = URL.createObjectURL(selectedImage);
-            } else if (updatedEmployee.imagenPerfil) {
-              // Si el backend devuelve una nueva URL de imagen
-              newImageUrl = `${IMAGE_BASE_URL}${updatedEmployee.imagenPerfil}`;
-            }
+        console.log('Actualizando empleado:', editingEmployeeId, updateData);
 
-            return {
-              ...emp,
-              ...updatedEmployee,
-              imagenPerfil: newImageUrl
-            };
-          }
-          return emp;
-        }));
+        await updateEmployee(editingEmployeeId, updateData, !!selectedImage);
 
-        toast.success("Empleado actualizado con éxito");
-        closeModal();
+        // Recargar empleados desde el servidor para mostrar datos actualizados
+        await reloadEmployees();
+
+        toast.success("¡Empleado actualizado con éxito!");
+
       } else {
-        // Creación de nuevo empleado
-        if (formData.cargo === "Cajero") {
-          const cajeroData = {
-            usuario: formData.usuario,
-            contraseña: formData.contraseña,
-            empleado: {
-              nombre: formData.nombre,
-              apellido: formData.apellido,
-              telefono: formData.telefono,
-              cargo: "Cajero",
-              estado: formData.estado,
-            },
+        // Crear nuevo empleado
+        if (formData.cargo === 'Cajero') {
+          // Crear cajero
+          const userData = {
+            nombre: formData.nombre.trim(),
+            apellido: formData.apellido.trim(),
+            telefono: formData.telefono.trim(),
+            usuario: formData.usuario.trim(),
+            contraseña: formData.contraseña
           };
-          const response = await createUser(cajeroData);
-          setEmployees(prev => [...prev, response.empleado]);
-          toast.success("Cajero creado con éxito");
+
+          await createUser(userData);
+          toast.success("¡Cajero creado con éxito!");
+
         } else {
-          const newEmployee = await createEmployee(formDataToSend);
+          // Crear barbero
+          const employeeData = {
+            nombre: formData.nombre.trim(),
+            apellido: formData.apellido.trim(),
+            telefono: formData.telefono.trim(),
+            imagen: selectedImage
+          };
 
-          // Generar vista previa si se seleccionó imagen
-          let imageUrl = "";
-          if (selectedImage) {
-            imageUrl = URL.createObjectURL(selectedImage);
-          } else if (newEmployee.imagenPerfil) {
-            imageUrl = `${IMAGE_BASE_URL}${newEmployee.imagenPerfil}?t=${Date.now()}`;
-          }
-
-          // Añadir empleado con imagen actualizada en tiempo real
-          setEmployees(prev => [...prev, {
-            ...newEmployee,
-            imagenPerfil: imageUrl
-          }]);
-
-          setImagePreview(imageUrl); // Mostrar en vista previa
-
-          toast.success("Barbero creado con éxito");
+          await createEmployee(employeeData);
+          toast.success("¡Barbero creado con éxito!");
         }
+
+        // Recargar empleados desde el servidor para mostrar el nuevo empleado con todos sus datos
+        await reloadEmployees();
       }
+
       closeModal();
+
     } catch (err) {
-      console.error("Error en handleSubmit:", err);
-      clearTimeout(timeoutId);
-      setSubmitting(false);
-      toast.error(err.response?.data?.message || err.message || "Error al guardar empleado");
+      console.error('Error en handleSubmit:', err);
+      setError(err.message.includes('500')
+        ? 'Error del servidor. Verifica los datos'
+        : err.message || 'Error desconocido'
+      );
     } finally {
-      clearTimeout(timeoutId);
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (employeeId) => {
-    try {
-      await deleteEmployee(employeeId)
-      setEmployees((prev) => prev.filter((emp) => emp.idEmpleado !== employeeId))
-      toast.success("Empleado eliminado con éxito")
-    } catch (err) {
-      toast.error(err.message || "Ocurrió un error al eliminar el empleado")
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este empleado?')) {
+      return;
     }
-  }
+
+    try {
+      await deleteEmployee(employeeId);
+      setEmployees(prev => prev.filter(emp => emp.idEmpleado !== employeeId));
+      toast.success("Empleado eliminado con éxito");
+
+      // Ajustar página actual si es necesario
+      const newTotal = employees.length - 1;
+      const newTotalPages = Math.ceil(newTotal / itemsPerPage);
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      }
+
+    } catch (err) {
+      console.error('Error deleting employee:', err);
+      toast.error(err.message || "Ocurrió un error al eliminar el empleado");
+    }
+  };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
       </div>
-    )
+    );
   }
 
-  if (error) {
+  if (error && !showModal) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md shadow-sm">
         <strong className="font-bold">Error!</strong>
         <span className="block sm:inline"> {error}</span>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+        >
+          Recargar página
+        </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -545,37 +628,42 @@ const TableEmployees = ({ isCollapsed }) => {
                     <td colSpan="6" className="py-8 text-center text-zinc-500">
                       <div className="flex flex-col items-center gap-2">
                         <User size={24} className="text-zinc-300" />
-                        <p>No se encontraron empleados</p>
-                        <Button
-                          variant="link"
-                          onClick={() => openModal()}
-                          className="text-red-500 hover:text-red-600 text-sm"
-                        >
-                          Agregar un empleado
-                        </Button>
+                        <p>{searchTerm ? 'No se encontraron empleados que coincidan con la búsqueda' : 'No se encontraron empleados'}</p>
+                        {!searchTerm && (
+                          <Button
+                            variant="link"
+                            onClick={() => openModal()}
+                            className="text-red-500 hover:text-red-600 text-sm"
+                          >
+                            Agregar un empleado
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ) : (
                   currentItems.map((emp) => (
-                    <tr key={emp.idEmpleado} className="hover:bg-zinc-50 transition-colors">
+                    <tr
+                      key={emp.idEmpleado}
+                      className="hover:bg-zinc-50 transition-colors"
+                    >
                       <td className="py-3 px-4 text-sm text-zinc-700">
                         <div className="flex items-center gap-3">
                           {emp.imagenPerfil ? (
                             <img
                               src={emp.imagenPerfil}
                               alt={`${emp.nombre} ${emp.apellido}`}
-                              className="h-8 w-8 rounded-full object-cover"
+                              className="h-8 w-8 rounded-full object-cover border border-zinc-200"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = '/default-profile.jpg';
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
                               }}
                             />
-                          ) : (
-                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                              <User className="h-4 w-4 text-gray-500" />
-                            </div>
-                          )}
+                          ) : null}
+                          <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center" style={{ display: emp.imagenPerfil ? 'none' : 'flex' }}>
+                            <User className="h-4 w-4 text-gray-500" />
+                          </div>
                           <span>{emp.nombre}</span>
                         </div>
                       </td>
@@ -641,7 +729,7 @@ const TableEmployees = ({ isCollapsed }) => {
             </table>
           </div>
 
-          {/* Paginación actualizada */}
+          {/* Paginación */}
           {employees.length > 0 && (
             <div className="py-3 px-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs text-zinc-500">
               <div>

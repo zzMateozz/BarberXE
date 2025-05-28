@@ -12,7 +12,7 @@ router.use(authMiddleware.passAuth('jwt'));
 
 // Ver todas las citas - ADMIN y EMPLEADO pueden ver todas, CLIENTE solo las suyas
 router.get('/', 
-    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO, RoleType.CLIENTE]),
     citaController.getAll
 );
 
@@ -47,7 +47,7 @@ router.post('/',
 
 // Solo empleados y admin pueden modificar citas
 router.put('/:id', 
-    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO]),
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.EMPLEADO, RoleType.CLIENTE]),
     citaController.update
 );
 

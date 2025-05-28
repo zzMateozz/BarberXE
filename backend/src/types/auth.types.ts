@@ -1,25 +1,30 @@
-// types/auth.types.ts
 export enum RoleType {
     ADMIN = 'ADMIN',
     EMPLEADO = 'EMPLEADO', 
     CLIENTE = 'CLIENTE'
-    }
+}
 
-    export interface PayloadToken {
-        role: RoleType;
-        sub: string;
-        username: string;
-        iat?: number;
-        exp?: number;
-    }
+export interface PayloadToken {
+    sub: string;
+    role: RoleType;
+    username: string;
+    iat?: number;
+    exp?: number;
+}
 
-    export interface AuthResponse {
+export interface AuthUser {
+    idUser: number;
+    role: RoleType;
+    username: string;
+}
+
+export interface AuthResponse {
     accessToken: string;
-    user: {
-        idUser: number;
-        usuario: string;
-        role: RoleType;
+    user: AuthUser & {
         empleado?: any;
         cliente?: any;
     };
 }
+
+
+

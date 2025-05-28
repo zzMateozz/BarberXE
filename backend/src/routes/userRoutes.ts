@@ -31,6 +31,11 @@ router.get('/username/:username',
     (req, res, next) => userController.getByUsername(req, res).catch(next)
 );
 
+router.get('/:userId/client',
+    authMiddleware.checkRoles([RoleType.ADMIN, RoleType.CLIENTE]),
+    (req, res, next) => userController.getClientByUserId(req, res).catch(next)
+);
+
 router.put('/:id', 
     authMiddleware.checkOwnerOrAdmin,
     (req, res, next) => userController.update(req, res).catch(next)

@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import {
   DollarSign,
@@ -11,34 +9,21 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
+  RefreshCw,
+  Eye,
+  X,
 } from "lucide-react"
 import {
   getHistorial,
+  cargarHistorial,
   createArqueo,
   closeArqueo,
   fetchIngresosByArqueo,
   fetchEgresosByArqueo,
   getArqueoById,
+  fetchEmpleados,
+  getOpenArqueo,
 } from "../../../services/ArqueoService"
-
-const fetchEmpleados = async () => {
-  try {
-    const response = await fetch("http://localhost:3000/api/empleados", {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-      },
-    })
-    if (!response.ok) throw new Error("Error al obtener empleados")
-    const empleados = await response.json()
-
-    // Filtrar solo cajeros activos (case insensitive)
-    return empleados.filter((e) => e.cargo.toLowerCase() === "cajero" && e.estado.toLowerCase() === "activo")
-  } catch (error) {
-    console.error("Error fetching empleados:", error)
-    return []
-  }
-}
 
 function ArqueoDeCaja() {
   // Estados principales
@@ -48,6 +33,7 @@ function ArqueoDeCaja() {
   const [saldoBase, setSaldoBase] = useState("")
   const [saldoFinal, setSaldoFinal] = useState("")
   const [observacion, setObservacion] = useState("")
+  const [historial, setHistorial] = useState([]); // Inicializa como array vacío
   const [arqueoActual, setArqueoActual] = useState(null)
   const [ingresos, setIngresos] = useState([])
   const [egresos, setEgresos] = useState([])
@@ -55,86 +41,198 @@ function ArqueoDeCaja() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [arqueoSeleccionado, setArqueoSeleccionado] = useState(null)
+  const [actualizando, setActualizando] = useState(false)
 
   // Formatear fecha para mostrar
   const formatDateTime = (dateString) => {
     if (!dateString) return "En curso"
-    const date = new Date(dateString)
-    if (isNaN(date)) return "Fecha inválida"
 
-    const options = { year: "numeric", month: "long", day: "numeric" }
-    const fechaFormateada = date.toLocaleDateString(undefined, options)
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return "Fecha inválida"
 
-    let horas = date.getHours()
-    const minutos = date.getMinutes()
-    const ampm = horas >= 12 ? "PM" : "AM"
-    horas = horas % 12 || 12
-    const minutosStr = minutos < 10 ? "0" + minutos : minutos
+      const options = {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: 'America/Mexico_City'
+      }
+      const fechaFormateada = date.toLocaleDateString('es-ES', options)
 
-    return `${fechaFormateada}, ${horas}:${minutosStr} ${ampm}`
+      let horas = date.getHours()
+      const minutos = date.getMinutes()
+      const ampm = horas >= 12 ? "PM" : "AM"
+      horas = horas % 12 || 12
+      const minutosStr = minutos < 10 ? "0" + minutos : minutos
+
+      return `${fechaFormateada}, ${horas}:${minutosStr} ${ampm}`
+    } catch (error) {
+      console.error('Error formateando fecha:', error)
+      return "Fecha inválida"
+    }
   }
 
+  // Limpiar mensajes después de un tiempo
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (arqueoActual?.idArqueo) {
-        try {
-          const [arqueoActualizado, nuevosIngresos, nuevosEgresos] = await Promise.all([
-            getArqueoById(arqueoActual.idArqueo),
-            fetchIngresosByArqueo(arqueoActual.idArqueo),
-            fetchEgresosByArqueo(arqueoActual.idArqueo),
-          ])
+    if (success) {
+      const timer = setTimeout(() => setSuccess(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [success])
 
-          if (arqueoActualizado.fechaCierre) {
-            setArqueoActual(null)
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
+
+  // Función para cargar movimientos de un arqueo
+  const cargarMovimientosArqueo = async (arqueoId) => {
+    if (!arqueoId) {
+      setIngresos([])
+      setEgresos([])
+      return
+    }
+
+    try {
+      const [ingresosData, egresosData] = await Promise.all([
+        fetchIngresosByArqueo(arqueoId),
+        fetchEgresosByArqueo(arqueoId),
+      ])
+
+      setIngresos(ingresosData || [])
+      setEgresos(egresosData || [])
+    } catch (error) {
+      console.error("Error cargando movimientos:", error)
+      setIngresos([])
+      setEgresos([])
+    }
+  }
+
+  // Función para verificar si un empleado tiene arqueo abierto
+  const verificarArqueoAbierto = async (empleadoId) => {
+    try {
+      const result = await getOpenArqueo(empleadoId)
+      return result
+    } catch (error) {
+      console.error("Error verificando arqueo abierto:", error)
+      return { exists: false, data: null }
+    }
+  }
+
+  // Actualización automática del arqueo activo
+  useEffect(() => {
+    if (!arqueoActual?.idArqueo) return
+
+    const interval = setInterval(async () => {
+      try {
+        setActualizando(true)
+
+        const arqueoActualizado = await getArqueoById(arqueoActual.idArqueo)
+
+        // Si el arqueo fue cerrado externamente
+        if (arqueoActualizado.fechaCierre) {
+          setArqueoActual(null)
+          setIngresos([])
+          setEgresos([])
+          if (typeof window !== 'undefined') {
             localStorage.removeItem("currentArqueoId")
-          } else {
-            setArqueoActual((prev) => ({ ...prev, ...arqueoActualizado }))
-            setIngresos(nuevosIngresos)
-            setEgresos(nuevosEgresos)
           }
-        } catch (error) {
-          console.error("Error al actualizar:", error)
+          setSuccess("El arqueo ha sido cerrado")
+
+          // Actualizar historial
+          const historialActualizado = await getHistorial()
+          setArqueos(historialActualizado)
+        } else {
+          // Actualizar datos del arqueo activo
+          setArqueoActual(prev => ({ ...prev, ...arqueoActualizado }))
+          // Cargar movimientos actualizados
+          await cargarMovimientosArqueo(arqueoActualizado.idArqueo)
         }
+      } catch (error) {
+        console.error("Error en actualización automática:", error)
+      } finally {
+        setActualizando(false)
       }
-    }, 10000) // Actualizar cada 10 segundos
+    }, 15000) // Actualizar cada 15 segundos
 
     return () => clearInterval(interval)
-  }, [arqueoActual])
+  }, [arqueoActual?.idArqueo])
 
-  // Cargar datos iniciales
+  // Inicialización de datos mejorada
   useEffect(() => {
     const inicializarDatos = async () => {
       try {
         setLoading(true)
+        setError(null)
 
-        const [cajerosData, historialData] = await Promise.all([fetchEmpleados(), getHistorial()])
+        console.log("Iniciando carga de datos...")
 
+        // Cargar cajeros primero
+        const cajerosData = await fetchEmpleados().catch(error => {
+          console.error('Error cargando cajeros:', error)
+          return []
+        })
         setCajeros(cajerosData)
+        console.log("Cajeros cargados:", cajerosData)
+
+        // Cargar historial
+        const historialData = await getHistorial().catch(error => {
+          console.error('Error cargando historial:', error)
+          return []
+        })
         setArqueos(historialData)
+        console.log("Historial cargado:", historialData)
 
-        const arqueoGuardadoId = localStorage.getItem("currentArqueoId")
+        // Buscar arqueos abiertos en el historial
+        const arqueoAbiertoEnHistorial = historialData.find(arqueo => !arqueo.fechaCierre)
 
-        if (arqueoGuardadoId) {
-          try {
-            const [arqueoData, ingresosData, egresosData] = await Promise.all([
-              getArqueoById(arqueoGuardadoId),
-              fetchIngresosByArqueo(arqueoGuardadoId),
-              fetchEgresosByArqueo(arqueoGuardadoId),
-            ])
+        // Verificar si hay un arqueo activo guardado en localStorage
+        let arqueoActivo = null
 
-            if (arqueoData && !arqueoData.fechaCierre) {
-              setArqueoActual(arqueoData)
-              setIngresos(ingresosData)
-              setEgresos(egresosData)
+        if (typeof window !== 'undefined') {
+          const savedArqueoId = localStorage.getItem("currentArqueoId")
+
+          if (savedArqueoId && !isNaN(Number(savedArqueoId))) {
+            try {
+              const arqueoGuardado = await getArqueoById(savedArqueoId)
+
+              // Solo restaurar si no está cerrado
+              if (!arqueoGuardado.fechaCierre) {
+                arqueoActivo = arqueoGuardado
+                console.log("Arqueo activo restaurado desde localStorage:", arqueoGuardado)
+              } else {
+                localStorage.removeItem("currentArqueoId")
+                console.log("Arqueo guardado ya estaba cerrado, removido del localStorage")
+              }
+            } catch (error) {
+              console.warn('No se pudo restaurar el arqueo guardado:', error)
+              localStorage.removeItem("currentArqueoId")
             }
-          } catch (error) {
-            console.error("Error al cargar arqueo actual:", error)
-            localStorage.removeItem("currentArqueoId")
           }
         }
+
+        // Si no hay arqueo en localStorage pero sí en el historial, usar ese
+        if (!arqueoActivo && arqueoAbiertoEnHistorial) {
+          arqueoActivo = arqueoAbiertoEnHistorial
+          console.log("Usando arqueo abierto del historial:", arqueoAbiertoEnHistorial)
+
+          // Guardar en localStorage para futuras sesiones
+          if (typeof window !== 'undefined') {
+            localStorage.setItem("currentArqueoId", arqueoAbiertoEnHistorial.idArqueo.toString())
+          }
+        }
+
+        // Si encontramos un arqueo activo, establecerlo y cargar sus movimientos
+        if (arqueoActivo) {
+          setArqueoActual(arqueoActivo)
+          await cargarMovimientosArqueo(arqueoActivo.idArqueo)
+        }
+
       } catch (error) {
-        console.error("Error:", error)
-        setError("Error al cargar datos iniciales")
+        console.error("Error en inicialización:", error)
+        setError(`Error al inicializar: ${error.message}`)
       } finally {
         setLoading(false)
       }
@@ -143,127 +241,214 @@ function ArqueoDeCaja() {
     inicializarDatos()
   }, [])
 
-  // Cargar movimientos para un arqueo específico
-  const cargarMovimientos = async (arqueoId) => {
-    if (!arqueoId) return
-
-    try {
-      setLoading(true)
-      const [ingresosData, egresosData] = await Promise.all([
-        fetchIngresosByArqueo(arqueoId),
-        fetchEgresosByArqueo(arqueoId),
-      ])
-
-      setIngresos(ingresosData)
-      setEgresos(egresosData)
-    } catch (error) {
-      console.error("Error cargando movimientos:", error)
-      setError("Error al cargar movimientos")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Actualizar arqueo seleccionado para ver detalles
+  // Cargar movimientos para arqueo seleccionado en el historial
   useEffect(() => {
-    if (arqueoSeleccionado) {
-      cargarMovimientos(arqueoSeleccionado.idArqueo)
+    if (arqueoSeleccionado && arqueoSeleccionado.idArqueo !== arqueoActual?.idArqueo) {
+      cargarMovimientosArqueo(arqueoSeleccionado.idArqueo)
     }
-  }, [arqueoSeleccionado])
+  }, [arqueoSeleccionado, arqueoActual])
 
   // Cálculos para totales
-  const calcularTotalIngresos = (ingresos = []) => {
-    return ingresos.reduce((total, ing) => total + (Number(ing.monto) || 0), 0)
+  const calcularTotalIngresos = (ingresosData = ingresos) => {
+    return ingresosData.reduce((total, ing) => total + (Number(ing.monto) || 0), 0)
   }
 
-  const calcularTotalEgresos = (egresos = []) => {
-    return egresos.reduce((total, eg) => total + (Number(eg.monto) || 0), 0)
+  const calcularTotalEgresos = (egresosData = egresos) => {
+    return egresosData.reduce((total, eg) => total + (Number(eg.monto) || 0), 0)
   }
 
-  const calcularSaldoPrevisto = (arqueo) => {
+  const calcularSaldoPrevisto = (arqueo = arqueoActual) => {
     if (!arqueo) return 0
 
-    // Usar los estados actualizados de ingresos y egresos en lugar de los del arqueo
-    const totalIngresos = ingresos.reduce((sum, ing) => sum + (Number(ing.monto) || 0), 0)
-    const totalEgresos = egresos.reduce((sum, eg) => sum + (Number(eg.monto) || 0), 0)
+    const totalIngresos = calcularTotalIngresos()
+    const totalEgresos = calcularTotalEgresos()
+    const saldoInicial = Number(arqueo.saldoInicial) || 0
 
-    return (Number(arqueo.saldoInicial) || 0) + totalIngresos - totalEgresos
+    return saldoInicial + totalIngresos - totalEgresos
   }
 
   // Handlers
-  const handleCajeroChange = (e) => {
-    setCajeroSeleccionadoId(e.target.value)
-  }
+  const handleCajeroChange = async (e) => {
+    const empleadoId = e.target.value;
+    setCajeroSeleccionadoId(empleadoId);
+
+    // Verificar si el valor es válido antes de continuar
+    if (!empleadoId || isNaN(Number(empleadoId))) {
+      return; // No mostrar error aquí, es normal cuando se deselecciona
+    }
+
+    try {
+      const result = await verificarArqueoAbierto(empleadoId);
+
+      if (result.exists && result.data) {
+        // Validar que el arqueo tiene ID
+        if (!result.data.idArqueo && !result.data.id) {
+          throw new Error("El arqueo no tiene un ID válido");
+        }
+
+        const arqueoId = result.data.idArqueo || result.data.id;
+        setArqueoActual(result.data);
+        await cargarMovimientosArqueo(arqueoId);
+
+        // Guardar en localStorage con verificación
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("currentArqueoId", arqueoId.toString());
+        }
+
+        setSuccess(`Arqueo existente #${arqueoId} cargado`);
+      }
+    } catch (error) {
+      console.error("Error verificando arqueo:", error);
+      setError(error.message || "Error al verificar arqueo abierto");
+    }
+  };
 
   const abrirArqueo = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
-      setLoading(true)
-      setError(null)
-      if (!cajeroSeleccionadoId || !saldoBase) {
-        throw new Error("Seleccione un cajero e ingrese el saldo base")
+      setLoading(true);
+      setError(null);
+
+      // Validación mejorada
+      const empleadoId = Number(cajeroSeleccionadoId);
+      const saldoInicial = Number(saldoBase.replace(/,/g, ''));
+
+      if (isNaN(empleadoId) || empleadoId <= 0) {
+        throw new Error("Seleccione un cajero válido");
       }
 
-      const response = await createArqueo({
-        empleadoId: Number(cajeroSeleccionadoId),
-        saldoInicial: Number(saldoBase),
-      })
-
-      if (!response.data || !response.data.idArqueo) {
-        throw new Error("Error al crear arqueo: la respuesta del servidor no incluyó un ID válido.")
+      if (isNaN(saldoInicial) || saldoInicial < 0) {
+        throw new Error("El saldo debe ser un número positivo");
       }
 
-      // Actualizar estado
-      const nuevoArqueo = response.data
-      setArqueoActual(nuevoArqueo)
-      setArqueoSeleccionado(nuevoArqueo)
-      localStorage.setItem("currentArqueoId", nuevoArqueo.idArqueo)
-      localStorage.setItem("currentEmpleadoIdForArqueo", cajeroSeleccionadoId)
+      // Verificar nuevamente si hay arqueo abierto antes de crear uno nuevo
+      const verificacion = await verificarArqueoAbierto(empleadoId)
+      if (verificacion.exists) {
+        // En lugar de mostrar error, usar el arqueo existente
+        setArqueoActual(verificacion.data)
+        await cargarMovimientosArqueo(verificacion.data.idArqueo)
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("currentArqueoId", (result.data.idArqueo || "").toString());
+        }
+
+        setSuccess(`Se ha restaurado el arqueo existente #${verificacion.data.idArqueo}`)
+
+        // Limpiar formulario
+        setCajeroSeleccionadoId("");
+        setSaldoBase("");
+
+        return;
+      }
+
+      console.log("Datos a enviar:", { empleadoId, saldoInicial });
+
+      // Crear arqueo nuevo
+      const nuevoArqueo = await createArqueo({
+        empleadoId: empleadoId,
+        saldoInicial: saldoInicial,
+      });
+
+      console.log("Respuesta del servidor:", nuevoArqueo);
+
+      // Actualización del estado con validación
+      if (nuevoArqueo && (nuevoArqueo.idArqueo || nuevoArqueo.id)) {
+        const arqueoId = nuevoArqueo.idArqueo || nuevoArqueo.id;
+
+        const arqueoCompleto = {
+          ...nuevoArqueo,
+          idArqueo: arqueoId,
+          empleado: cajeros.find(c => c.idEmpleado === empleadoId) || {
+            idEmpleado: empleadoId,
+            nombre: "Cajero"
+          }
+        };
+
+        setArqueoActual(arqueoCompleto);
+
+        // Guardar en localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("currentArqueoId", arqueoId.toString());
+        }
+      }
+
+      // Limpiar campos del formulario
+      setCajeroSeleccionadoId("");
+      setSaldoBase("");
 
       // Recargar historial
-      const historialActualizado = await getHistorial()
-      setArqueos(historialActualizado)
+      try {
+        const historialActualizado = await cargarHistorial();
+        setArqueos(historialActualizado);
+      } catch (historialError) {
+        console.warn("Error recargando historial:", historialError);
+      }
 
-      setSuccess("Arqueo iniciado correctamente")
-      setSaldoBase("")
-      setTimeout(() => setSuccess(null), 3000)
+      setSuccess(`Arqueo #${nuevoArqueo.idArqueo || nuevoArqueo.id} creado exitosamente`);
+
     } catch (error) {
-      console.error("Error al abrir arqueo:", error)
-      setError(error.message || "Error al abrir arqueo")
+      console.error("Error completo:", error);
+
+      let errorMessage = "Error al crear arqueo";
+
+      if (error.message) {
+        errorMessage = error.message
+          .replace("Error al crear arqueo: ", "")
+          .replace("Error en la creación", "Error en la creación del arqueo");
+      }
+
+      setError(errorMessage);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const cerrarArqueo = async (e) => {
     e.preventDefault()
+
     try {
       setLoading(true)
       setError(null)
       setSuccess(null)
 
       if (!arqueoActual?.idArqueo) {
-        throw new Error("No hay arqueo activo")
+        throw new Error("No hay arqueo activo para cerrar")
       }
 
-      // Calcular saldo final automáticamente
-      const saldoCalculado = calcularSaldoPrevisto(arqueoActual)
+      // Usar saldo final ingresado o calcular automáticamente
+      let saldoFinalNum
+      if (saldoFinal && saldoFinal.trim() !== "") {
+        saldoFinalNum = Number(saldoFinal)
+        if (isNaN(saldoFinalNum) || saldoFinalNum < 0) {
+          throw new Error("El saldo final debe ser un número válido mayor o igual a cero")
+        }
+      } else {
+        // Calcular saldo final automáticamente
+        saldoFinalNum = calcularSaldoPrevisto(arqueoActual)
+      }
 
       await closeArqueo(arqueoActual.idArqueo, {
-        saldoFinal: saldoCalculado, // Usar el cálculo automático
-        observacion: observacion || "",
+        saldoFinal: saldoFinalNum,
+        observacion: observacion.trim() || "Sin observaciones",
       })
 
-      // Actualizar estados
-      const historialActualizado = await getHistorial()
-      setArqueos(historialActualizado)
+      // Limpiar estados
       setArqueoActual(null)
       setIngresos([])
       setEgresos([])
-      localStorage.removeItem("currentArqueoId")
+      setObservacion("")
+      setSaldoFinal("")
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("currentArqueoId")
+      }
+
+      // Actualizar historial
+      const historialActualizado = await getHistorial()
+      setArqueos(historialActualizado)
 
       setSuccess("Arqueo cerrado correctamente")
-      setTimeout(() => setSuccess(null), 3000)
+
     } catch (error) {
       console.error("Error al cerrar arqueo:", error)
       setError(error.message || "Error al cerrar arqueo")
@@ -273,8 +458,17 @@ function ArqueoDeCaja() {
   }
 
   const handleSelectArqueo = (arqueo) => {
-    setArqueoSeleccionado(arqueo.idArqueo === arqueoSeleccionado?.idArqueo ? null : arqueo)
+    const isSelected = arqueoSeleccionado?.idArqueo === arqueo.idArqueo
+    setArqueoSeleccionado(isSelected ? null : arqueo)
   }
+
+  // Efecto para actualizar saldo final sugerido cuando cambian los movimientos
+  useEffect(() => {
+    if (arqueoActual) {
+      const saldoCalculado = calcularSaldoPrevisto(arqueoActual)
+      setSaldoFinal(saldoCalculado.toString())
+    }
+  }, [arqueoActual, ingresos, egresos])
 
   // Render
   return (
@@ -284,23 +478,55 @@ function ArqueoDeCaja() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-zinc-800 mb-2">Arqueo de Caja</h1>
           <p className="text-zinc-600">Gestiona y controla los arqueos de caja de tu barbería</p>
+          {arqueoActual && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-lg border border-green-200">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">Arqueo #{arqueoActual.idArqueo} en curso</span>
+            </div>
+          )}
         </div>
 
         {/* Alertas */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg shadow-sm">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
-              <p className="text-red-700 font-medium">{error}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
+                <p className="text-red-700 font-medium">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-500 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
 
         {success && (
           <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg shadow-sm">
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
-              <p className="text-green-700 font-medium">{success}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                <p className="text-green-700 font-medium">{success}</p>
+              </div>
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-green-500 hover:text-green-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Indicador de actualización */}
+        {actualizando && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center text-blue-700">
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              <span className="text-sm">Actualizando datos...</span>
             </div>
           </div>
         )}
@@ -314,6 +540,11 @@ function ArqueoDeCaja() {
                   <Clock className="w-5 h-5 text-zinc-700" />
                 </div>
                 Historial de Arqueos
+                {historial?.length > 0 && (
+                  <span className="bg-zinc-200 text-zinc-700 px-2 py-1 rounded-full text-sm">
+                    {historial.length}
+                  </span>
+                )}
               </h2>
             </div>
 
@@ -328,17 +559,18 @@ function ArqueoDeCaja() {
                   {arqueos.map((arqueo) => (
                     <div
                       key={arqueo.idArqueo}
-                      className={`border rounded-xl p-5 transition-all duration-200 cursor-pointer hover:shadow-md ${
-                        arqueoSeleccionado?.idArqueo === arqueo.idArqueo
-                          ? "border-zinc-800 bg-zinc-50 shadow-md"
+                      className={`border rounded-xl p-5 transition-all duration-200 cursor-pointer hover:shadow-md ${arqueoSeleccionado?.idArqueo === arqueo.idArqueo
+                        ? "border-zinc-800 bg-zinc-50 shadow-md"
+                        : !arqueo.fechaCierre
+                          ? "border-green-300 bg-green-50 shadow-sm"
                           : "border-zinc-200 hover:border-zinc-300"
-                      }`}
+                        }`}
                       onClick={() => handleSelectArqueo(arqueo)}
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-zinc-100 rounded-lg">
-                            <User className="w-4 h-4 text-zinc-600" />
+                          <div className={`p-2 rounded-lg ${!arqueo.fechaCierre ? 'bg-green-200' : 'bg-zinc-100'}`}>
+                            <User className={`w-4 h-4 ${!arqueo.fechaCierre ? 'text-green-700' : 'text-zinc-600'}`} />
                           </div>
                           <div>
                             <p className="font-semibold text-lg text-zinc-800">
@@ -352,15 +584,19 @@ function ArqueoDeCaja() {
                             </div>
                           </div>
                         </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            !arqueo.fechaCierre
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${!arqueo.fechaCierre
                               ? "bg-green-100 text-green-800 border border-green-200"
                               : "bg-zinc-100 text-zinc-700 border border-zinc-200"
-                          }`}
-                        >
-                          {!arqueo.fechaCierre ? "Abierto" : "Cerrado"}
-                        </span>
+                              }`}
+                          >
+                            {!arqueo.fechaCierre ? "Abierto" : "Cerrado"}
+                          </span>
+                          {arqueoSeleccionado?.idArqueo === arqueo.idArqueo && (
+                            <Eye className="w-4 h-4 text-zinc-600" />
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -383,7 +619,7 @@ function ArqueoDeCaja() {
                         )}
 
                         {/* Mostrar detalles si el arqueo está seleccionado */}
-                        {arqueoSeleccionado?.idArqueo === arqueo.idArqueo && arqueo.fechaCierre && (
+                        {arqueoSeleccionado?.idArqueo === arqueo.idArqueo && (
                           <>
                             <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                               <p className="text-sm text-green-700 mb-1 flex items-center gap-1">
@@ -391,7 +627,7 @@ function ArqueoDeCaja() {
                                 Total Ingresos
                               </p>
                               <p className="font-semibold text-green-800">
-                                ${calcularTotalIngresos(arqueo.ingresos).toLocaleString()}
+                                ${calcularTotalIngresos().toLocaleString()}
                               </p>
                             </div>
                             <div className="bg-red-50 p-3 rounded-lg border border-red-200">
@@ -400,7 +636,7 @@ function ArqueoDeCaja() {
                                 Total Egresos
                               </p>
                               <p className="font-semibold text-red-800">
-                                ${calcularTotalEgresos(arqueo.egresos).toLocaleString()}
+                                ${calcularTotalEgresos().toLocaleString()}
                               </p>
                             </div>
                             <div className="col-span-2 bg-zinc-50 p-3 rounded-lg">
@@ -431,7 +667,7 @@ function ArqueoDeCaja() {
 
           {/* Panel de control */}
           <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-zinc-800 to-black px-6 py-4">
+            <div className={`px-6 py-4 ${arqueoActual ? 'bg-gradient-to-r from-green-600 to-green-700' : 'bg-gradient-to-r from-zinc-800 to-black'}`}>
               <h2 className="text-xl font-semibold text-white flex items-center gap-3">
                 <div className="p-2 bg-white/10 rounded-lg">
                   <DollarSign className="w-5 h-5 text-white" />
@@ -439,7 +675,6 @@ function ArqueoDeCaja() {
                 {arqueoActual ? "Arqueo en Curso" : "Iniciar Arqueo"}
               </h2>
             </div>
-
             <div className="p-6">
               {arqueoActual && (
                 <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 p-5 rounded-xl mb-6 border border-zinc-200">
@@ -447,14 +682,21 @@ function ArqueoDeCaja() {
                     <div className="p-2 bg-zinc-200 rounded-lg">
                       <User className="w-4 h-4 text-zinc-700" />
                     </div>
-                    <p className="font-semibold text-zinc-800">Cajero: {arqueoActual.empleado?.nombre}</p>
+                    <div>
+                      <p className="font-semibold text-zinc-800">
+                        Cajero: {arqueoActual.empleado?.nombre || "Sin especificar"}
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        Arqueo #{arqueoActual.idArqueo}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white p-3 rounded-lg border border-zinc-200">
                       <p className="text-sm text-zinc-600 mb-1">Saldo Inicial</p>
                       <p className="font-semibold text-zinc-800">
-                        ${Number(arqueoActual.saldoInicial).toLocaleString()}
+                        ${Number(arqueoActual.saldoInicial || 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="bg-white p-3 rounded-lg border border-zinc-200">
@@ -462,6 +704,95 @@ function ArqueoDeCaja() {
                       <p className="font-semibold text-zinc-800">
                         ${calcularSaldoPrevisto(arqueoActual).toLocaleString()}
                       </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {arqueoActual && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-zinc-800 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Movimientos del Día
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-green-200 rounded-lg">
+                            <TrendingUp className="w-5 h-5 text-green-700" />
+                          </div>
+                          <div>
+                            <h4 className="text-green-800 font-semibold">Ingresos</h4>
+                            <p className="text-green-600 text-sm">Total del día</p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-green-800 text-xl">
+                          ${calcularTotalIngresos().toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-xl border border-red-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-red-200 rounded-lg">
+                            <TrendingDown className="w-5 h-5 text-red-700" />
+                          </div>
+                          <div>
+                            <h4 className="text-red-800 font-semibold">Egresos</h4>
+                            <p className="text-red-600 text-sm">Total del día</p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-red-800 text-xl">
+                          ${calcularTotalEgresos().toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {arqueoActual && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-zinc-800 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Movimientos del Día
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-green-200 rounded-lg">
+                            <TrendingUp className="w-5 h-5 text-green-700" />
+                          </div>
+                          <div>
+                            <h4 className="text-green-800 font-semibold">Ingresos</h4>
+                            <p className="text-green-600 text-sm">Total del día</p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-green-800 text-xl">
+                          ${calcularTotalIngresos(ingresos).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-xl border border-red-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-red-200 rounded-lg">
+                            <TrendingDown className="w-5 h-5 text-red-700" />
+                          </div>
+                          <div>
+                            <h4 className="text-red-800 font-semibold">Egresos</h4>
+                            <p className="text-red-600 text-sm">Total del día</p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-red-800 text-xl">
+                          ${calcularTotalEgresos(egresos).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -527,7 +858,10 @@ function ArqueoDeCaja() {
                       >
                         <option value="">Seleccionar cajero</option>
                         {cajeros.map((cajero) => (
-                          <option key={`cajero-${cajero.idEmpleado}`} value={cajero.idEmpleado}>
+                          <option
+                            key={`cajero-${cajero.idEmpleado}`}
+                            value={cajero.idEmpleado ?? ''} // Forzar string vacío si es undefined
+                          >
                             {cajero.nombre}
                           </option>
                         ))}

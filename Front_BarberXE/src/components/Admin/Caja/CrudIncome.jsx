@@ -3,16 +3,15 @@ import { PlusCircle, Trash2, Edit, Check, X, DollarSign } from 'lucide-react';
 import { 
   addIngreso, 
   fetchIngresosByArqueo, 
-  getOpenArqueo 
+  getOpenArqueo,
+  updateIngreso,
+  deleteIngreso
 } from '../../../services/ArqueoService';
 
 function CrudIncome() {
   // Estados
   const [ingresos, setIngresos] = useState([]);
   const [arqueoActual, setArqueoActual] = useState(null);
-  const [descripcion, setDescripcion] = useState("");
-  const [monto, setMonto] = useState("");
-  const [arqueoCajaId, setArqueoCajaId] = useState(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,7 +32,14 @@ function CrudIncome() {
     medioPago: ''
   });
 
-  // Cargar datos iniciales
+  // Función para limpiar mensajes después de un tiempo
+  const clearMessages = () => {
+    setTimeout(() => {
+      setError(null);
+      setSuccess(null);
+    }, 3000);
+  };
+
   // Cargar datos iniciales
   useEffect(() => {
     const cargarDatosIniciales = async () => {
@@ -46,26 +52,25 @@ function CrudIncome() {
         
         if (!empleadoIdActual) {
           setError("No se encontró un empleado asociado al arqueo.");
-          setLoading(false);
           return;
         }
 
         // 2. Obtener arqueo abierto
         const { exists, data: arqueo } = await getOpenArqueo(empleadoIdActual);
         
-        if (exists) {
-          setArqueoActual(arqueo); // Actualizar estado del arqueo
-          setArqueoCajaId(arqueo.idArqueo);
+        if (exists && arqueo) {
+          setArqueoActual(arqueo);
           
           // 3. Cargar ingresos del arqueo
           const ingresosData = await fetchIngresosByArqueo(arqueo.idArqueo);
           setIngresos(Array.isArray(ingresosData) ? ingresosData : []);
         } else {
-          setArqueoActual(null); // No hay arqueo abierto, actualiza el estado
-          setError("No hay un arqueo abierto actualmente"); // Muestra el mensaje
+          setArqueoActual(null);
+          setIngresos([]);
+          setError("No hay un arqueo abierto actualmente");
         }
       } catch (err) {
-        console.error("Error:", err);
+        console.error("Error cargando datos:", err);
         setError(err.message || "Error al cargar datos");
       } finally {
         setLoading(false);
@@ -75,29 +80,30 @@ function CrudIncome() {
     cargarDatosIniciales();
   }, []);
 
-
   // Manejar cambios en el formulario principal
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
   // Manejar cambios en el formulario de edición
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    setEditForm({
-      ...editForm,
+    setEditForm(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
   // Agregar nuevo ingreso
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
+      setLoading(true);
       setError(null);
       setSuccess(null);
 
@@ -113,25 +119,31 @@ function CrudIncome() {
       }
 
       // Crear objeto de ingreso
-      const nuevoIngreso = await addIngreso({
+      const ingresoData = {
         monto: Number(formData.monto),
         descripcion: formData.descripcion.trim(),
         medioPago: formData.medioPago,
         arqueoId: arqueoActual.idArqueo
-      });
+      };
 
-      // Actualizar estado local (evitar recarga completa)
-      setIngresos([...ingresos, nuevoIngreso]);
+      const nuevoIngreso = await addIngreso(ingresoData);
+
+      // Actualizar estado local
+      setIngresos(prev => [...prev, nuevoIngreso]);
       
+      // Limpiar formulario
       setFormData({ monto: "", descripcion: "", medioPago: "Efectivo" });
       setSuccess("Ingreso registrado exitosamente");
+      clearMessages();
       
     } catch (err) {
+      console.error("Error agregando ingreso:", err);
       setError(err.message || "Error al registrar ingreso");
+      clearMessages();
+    } finally {
+      setLoading(false);
     }
   };
-  
-  
 
   // Iniciar edición de un ingreso
   const handleStartEdit = (ingreso) => {
@@ -141,29 +153,52 @@ function CrudIncome() {
       descripcion: ingreso.descripcion || '',
       medioPago: ingreso.medioPago || 'Efectivo'
     });
+    setError(null);
+    setSuccess(null);
   };
 
   // Cancelar edición
   const handleCancelEdit = () => {
     setEditingId(null);
+    setEditForm({ monto: '', descripcion: '', medioPago: '' });
   };
 
   // Guardar cambios de edición
   const handleSaveEdit = async (id) => {
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(null);
 
+      // Validar campos
+      if (!editForm.monto || !editForm.descripcion) {
+        setError("Monto y descripción son requeridos");
+        return;
+      }
+
+      const datosActualizados = {
+        monto: Number(editForm.monto),
+        descripcion: editForm.descripcion.trim(),
+        medioPago: editForm.medioPago
+      };
+
+      const ingresoActualizado = await updateIngreso(id, datosActualizados);
       
-      // Recargar ingresos
-      const ingresosActualizados = await getIngresos(arqueoActual.idArqueo);
-      setIngresos(ingresosActualizados.data);
+      // Actualizar estado local
+      setIngresos(prev => 
+        prev.map(ing => 
+          ing.idIngreso === id ? { ...ing, ...ingresoActualizado } : ing
+        )
+      );
       
       setEditingId(null);
       setSuccess("Ingreso actualizado correctamente");
-      setTimeout(() => setSuccess(null), 3000);
+      clearMessages();
+      
     } catch (err) {
       console.error("Error actualizando ingreso:", err);
       setError(err.message || "Error al actualizar el ingreso");
+      clearMessages();
     } finally {
       setLoading(false);
     }
@@ -171,22 +206,27 @@ function CrudIncome() {
 
   // Eliminar un ingreso
   const handleDelete = async (id) => {
-    if (!confirm("¿Está seguro de eliminar este ingreso?")) {
+    if (!window.confirm("¿Está seguro de eliminar este ingreso?")) {
       return;
     }
     
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(null);
       
-      // Recargar ingresos
-      const ingresosActualizados = await getIngresos(arqueoActual.idArqueo);
-      setIngresos(ingresosActualizados);
+      await deleteIngreso(id);
+      
+      // Actualizar estado local
+      setIngresos(prev => prev.filter(ing => ing.idIngreso !== id));
       
       setSuccess("Ingreso eliminado correctamente");
-      setTimeout(() => setSuccess(null), 3000);
+      clearMessages();
+      
     } catch (err) {
       console.error("Error eliminando ingreso:", err);
       setError(err.message || "Error al eliminar el ingreso");
+      clearMessages();
     } finally {
       setLoading(false);
     }
@@ -194,20 +234,19 @@ function CrudIncome() {
 
   // Calcular total de ingresos
   const calcularTotal = () => {
-    if (!Array.isArray(ingresos)) return 0; // Prevenir errores
+    if (!Array.isArray(ingresos)) return 0;
     return ingresos.reduce((total, ing) => total + (Number(ing.monto) || 0), 0);
   };
 
   // Formato para moneda
   const formatCurrency = (value) => {
-  // Asegurar que el valor sea numérico
-  const numericValue = Number(value) || 0;
-  return numericValue.toLocaleString('es-ES', {
-    style: 'currency',
-    currency: 'COD',
-    minimumFractionDigits: 2
-  });
-};
+    const numericValue = Number(value) || 0;
+    return numericValue.toLocaleString('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    });
+  };
 
   return (
     <div className="min-h-[70vh] bg-gray-50 p-3">
@@ -253,6 +292,7 @@ function CrudIncome() {
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
                     placeholder="0"
                     min="1"
+                    step="0.01"
                     required
                     disabled={loading}
                   />
@@ -347,6 +387,7 @@ function CrudIncome() {
                                   onChange={handleEditChange}
                                   className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
                                   min="1"
+                                  step="0.01"
                                   required
                                 />
                               </td>
@@ -446,4 +487,4 @@ function CrudIncome() {
   );
 }
 
-export default CrudIncome; 
+export default CrudIncome;

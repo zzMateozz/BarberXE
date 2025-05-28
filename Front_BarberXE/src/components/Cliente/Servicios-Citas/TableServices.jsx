@@ -35,31 +35,61 @@ const CardServices = () => {
                     fetchAllCuts()
                 ]);
 
-                // Filtrar solo servicios activos
-                const activeServices = servicesData.filter(
-                    service => service.estado?.toLowerCase() === "activo"
-                );
+                console.log('Services data received:', servicesData);
+                console.log('Cuts data received:', cutsData);
 
-                // Procesar servicios con IDs únicos
-                const processedServices = activeServices.map((service) => ({
-                    ...service,
-                    id: service.id || `service-${Math.random().toString(36).substr(2, 9)}`,
-                    imagen: service.imagenUrl
-                        ? `${IMAGE_BASE_URL}${service.imagenUrl}`
-                        : null,
-                    cortes: service.cortes || [],
-                }));
+                // Validar y normalizar datos de servicios
+                let processedServices = [];
+                if (servicesData) {
+                    // Si servicesData es un objeto con una propiedad que contiene el array
+                    const servicesArray = Array.isArray(servicesData) 
+                        ? servicesData 
+                        : servicesData.data || servicesData.services || servicesData.results || [];
+                    
+                    if (Array.isArray(servicesArray)) {
+                        // Filtrar solo servicios activos
+                        const activeServices = servicesArray.filter(
+                            service => service && service.estado?.toLowerCase() === "activo"
+                        );
 
-                // Procesar cortes con IDs únicos
-                const processedCuts = cutsData.map((cut) => ({
-                    ...cut,
-                    idCorte: cut.idCorte || `cut-${Math.random().toString(36).substr(2, 9)}`,
-                }));
+                        // Procesar servicios con IDs únicos
+                        processedServices = activeServices.map((service) => ({
+                            ...service,
+                            id: service.id || service.idServicio || `service-${Math.random().toString(36).substr(2, 9)}`,
+                            imagen: service.imagenUrl
+                                ? `${IMAGE_BASE_URL}${service.imagenUrl}`
+                                : null,
+                            cortes: service.cortes || [],
+                        }));
+                    }
+                }
+
+                // Validar y normalizar datos de cortes
+                let processedCuts = [];
+                if (cutsData) {
+                    // Si cutsData es un objeto con una propiedad que contiene el array
+                    const cutsArray = Array.isArray(cutsData) 
+                        ? cutsData 
+                        : cutsData.data || cutsData.cuts || cutsData.cortes || cutsData.results || [];
+                    
+                    if (Array.isArray(cutsArray)) {
+                        // Procesar cortes con IDs únicos
+                        processedCuts = cutsArray.map((cut) => ({
+                            ...cut,
+                            idCorte: cut.idCorte || cut.id || `cut-${Math.random().toString(36).substr(2, 9)}`,
+                        }));
+                    }
+                }
 
                 setServices(processedServices);
                 setCuts(processedCuts);
+                setError(null);
             } catch (err) {
-                setError(err.message);
+                console.error('Error loading data:', err);
+                setError(`Error al cargar los datos: ${err.message}`);
+                // Establecer arrays vacíos en caso de error
+                setServices([]);
+                setCuts([]);
             } finally {
                 setLoading(false);
             }
@@ -71,15 +101,15 @@ const CardServices = () => {
         setSearchTerm(e.target.value);
     };
 
-    // Filtrar servicios por nombre
-    const filteredServices = services.filter((service) =>
-        service.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filtrar servicios por nombre con validación
+    const filteredServices = Array.isArray(services) ? services.filter((service) =>
+        service && service.nombre && service.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : [];
 
-    // Filtrar cortes por estilo
-    const filteredCuts = cuts.filter((cut) =>
-        cut.estilo.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filtrar cortes por estilo con validación
+    const filteredCuts = Array.isArray(cuts) ? cuts.filter((cut) =>
+        cut && cut.estilo && cut.estilo.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : [];
 
     if (loading) {
         return (
@@ -103,6 +133,14 @@ const CardServices = () => {
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
                 <strong className="font-bold">Error!</strong>
                 <span className="block sm:inline"> {error}</span>
+                <div className="mt-2 text-sm">
+                    <p>Posibles soluciones:</p>
+                    <ul className="list-disc list-inside">
+                        <li>Verificar que el servidor esté funcionando</li>
+                        <li>Revisar la respuesta de la API en la consola</li>
+                        <li>Verificar que los endpoints devuelvan el formato esperado</li>
+                    </ul>
+                </div>
             </div>
         );
     }
@@ -124,7 +162,7 @@ const CardServices = () => {
                            data-[state=active]:font-semibold py-2 rounded-md transition-all 
                            duration-300 font-medium text-white hover:bg-gray-800"
                             >
-                                Servicios
+                                Servicios ({filteredServices.length})
                             </TabsTrigger>
                             <TabsTrigger
                                 value="cuts"
@@ -132,7 +170,7 @@ const CardServices = () => {
                            data-[state=active]:font-semibold py-2 rounded-md transition-all 
                            duration-300 font-medium text-white hover:bg-gray-800"
                             >
-                                Cortes
+                                Cortes ({filteredCuts.length})
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
@@ -157,7 +195,7 @@ const CardServices = () => {
                                         <div className="h-48 overflow-hidden">
                                             <img
                                                 src={service.imagen || "https://via.placeholder.com/300x200?text=Servicio"}
-                                                alt={service.nombre}
+                                                alt={service.nombre || "Servicio"}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
                                                     e.target.onerror = null;
@@ -166,27 +204,32 @@ const CardServices = () => {
                                             />
                                         </div>
                                         <CardHeader>
-                                            <CardTitle className="text-xl">{service.nombre}</CardTitle>
+                                            <CardTitle className="text-xl">{service.nombre || "Sin nombre"}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="flex-grow space-y-2">
                                             <div className="flex justify-between">
                                                 <div>
                                                     <span className="text-sm text-muted-foreground">Precio: </span>
-                                                    <span className="font-bold text-primary">${service.precio}</span>
+                                                    <span className="font-bold text-primary">
+                                                        ${service.precio || "N/A"}
+                                                    </span>
                                                 </div>
                                                 <div>
                                                     <span className="text-sm text-muted-foreground">Duración: </span>
-                                                    <span>{service.duracion} min</span>
+                                                    <span>{service.duracion || "N/A"} min</span>
                                                 </div>
                                             </div>
 
-                                            {service.cortes?.length > 0 && (
+                                            {service.cortes && Array.isArray(service.cortes) && service.cortes.length > 0 && (
                                                 <div className="mt-2">
                                                     <p className="text-sm text-muted-foreground mb-1">Cortes incluidos:</p>
                                                     <div className="flex flex-wrap gap-1">
-                                                        {service.cortes.map((corte) => (
-                                                            <Badge key={`service-${service.id}-cut-${corte.idCorte}`} variant="outline">
-                                                                {corte.estilo}
+                                                        {service.cortes.map((corte, index) => (
+                                                            <Badge 
+                                                                key={`service-${service.id}-cut-${corte.idCorte || index}`} 
+                                                                variant="outline"
+                                                            >
+                                                                {corte.estilo || "Sin estilo"}
                                                             </Badge>
                                                         ))}
                                                     </div>
@@ -216,7 +259,7 @@ const CardServices = () => {
                                         <div className="h-48 overflow-hidden">
                                             <img
                                                 src={cut.imagenUrl ? `${IMAGE_BASE_URL}${cut.imagenUrl}` : "https://via.placeholder.com/300x200?text=Corte"}
-                                                alt={cut.estilo}
+                                                alt={cut.estilo || "Corte"}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
                                                     e.target.onerror = null;
@@ -225,11 +268,8 @@ const CardServices = () => {
                                             />
                                         </div>
                                         <CardHeader>
-                                            <CardTitle className="text-xl">{cut.estilo}</CardTitle>
+                                            <CardTitle className="text-xl">{cut.estilo || "Sin estilo"}</CardTitle>
                                         </CardHeader>
-                                        <CardContent className="flex-grow">
-                                            <CardDescription>{cut.descripcion}</CardDescription>
-                                        </CardContent>
                                     </Card>
                                 ))
                             ) : (

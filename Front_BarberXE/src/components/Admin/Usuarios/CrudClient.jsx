@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { Pencil, Trash2, Search, Plus, Eye, EyeOff, X, Check, Loader2, Mail, User, Phone, Lock } from "lucide-react"
 import {
@@ -39,7 +37,8 @@ const TableClients = ({ isCollapsed }) => {
   const [telefonoError, setTelefonoError] = useState("")
   const [usuarioError, setUsuarioError] = useState("")
   const [contraseñaError, setContraseñaError] = useState("")
-  // En la parte de los estados, asegúrate de tener:
+
+  // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -120,55 +119,83 @@ const TableClients = ({ isCollapsed }) => {
     }
   }, [formData.usuario])
 
-useEffect(() => {
+  useEffect(() => {
     if (formData.contraseña) {
-        // Validación de longitud
-        if (formData.contraseña.length < 8) {
-            setContraseñaError("La contraseña debe tener al menos 8 caracteres");
-            return;
-        } else if (formData.contraseña.length > 12) {
-            setContraseñaError("La contraseña no debe exceder 12 caracteres");
-            return;
-        }
+      // Validación de longitud
+      if (formData.contraseña.length < 8) {
+        setContraseñaError("La contraseña debe tener al menos 8 caracteres");
+        return;
+      } else if (formData.contraseña.length > 12) {
+        setContraseñaError("La contraseña no debe exceder 12 caracteres");
+        return;
+      }
 
-        // Validación de caracteres permitidos (letras, números y caracteres especiales comunes)
-        if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.contraseña)) {
-            setContraseñaError("La contraseña contiene caracteres no permitidos");
-            return;
-        }
+      // Validación de caracteres permitidos (letras, números y caracteres especiales comunes)
+      if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.contraseña)) {
+        setContraseñaError("La contraseña contiene caracteres no permitidos");
+        return;
+      }
 
-        // Validación de requisitos adicionales
-        let errorMessages = [];
-        
-        if (!/[A-Z]/.test(formData.contraseña)) {
-            errorMessages.push("al menos una letra mayúscula");
-        }
-        
-        if (!/[0-9]/.test(formData.contraseña)) {
-            errorMessages.push("al menos un número");
-        }
-        
-        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.contraseña)) {
-            errorMessages.push("al menos un carácter especial");
-        }
+      // Validación de requisitos adicionales
+      let errorMessages = [];
 
-        if (errorMessages.length > 0) {
-            setContraseñaError(`La contraseña debe contener ${errorMessages.join(", ")}`);
-        } else {
-            setContraseñaError("");
-        }
-    } else {
+      if (!/[A-Z]/.test(formData.contraseña)) {
+        errorMessages.push("al menos una letra mayúscula");
+      }
+
+      if (!/[0-9]/.test(formData.contraseña)) {
+        errorMessages.push("al menos un número");
+      }
+
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.contraseña)) {
+        errorMessages.push("al menos un carácter especial");
+      }
+
+      if (errorMessages.length > 0) {
+        setContraseñaError(`La contraseña debe contener ${errorMessages.join(", ")}`);
+      } else {
         setContraseñaError("");
+      }
+    } else {
+      setContraseñaError("");
     }
-}, [formData.contraseña]);
+  }, [formData.contraseña]);
+
+  // Función auxiliar para validar y convertir datos a array
+  const ensureArray = (data, fallback = []) => {
+    if (!data) return fallback;
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'object' && data.data && Array.isArray(data.data)) return data.data;
+    if (typeof data === 'object' && data.clients && Array.isArray(data.clients)) return data.clients;
+    console.warn('Unexpected data format:', data);
+    return fallback;
+  };
 
   // Cargar clientes al montar el componente
   useEffect(() => {
     const loadCombinedData = async () => {
       try {
         setLoading(true)
+        setError(null)
+
         // Cargar ambos conjuntos de datos en paralelo
-        const [clientsData, usersData] = await Promise.all([fetchClients(), fetchUsers()])
+        const [clientsResponse, usersResponse] = await Promise.all([
+          fetchClients().catch(err => {
+            console.error('Error fetching clients:', err);
+            return [];
+          }),
+          fetchUsers().catch(err => {
+            console.error('Error fetching users:', err);
+            return [];
+          })
+        ]);
+
+        // Validar y convertir a arrays
+        const clientsData = ensureArray(clientsResponse);
+        const usersData = ensureArray(usersResponse);
+
+        console.log('Clients data:', clientsData);
+        console.log('Users data:', usersData);
 
         // Combinar los datos
         const combinedData = clientsData.map((client) => {
@@ -185,7 +212,9 @@ useEffect(() => {
         setClients(combinedData)
         setLoading(false)
       } catch (err) {
-        setError(err.message)
+        console.error('Error in loadCombinedData:', err);
+        setError(err.message || 'Error al cargar los datos')
+        setClients([])
         setLoading(false)
       }
     }
@@ -197,11 +226,23 @@ useEffect(() => {
   useEffect(() => {
     const searchClientsUser = async (term) => {
       try {
+        setError(null)
+
         // 1. Buscar clientes por nombre
-        const foundClients = await searchClientsByName(term)
+        const foundClientsResponse = await searchClientsByName(term).catch(err => {
+          console.error('Error searching clients:', err);
+          return [];
+        });
 
         // 2. Obtener todos los usuarios para hacer el match
-        const usersData = await fetchUsers()
+        const usersResponse = await fetchUsers().catch(err => {
+          console.error('Error fetching users for search:', err);
+          return [];
+        });
+
+        // Validar y convertir a arrays
+        const foundClients = ensureArray(foundClientsResponse);
+        const usersData = ensureArray(usersResponse);
 
         // 3. Combinar los resultados
         const combinedResults = foundClients.map((client) => {
@@ -215,7 +256,9 @@ useEffect(() => {
 
         setClients(combinedResults)
       } catch (err) {
-        setError(err.message)
+        console.error('Error in searchClientsUser:', err);
+        setError(err.message || 'Error al buscar clientes')
+        setClients([])
       }
     }
 
@@ -231,7 +274,21 @@ useEffect(() => {
       const loadCombinedData = async () => {
         try {
           setLoading(true)
-          const [clientsData, usersData] = await Promise.all([fetchClients(), fetchUsers()])
+          setError(null)
+
+          const [clientsResponse, usersResponse] = await Promise.all([
+            fetchClients().catch(err => {
+              console.error('Error fetching clients:', err);
+              return [];
+            }),
+            fetchUsers().catch(err => {
+              console.error('Error fetching users:', err);
+              return [];
+            })
+          ]);
+
+          const clientsData = ensureArray(clientsResponse);
+          const usersData = ensureArray(usersResponse);
 
           const combinedData = clientsData.map((client) => {
             const user = usersData.find((u) => u.cliente?.idCliente === client.idCliente)
@@ -246,7 +303,9 @@ useEffect(() => {
           setCurrentPage(1) // Resetear a la primera página al recargar
           setLoading(false)
         } catch (err) {
-          setError(err.message)
+          console.error('Error in loadCombinedData (search effect):', err);
+          setError(err.message || 'Error al cargar los datos')
+          setClients([])
           setLoading(false)
         }
       }
@@ -331,8 +390,6 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    // Validaciones
     if (
       nombreError ||
       apellidoError ||
@@ -360,59 +417,97 @@ useEffect(() => {
 
     try {
       setSubmitting(true)
+      setError(null) // Limpiar errores previos
+  if (editingClientId !== null) {
+      // ACTUALIZACIÓN
+      const response = await updateClient(editingClientId, {
+        nombre: formData.cliente.nombre,
+        apellido: formData.cliente.apellido,
+        telefono: formData.cliente.telefono,
+      });
 
-      if (editingClientId !== null) {
-        // Actualización
-        const updatedClient = await updateClient(editingClientId, {
-          nombre: formData.cliente.nombre,
-          apellido: formData.cliente.apellido,
-          telefono: formData.cliente.telefono,
-        })
+      // Extraer datos de la respuesta
+      const updatedData = response.data;
 
-        setClients((prev) =>
-          prev.map((cli) =>
-            cli.idCliente === editingClientId
-              ? {
+      setClients(prev => 
+        prev.map(cli => 
+          cli.idCliente === editingClientId
+            ? {
                 ...cli,
-                nombre: updatedClient.nombre,
-                apellido: updatedClient.apellido,
-                telefono: updatedClient.telefono,
+                ...updatedData, // Actualizar campos principales
+                cliente: { // Si existe estructura anidada
+                  ...cli.cliente,
+                  ...updatedData
+                }
               }
-              : cli,
-          ),
+            : cli
         )
-        toast.success("Cliente actualizado con éxito")
-      } else {
+      );
+      toast.success("Cliente actualizado con éxito");
+    } else {
         // Creación
-        const response = await createUser({
-          usuario: formData.usuario,
+        console.log('Creando nuevo cliente:', formData);
+
+        const { data } = await createUser({
+          usuario: formData.usuario, // No usar "email"
           contraseña: formData.contraseña,
-          cliente: {
+          cliente: { // No usar "client"
             nombre: formData.cliente.nombre,
             apellido: formData.cliente.apellido,
-            telefono: formData.cliente.telefono,
-          },
-        })
+            telefono: formData.cliente.telefono
+          }
+        });
+
+        console.log('Respuesta del servidor:', data);
+
+        // Validar que la respuesta contenga los datos necesarios
+        if (!data || !data.cliente) {
+          throw new Error('Respuesta del servidor incompleta');
+        }
+
+        if (!data.cliente.idCliente) {
+          throw new Error('Error: No se recibió el ID del cliente del servidor');
+        }
 
         const newClient = {
-          ...response.cliente,
-          idCliente: response.cliente.idCliente,
-          usuario: response.usuario,
+          ...data.cliente,
+          idCliente: data.cliente.idCliente,
+          usuario: data.usuario, // Usar data.usuario en lugar de response.usuario
           user: {
-            usuario: response.usuario,
-            idUsuario: response.idUsuario,
-          },
-        }
+            usuario: data.usuario,
+            idUsuario: data.idUser // Cambiar response.idUsuario -> data.idUser
+          }
+        };
+
+        console.log('Nuevo cliente preparado:', newClient);
 
         setClients((prev) => [...prev, newClient])
         toast.success("Cliente creado con éxito")
       }
+
       closeModal()
     } catch (err) {
-      toast.error(err.message || "Error al guardar los cambios")
+      console.error('Error completo en handleSubmit:', err);
+
+      // Manejo más específico de errores
+      let errorMessage = 'Error desconocido al guardar los cambios';
+
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      // Mostrar el error específico
+      toast.error(errorMessage);
+      setError(errorMessage);
+
+      // Log adicional para depuración
+      console.log('Tipo de error:', typeof err);
+      console.log('Error stringified:', JSON.stringify(err, null, 2));
     } finally {
       setSubmitting(false)
-      clearTimeout(timeoutId); 
+      clearTimeout(timeoutId);
     }
   }
 
