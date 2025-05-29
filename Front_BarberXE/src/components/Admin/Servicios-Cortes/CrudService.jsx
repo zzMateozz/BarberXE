@@ -82,12 +82,11 @@ const TableServices = () => {
           fetchAllCuts(),
         ]);
 
-        console.log('Raw servicesData:', servicesData);
-        console.log('Raw cutsData:', cutsData);
+  
 
         // Asegurar que servicesData sea un array usando la función auxiliar
         const servicesArray = ensureArray(servicesData);
-        console.log('Processed servicesArray:', servicesArray);
+    
 
         // Validar que servicesArray realmente sea un array antes de usar map
         if (!Array.isArray(servicesArray)) {
@@ -268,20 +267,11 @@ const handleSubmit = async (e) => {
   
   formDataToSend.append("corteIds", JSON.stringify(corteIds));
 
-  // Debug: Verificar qué se está enviando
-  console.log("Corte IDs a enviar:", corteIds);
-  console.log("Selected cuts:", selectedCuts);
-  console.log("FormData corteIds:", formData.corteIds);
+
 
   // Imagen (solo si existe y es File)
   if (formData.imagen instanceof File) {
     formDataToSend.append("imagen", formData.imagen, formData.imagen.name);
-  }
-
-  // Debug: Mostrar todo el contenido del FormData
-  console.log("FormData contents:");
-  for (let [key, value] of formDataToSend.entries()) {
-    console.log(key, value);
   }
 
   const timeoutId = setTimeout(() => {
@@ -342,7 +332,6 @@ if (editingServiceId !== null) {
   }
 
   if (serviceData) {
-    console.log("Datos del servicio actualizado:", serviceData);
     
     setServices(prev => 
       prev.map(service => 
@@ -362,15 +351,13 @@ if (editingServiceId !== null) {
   
 } else {
   // Creación
-  console.log("Enviando creación de nuevo servicio");
+  
   
   try {
     response = await createService(formDataToSend);
     
     // DEBUG: Ver qué devuelve el servidor
-    console.log("Respuesta completa del servidor (creación):", response);
-    console.log("Tipo de respuesta:", typeof response);
-    console.log("Propiedades de la respuesta:", Object.keys(response));
+   
     
     let serviceData = null;
     
@@ -382,7 +369,7 @@ if (editingServiceId !== null) {
       serviceData = response.service;
     } else if (response.success || response.message) {
       // Solo confirmación de éxito, recargar datos
-      console.log("Creación exitosa, recargando datos del servidor...");
+     
       const serviciosActualizados = await fetchServices();
       const processedServices = ensureArray(serviciosActualizados).map((service) => ({
         ...service,
@@ -407,7 +394,7 @@ if (editingServiceId !== null) {
       toast.success("Servicio creado correctamente");
     } else {
       // Fallback: recargar todos los datos
-      console.log("Estructura desconocida en creación, recargando...");
+
       const serviciosActualizados = await fetchServices();
       const processedServices = ensureArray(serviciosActualizados).map((service) => ({
         ...service,
@@ -423,7 +410,7 @@ if (editingServiceId !== null) {
     
     // Intentar recargar datos como fallback
     try {
-      console.log("Error en creación, intentando recargar datos...");
+     
       const serviciosActualizados = await fetchServices();
       const processedServices = ensureArray(serviciosActualizados).map((service) => ({
         ...service,

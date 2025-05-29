@@ -101,7 +101,7 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                         const storedData = storage.getItem(key);
                         if (storedData) {
                             const parsed = JSON.parse(storedData);
-                            console.log(`Datos encontrados en ${storage === localStorage ? 'localStorage' : 'sessionStorage'}.${key}:`, parsed);
+                          
 
                             // Si el objeto tiene una propiedad user, devolverla
                             if (parsed.user) {
@@ -134,11 +134,10 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     // 2. Reemplazar la función processUserInfo
     const processUserInfo = async (userObj) => {
         if (!userObj) {
-            console.log("No se recibió objeto de usuario");
             return null;
         }
 
-        console.log("Procesando información del usuario:", userObj);
+      
 
         // Extraer userId (no clienteId directamente)
         let userId = null;
@@ -158,13 +157,13 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
             return null;
         }
 
-        console.log("UserId extraído:", userId);
+  
 
         try {
-            console.log("Obteniendo información del cliente desde API usando userId:", userId);
+          
             const clienteResponse = await fetchClienteByUserId(userId);
 
-            console.log("Respuesta del cliente:", clienteResponse);
+     
 
             if (clienteResponse && clienteResponse.data) {
                 const clienteData = clienteResponse.data;
@@ -202,21 +201,20 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
     // 3. Actualizar el useEffect que procesa la información del usuario
     useEffect(() => {
         const processUser = async () => {
-            console.log("Current user recibido:", currentUser);
+        
 
             let userToProcess = currentUser;
 
             // Si no viene currentUser por props, intentar obtenerlo del storage
             if (!userToProcess) {
-                console.log("No se recibió currentUser, intentando obtener del storage...");
+              
                 userToProcess = getUserFromStorage();
             }
 
             if (userToProcess) {
                 try {
                     const clienteData = await processUserInfo(userToProcess);
-                    console.log("Cliente procesado:", clienteData);
-
+                   
                     if (clienteData && clienteData.idCliente) {
                         setClienteInfo(clienteData);
                         setUserLoading(false);
@@ -231,7 +229,7 @@ const TableCitasCliente = ({ isCollapsed, currentUser }) => {
                     setUserLoading(false);
                 }
             } else {
-                console.log("Esperando currentUser o datos en storage...");
+               
                 // Dar tiempo para que el usuario se cargue
                 const timeout = setTimeout(async () => {
                     const fallbackUser = getUserFromStorage();
@@ -339,7 +337,7 @@ useEffect(() => {
 
         try {
             setLoading(true);
-            console.log("Cargando datos para clienteId:", clienteInfo.idCliente);
+          
 
             // CAMBIO: Cargar tanto las citas del cliente como todas las citas
             const [citasClienteResponse, todasCitasResponse, empleadosResponse, serviciosResponse] = await Promise.all([
@@ -349,8 +347,6 @@ useEffect(() => {
                 fetchServicios()
             ]);
 
-            console.log("Respuesta de citas del cliente:", citasClienteResponse);
-            console.log("Respuesta de todas las citas:", todasCitasResponse);
 
             const citasClienteData = normalizeApiResponse(citasClienteResponse);
             const todasCitasData = normalizeApiResponse(todasCitasResponse); // NUEVO
@@ -642,12 +638,11 @@ useEffect(() => {
 
 const obtenerCitasOcupadasEmpleado = (empleadoId, fecha) => {
     if (!empleadoId || !fecha || !Array.isArray(todasLasCitas)) { // CAMBIO: usar todasLasCitas
-        console.log("Parámetros faltantes para obtener citas ocupadas:", { empleadoId, fecha, todasLasCitas: !!todasLasCitas });
+        
         return [];
     }
     
-    console.log("Buscando citas ocupadas para empleado:", empleadoId, "en fecha:", fecha);
-    console.log("Total de citas disponibles:", todasLasCitas.length);
+    
     
     // 1. Filtrar citas del empleado en la fecha seleccionada
     const citasEmpleado = todasLasCitas.filter(cita => {
@@ -655,20 +650,12 @@ const obtenerCitasOcupadasEmpleado = (empleadoId, fecha) => {
         const citaFecha = new Date(cita.fecha).toISOString().split('T')[0];
         
         const coincide = citaEmpleadoId === empleadoId && citaFecha === fecha;
-        
-        if (coincide) {
-            console.log("Cita encontrada:", {
-                citaId: cita.idCita,
-                empleado: cita.empleado?.nombre,
-                fecha: citaFecha,
-                hora: new Date(cita.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-            });
-        }
+    
         
         return coincide;
     });
 
-    console.log(`Encontradas ${citasEmpleado.length} citas para el empleado ${empleadoId} en ${fecha}`);
+ 
 
     // 2. Mapear horarios ocupados
     return citasEmpleado.map(cita => {
@@ -688,13 +675,7 @@ const obtenerCitasOcupadasEmpleado = (empleadoId, fecha) => {
 
         const esTuCita = cita.cliente?.idCliente === clienteInfo?.idCliente;
         
-        console.log("Procesando cita:", {
-            id: cita.idCita,
-            horario: horarioFormateado,
-            duracion: duracionMinutos,
-            servicios: serviciosTexto,
-            esTuCita
-        });
+      
 
         return {
             idCita: cita.idCita,

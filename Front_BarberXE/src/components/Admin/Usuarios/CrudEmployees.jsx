@@ -452,8 +452,6 @@ const TableEmployees = ({ isCollapsed }) => {
           ...(selectedImage && { imagen: selectedImage })
         };
 
-        console.log('Actualizando empleado:', editingEmployeeId, updateData);
-
         await updateEmployee(editingEmployeeId, updateData, !!selectedImage);
 
         // Recargar empleados desde el servidor para mostrar datos actualizados

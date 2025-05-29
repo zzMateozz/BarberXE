@@ -11,7 +11,7 @@ import {
 } from '../../../services/ArqueoService';
 
 function CrudIncome() {
-  // Estados
+  
   const [ingresos, setIngresos] = useState([]);
   const [arqueoActual, setArqueoActual] = useState(null);
   
@@ -19,14 +19,14 @@ function CrudIncome() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   
-  // Estados para el formulario
+ 
   const [formData, setFormData] = useState({
     monto: '',
     descripcion: '',
     medioPago: 'Efectivo'
   });
   
-  // Estado para edición
+
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
     monto: '',
@@ -34,7 +34,6 @@ function CrudIncome() {
     medioPago: ''
   });
 
-  // Función para limpiar mensajes después de un tiempo
   const clearMessages = () => {
     setTimeout(() => {
       setError(null);
@@ -42,28 +41,18 @@ function CrudIncome() {
     }, 5000);
   };
 
-  // FUNCIÓN CORREGIDA: Buscar arqueo abierto de manera alternativa
   const buscarArqueoAbierto = async (empleadoId) => {
     try {
-      console.log("🔍 Buscando arqueo abierto para empleado:", empleadoId);
-      
-      // Método 1: Usar la función getOpenArqueo
       try {
         const { exists, data } = await getOpenArqueo(empleadoId);
         if (exists && data) {
-          console.log("✅ Arqueo encontrado con getOpenArqueo:", data);
           return data;
         }
       } catch (err) {
         console.warn("⚠️ getOpenArqueo falló:", err.message);
       }
-      
-      // Método 2: Buscar en el historial general
-      console.log("🔍 Buscando en historial general...");
       const historial = await getHistorial();
-      
       if (Array.isArray(historial)) {
-        // Buscar arqueos sin fecha de cierre (abiertos)
         const arqueosAbiertos = historial.filter(arqueo => 
           !arqueo.fechaCierre && 
           (arqueo.empleado?.idEmpleado === empleadoId || 
@@ -71,27 +60,17 @@ function CrudIncome() {
            arqueo.idEmpleado === empleadoId)
         );
         
-        console.log("📋 Arqueos abiertos encontrados:", arqueosAbiertos);
-        
         if (arqueosAbiertos.length > 0) {
-          // Tomar el más reciente
           const arqueoActivo = arqueosAbiertos.sort((a, b) => 
             new Date(b.fechaInicio) - new Date(a.fechaInicio)
           )[0];
-          
-          console.log("✅ Arqueo activo seleccionado:", arqueoActivo);
           return arqueoActivo;
         }
-
-        // Si no encontramos por empleado específico, buscar cualquier arqueo abierto
         const cualquierArqueoAbierto = historial.find(arqueo => !arqueo.fechaCierre);
         if (cualquierArqueoAbierto) {
-          console.log("⚠️ Usando cualquier arqueo abierto encontrado:", cualquierArqueoAbierto);
           return cualquierArqueoAbierto;
         }
       }
-      
-      console.log("❌ No se encontró ningún arqueo abierto");
       return null;
       
     } catch (error) {
@@ -100,18 +79,14 @@ function CrudIncome() {
     }
   };
 
-  // FUNCIÓN CORREGIDA: Obtener ID del empleado de manera más robusta
   const obtenerEmpleadoId = () => {
     try {
-      // Método 1: Usar la función getCurrentEmpleadoId
       let empleadoId = getCurrentEmpleadoId();
-      console.log("🔍 ID desde getCurrentEmpleadoId:", empleadoId);
       
       if (empleadoId) {
         return Number(empleadoId);
       }
       
-      // Método 2: Decodificar token manualmente
       const token = localStorage.getItem('authToken');
       if (token) {
         try {
@@ -119,9 +94,6 @@ function CrudIncome() {
           const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
           const payload = JSON.parse(atob(base64));
           
-          console.log("🔍 Payload completo del token:", payload);
-          
-          // Buscar el ID en diferentes propiedades posibles
           empleadoId = payload.empleadoId || 
                       payload.idEmpleado || 
                       payload.userId || 
@@ -129,7 +101,6 @@ function CrudIncome() {
                       payload.sub;
           
           if (empleadoId) {
-            console.log("✅ ID encontrado en token:", empleadoId);
             return Number(empleadoId);
           }
         } catch (decodeError) {
@@ -137,9 +108,9 @@ function CrudIncome() {
         }
       }
       
-      // Método 3: Valor por defecto (temporal para testing)
+    
       console.warn("⚠️ Usando ID por defecto para testing");
-      return 1; // Cambiar por el ID real del empleado
+      return 1;
       
     } catch (error) {
       console.error("❌ Error obteniendo empleado ID:", error);
@@ -147,14 +118,12 @@ function CrudIncome() {
     }
   };
 
-  // Cargar datos iniciales - VERSIÓN CORREGIDA
+
   useEffect(() => {
     const cargarDatosIniciales = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        console.log("🚀 Iniciando carga de datos...");
 
         // 1. Obtener empleado ID
         const empleadoId = obtenerEmpleadoId();
@@ -164,14 +133,11 @@ function CrudIncome() {
           return;
         }
 
-        console.log("👤 ID del empleado obtenido:", empleadoId);
-
         // 2. Buscar arqueo abierto
         const arqueoData = await buscarArqueoAbierto(empleadoId);
         
         if (arqueoData) {
           setArqueoActual(arqueoData);
-          console.log("📦 Arqueo actual cargado:", arqueoData);
           
           // 3. Cargar ingresos del arqueo
           try {
@@ -186,7 +152,6 @@ function CrudIncome() {
             })) : [];
             
             setIngresos(ingresosNormalizados);
-            console.log("💰 Ingresos cargados:", ingresosNormalizados);
           } catch (ingresosError) {
             console.warn("⚠️ Error cargando ingresos, continuando con array vacío:", ingresosError);
             setIngresos([]);
@@ -260,8 +225,6 @@ function CrudIncome() {
         medioPago: formData.medioPago,
         arqueoId: arqueoActual.idArqueo || arqueoActual.id
       };
-
-      console.log("💰 Enviando nuevo ingreso:", ingresoData);
 
       const nuevoIngreso = await addIngreso(ingresoData);
       
@@ -339,7 +302,7 @@ function CrudIncome() {
         medioPago: editForm.medioPago
       };
 
-      console.log("✏️ Actualizando ingreso:", id, datosActualizados);
+   
 
       const ingresoActualizado = await updateIngreso(id, datosActualizados);
       
@@ -383,8 +346,7 @@ function CrudIncome() {
       setLoading(true);
       setError(null);
       setSuccess(null);
-      
-      console.log("🗑️ Eliminando ingreso:", id);
+
       
       await deleteIngreso(id);
       

@@ -75,10 +75,10 @@ const BarberosCards = ({ isCollapsed }) => {
         setError(null);
         
         const data = await fetchEmployees();
-        console.log("Raw fetchEmployees data:", data); // Debug log
+     
         
         const filteredData = filterBarberos(data);
-        console.log("Filtered barberos:", filteredData); // Debug log
+  
         
         setBarberos(filteredData);
       } catch (err) {
@@ -101,7 +101,7 @@ const BarberosCards = ({ isCollapsed }) => {
           setError(null);
           
           const data = await fetchEmployees();
-          console.log("Raw fetchEmployees data (search):", data); // Debug log
+       
           
           const filteredData = filterBarberos(data);
           setBarberos(filteredData);
@@ -123,7 +123,7 @@ const BarberosCards = ({ isCollapsed }) => {
         setError(null);
         
         const results = await searchEmployeesByName(searchTerm);
-        console.log("Raw searchEmployeesByName data:", results); // Debug log
+    
         
         const filteredResults = filterBarberos(results);
         setBarberos(filteredResults);

@@ -181,7 +181,7 @@ function ArqueoDeCaja() {
           return []
         })
         setCajeros(Array.isArray(cajerosData) ? cajerosData : [])
-        console.log("Cajeros cargados:", cajerosData)
+      
 
         // Cargar historial con manejo de errores mejorado
         try {
@@ -192,7 +192,7 @@ function ArqueoDeCaja() {
             const sortedArqueos = sortArqueos(historialData)
             setArqueos(sortedArqueos)
             setHistorial(historialData)
-            console.log("Historial cargado:", historialData)
+         
 
             // Buscar arqueos abiertos en el historial
             const arqueoAbiertoEnHistorial = historialData.find(arqueo => !arqueo.fechaCierre)
@@ -212,17 +212,17 @@ function ArqueoDeCaja() {
 
                   if (arqueoEnHistorial && !arqueoEnHistorial.fechaCierre) {
                     arqueoActivo = arqueoEnHistorial
-                    console.log("Arqueo activo encontrado en historial:", arqueoEnHistorial)
+                    
                   } else {
                     // Si no está en historial o está cerrado, hacer llamada al servidor
                     const arqueoGuardado = await getArqueoById(savedArqueoId)
 
                     if (arqueoGuardado && arqueoGuardado.idArqueo && !arqueoGuardado.fechaCierre) {
                       arqueoActivo = arqueoGuardado
-                      console.log("Arqueo activo restaurado desde servidor:", arqueoGuardado)
+                   
                     } else {
                       localStorage.removeItem("currentArqueoId")
-                      console.log("Arqueo guardado ya estaba cerrado, removido del localStorage")
+            
                     }
                   }
                 } catch (error) {
@@ -235,7 +235,7 @@ function ArqueoDeCaja() {
             // Si no hay arqueo en localStorage pero sí en el historial, usar ese
             if (!arqueoActivo && arqueoAbiertoEnHistorial) {
               arqueoActivo = arqueoAbiertoEnHistorial
-              console.log("Usando arqueo abierto del historial:", arqueoAbiertoEnHistorial)
+
 
               // Guardar en localStorage para futuras sesiones
               if (typeof window !== 'undefined') {
@@ -389,7 +389,7 @@ function ArqueoDeCaja() {
         return
       }
 
-      console.log("Datos a enviar:", { empleadoId, saldoInicial })
+
 
       // Crear arqueo nuevo
       const response = await createArqueo({
@@ -399,7 +399,7 @@ function ArqueoDeCaja() {
 
       const nuevoArqueo = response?.data || response
 
-      console.log("Respuesta del servidor:", nuevoArqueo)
+
 
       // Actualización del estado con validación
       if (nuevoArqueo && (nuevoArqueo.idArqueo || nuevoArqueo.id)) {
@@ -490,19 +490,13 @@ function ArqueoDeCaja() {
       }
     }
 
-    console.log('Datos a enviar para cerrar arqueo:', {
-      arqueoId: arqueoActual.idArqueo,
-      saldoFinal: saldoFinalNum,
-      observacion: observacion.trim() || "Sin observaciones"
-    })
-
     // ENVIAR SOLO LOS DATOS QUE ACEPTA EL BACKEND
     const response = await closeArqueo(arqueoActual.idArqueo, {
       saldoFinal: saldoFinalNum,
       observacion: observacion.trim() || "Sin observaciones"
     })
 
-    console.log('Respuesta del servidor al cerrar:', response)
+
 
     // Limpiar estados
     setArqueoActual(null)

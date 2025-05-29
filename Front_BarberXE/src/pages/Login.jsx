@@ -178,9 +178,9 @@ function Login() {
                     contraseña: formData.password
                 };
 
-                console.log("Enviando credenciales:", credentials);
+                
                 const authData = await LoginService.login(credentials);
-                console.log("Datos de autenticación recibidos:", authData);
+           
 
                 // Verificación más estricta de la estructura de respuesta
                 if (!authData || !authData.token || !authData.user || !authData.role) {
@@ -199,7 +199,7 @@ function Login() {
                 localStorage.setItem('authData', JSON.stringify(authInfo));
                 localStorage.setItem('authToken', authData.token);
                 
-                console.log("Datos guardados en localStorage:", authInfo);
+              
 
                 toast.success(`¡Bienvenido ${authData.user.username || authData.user.name || 'Usuario'}!`);
 
@@ -219,9 +219,7 @@ function Login() {
                     toast.error("Rol de usuario no válido");
                     return;
                 }
-                
-                console.log(`Redirigiendo a: ${redirectPath} (Rol: ${userRole})`);
-                
+                  
                 // Usar setTimeout para asegurar que el localStorage se haya guardado
                 setTimeout(() => {
                     navigate(redirectPath, { replace: true });

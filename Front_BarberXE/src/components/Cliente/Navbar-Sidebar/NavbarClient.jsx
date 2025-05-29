@@ -26,12 +26,12 @@ const Navbar = ({ toggleSidebar, isCollapsed }) => {
 
   const handleLogout = async () => {
     try {
-      console.log("Iniciando proceso de logout...");
+  
 
       // Usar el LoginService que ya tienes configurado
       await LoginService.logout();
 
-      console.log("Logout exitoso - token enviado a blacklist");
+
       toast.success("Sesión cerrada correctamente");
 
       // Redirigir al login

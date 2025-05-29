@@ -52,9 +52,6 @@ export class ServicioController {
 
     create = async (req: Request, res: Response): Promise<void> => {
         try {
-            console.log("Body recibido:", req.body);
-            console.log("Archivo recibido:", req.file);
-
             if (!req.body.nombre || !req.body.precio || !req.body.duracion) {
                 this.httpResponse.BadRequest(res, 'Nombre, precio y duración son requeridos');
                 return;
