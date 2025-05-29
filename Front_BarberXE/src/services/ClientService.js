@@ -45,7 +45,6 @@ export const loginUser = async (credentials) => {
 // ClientService.js (createUser actualizado)
 export const createUser = async (userData) => {
   try {
-    console.log('Enviando payload a /users:', userData);
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
       headers: getHeaders(), // Incluye Authorization si es necesario
@@ -60,7 +59,7 @@ export const createUser = async (userData) => {
       }),
     });
 
-    console.log('Respuesta HTTP:', response.status);
+   
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Error detallado del backend:', errorData);

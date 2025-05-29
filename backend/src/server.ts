@@ -62,9 +62,7 @@ app.use('/api/users', userRoutes);
 // Iniciar la conexión a la base de datos y el servidor
 AppDataSource.initialize()
     .then(() => {
-        console.log('Conexión a la base de datos establecida');
         app.listen(PORT, () => {
-        console.log(`Servidor corriendo en el puerto ${PORT}`);
         });
     })
     .catch((error) => {

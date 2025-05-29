@@ -194,8 +194,6 @@ const TableClients = ({ isCollapsed }) => {
         const clientsData = ensureArray(clientsResponse);
         const usersData = ensureArray(usersResponse);
 
-        console.log('Clients data:', clientsData);
-        console.log('Users data:', usersData);
 
         // Combinar los datos
         const combinedData = clientsData.map((client) => {
@@ -446,7 +444,7 @@ const TableClients = ({ isCollapsed }) => {
       toast.success("Cliente actualizado con éxito");
     } else {
         // Creación
-        console.log('Creando nuevo cliente:', formData);
+
 
         const { data } = await createUser({
           usuario: formData.usuario, // No usar "email"
@@ -458,7 +456,7 @@ const TableClients = ({ isCollapsed }) => {
           }
         });
 
-        console.log('Respuesta del servidor:', data);
+
 
         // Validar que la respuesta contenga los datos necesarios
         if (!data || !data.cliente) {
@@ -479,7 +477,6 @@ const TableClients = ({ isCollapsed }) => {
           }
         };
 
-        console.log('Nuevo cliente preparado:', newClient);
 
         setClients((prev) => [...prev, newClient])
         toast.success("Cliente creado con éxito")
@@ -503,8 +500,7 @@ const TableClients = ({ isCollapsed }) => {
       setError(errorMessage);
 
       // Log adicional para depuración
-      console.log('Tipo de error:', typeof err);
-      console.log('Error stringified:', JSON.stringify(err, null, 2));
+  
     } finally {
       setSubmitting(false)
       clearTimeout(timeoutId);

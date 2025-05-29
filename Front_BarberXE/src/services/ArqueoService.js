@@ -61,9 +61,7 @@ export const getHistorial = async () => {
     });
 
     const data = await handleResponse(response);
-    
-    console.log('Respuesta completa del servidor:', data);
-    
+  
     // Normalizar respuesta - verificar diferentes estructuras posibles
     let arqueosData;
     
@@ -91,7 +89,7 @@ export const getHistorial = async () => {
       return [];
     }
 
-    console.log('Array de arqueos encontrado:', arqueosData);
+
 
     const arqueosProcessed = arqueosData.map(arqueo => {
       return {
@@ -135,7 +133,7 @@ export const getArqueoById = async (id) => {
       throw new Error('ID de arqueo requerido');
     }
 
-    console.log(`🔍 Obteniendo arqueo ID: ${id}`);
+  
     
     const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
       method: "GET",
@@ -144,10 +142,7 @@ export const getArqueoById = async (id) => {
 
     const raw = await handleResponse(response);
 
-    // Verificar estructura real de la respuesta
-    console.log("📦 Respuesta cruda:", raw);
 
-    // Extraer la data del arqueo correctamente
     const arqueo = raw?.data?.data || raw?.data || raw;
 
     // Procesar y validar datos
@@ -163,9 +158,7 @@ export const getArqueoById = async (id) => {
       estado: arqueo.estado || 'abierto'
     };
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`✅ Arqueo procesado - ID: ${arqueoProcessed.idArqueo}, Saldo: $${arqueoProcessed.saldoInicial}`);
-    }
+   
 
     return arqueoProcessed;
 
@@ -187,7 +180,7 @@ export const createArqueo = async (arqueoData) => {
       saldoInicial: Number(arqueoData.saldoInicial)
     };
     
-    console.log("Enviando al servidor:", JSON.stringify(body));
+  
 
     const response = await fetch(`${API_BASE_URL}/arqueos`, {
       method: 'POST',
@@ -214,8 +207,7 @@ export const createArqueo = async (arqueoData) => {
 
 export const closeArqueo = async (id, { saldoFinal, observacion }) => {
   try {
-    console.log("🚀 INICIANDO CIERRE DE ARQUEO:", id);
-    console.log("📥 Datos de entrada:", { saldoFinal, observacion });
+
     
     // Validación básica de parámetros
     if (!id) throw new Error("ID de arqueo es requerido.");
@@ -228,16 +220,11 @@ export const closeArqueo = async (id, { saldoFinal, observacion }) => {
 
     const saldoCalculadoNum = Number(resumen.saldoCalculado);
     
-    console.log("🔍 DEPURACIÓN - Valores antes del cálculo:");
-    console.log("  - Saldo Inicial:", resumen.saldoInicial);
-    console.log("  - Total Ingresos:", resumen.totalIngresos);
-    console.log("  - Total Egresos:", resumen.totalEgresos);
-    console.log("  - Saldo Calculado:", saldoCalculadoNum);
-    console.log("  - Saldo Final (input):", saldoFinalNum);
+ 
 
     // Calcular diferencia
     const diferencia = saldoFinalNum - saldoCalculadoNum;
-    console.log(`💰 DIFERENCIA CALCULADA: ${saldoFinalNum} - ${saldoCalculadoNum} = ${diferencia}`);
+   
     
     // 🚨 VERIFICACIÓN ESPECÍFICA para tu caso
     if (resumen.saldoInicial === 0) {
@@ -272,7 +259,7 @@ export const closeArqueo = async (id, { saldoFinal, observacion }) => {
       observacion: observacionFinal
     };
 
-    console.log("➡️ Datos enviados para cerrar arqueo:", { id, ...payload });
+
 
     const response = await fetch(`${API_BASE_URL}/arqueos/${id}/close`, {
       method: "POST",
@@ -281,7 +268,7 @@ export const closeArqueo = async (id, { saldoFinal, observacion }) => {
     });
 
     const data = await handleResponse(response);
-    console.log("🔍 Respuesta del servidor:", data);
+
 
     // ... resto del código de respuesta
     
@@ -315,8 +302,6 @@ export const closeArqueo = async (id, { saldoFinal, observacion }) => {
         mensajeAlerta: validacion.mensaje
       }
     };
-
-    console.log("✅ RESULTADO FINAL:", result);
     return result;
 
   } catch (error) {
@@ -363,7 +348,7 @@ export const getOpenArqueo = async (empleadoId) => {
 
 export const fetchIngresosByArqueo = async (arqueoId) => {
   try {
-    console.log("🔍 Obteniendo ingresos para arqueo:", arqueoId);
+   
     
     const response = await fetch(`${API_BASE_URL}/ingresos/arqueo/${arqueoId}`, {
       method: 'GET',
@@ -371,12 +356,11 @@ export const fetchIngresosByArqueo = async (arqueoId) => {
     });
     
     if (response.status === 404) {
-      console.log("ℹ️ No se encontraron ingresos para el arqueo");
       return [];
     }
     
     const data = await handleResponse(response);
-    console.log("📄 Respuesta raw de ingresos:", data);
+ 
     
     // 🔧 CORRECCIÓN: Normalizar estructura de respuesta
     const ingresos = data.data?.items || data.items || data.data || data || [];
@@ -390,11 +374,11 @@ export const fetchIngresosByArqueo = async (arqueoId) => {
         fecha: ingreso.fecha || ingreso.createdAt,
         arqueoId: Number(arqueoId)
       };
-      console.log(`  - Ingreso normalizado:`, ingresoNormalizado);
+   
       return ingresoNormalizado;
     }) : [];
     
-    console.log("✅ Ingresos finales:", ingresosNormalizados);
+
     return ingresosNormalizados;
     
   } catch (error) {
@@ -430,7 +414,7 @@ export const addIngreso = async (ingresoData) => {
 
 export const fetchEgresosByArqueo = async (arqueoId) => {
   try {
-    console.log("🔍 Obteniendo egresos para arqueo:", arqueoId);
+
     
     const response = await fetch(`${API_BASE_URL}/egresos/arqueo/${arqueoId}`, {
       method: 'GET',
@@ -438,12 +422,12 @@ export const fetchEgresosByArqueo = async (arqueoId) => {
     });
     
     if (response.status === 404) {
-      console.log("ℹ️ No se encontraron egresos para el arqueo");
+     
       return [];
     }
     
     const data = await handleResponse(response);
-    console.log("📄 Respuesta raw de egresos:", data);
+
     
     // 🔧 CORRECCIÓN: Normalizar estructura de respuesta
     const egresos = data.data?.items || data.items || data.data || data || [];
@@ -458,11 +442,10 @@ export const fetchEgresosByArqueo = async (arqueoId) => {
         fecha: egreso.fecha || egreso.createdAt,
         arqueoId: Number(arqueoId)
       };
-      console.log(`  - Egreso normalizado:`, egresoNormalizado);
+     
       return egresoNormalizado;
     }) : [];
     
-    console.log("✅ Egresos finales:", egresosNormalizados);
     return egresosNormalizados;
     
   } catch (error) {
@@ -648,16 +631,13 @@ export const validarCierreArqueo = (saldoCalculado, saldoFinal, tolerancia = 100
   const saldoFinalNum = Number(saldoFinal);
   const saldoCalculadoNum = Number(saldoCalculado);
   
-  console.log("🔍 VALIDACIÓN - Entrada:");
-  console.log("  - Saldo Calculado:", saldoCalculadoNum);
-  console.log("  - Saldo Final:", saldoFinalNum);
+
   
   // Diferencia = Saldo Final - Saldo Calculado
   const diferencia = saldoFinalNum - saldoCalculadoNum;
   const diferenciaAbsoluta = Math.abs(diferencia);
   
-  console.log("  - Diferencia:", diferencia);
-  console.log("  - Diferencia Absoluta:", diferenciaAbsoluta);
+  
   
   const resultado = {
     diferencia: Number(diferencia.toFixed(2)),
@@ -673,7 +653,7 @@ export const validarCierreArqueo = (saldoCalculado, saldoFinal, tolerancia = 100
         : 'Arqueo cuadrado perfectamente'
   };
   
-  console.log("✅ VALIDACIÓN - Resultado:", resultado);
+ 
   return resultado;
 };
 
@@ -681,7 +661,7 @@ export const validarCierreArqueo = (saldoCalculado, saldoFinal, tolerancia = 100
 
 export const getDetallesCierre = async (arqueoId, saldoFinal = null) => {
   try {
-    console.log("🔍 Obteniendo detalles del arqueo:", arqueoId);
+ 
     
     const [arqueo, ingresos, egresos] = await Promise.all([
       getArqueoById(arqueoId),
@@ -689,17 +669,7 @@ export const getDetallesCierre = async (arqueoId, saldoFinal = null) => {
       fetchEgresosByArqueo(arqueoId)
     ]);
     
-    console.log("📊 Datos obtenidos:");
-    console.log("  - Arqueo RAW:", arqueo);
-    console.log("  - Ingresos cantidad:", ingresos.length);
-    console.log("  - Egresos cantidad:", egresos.length);
-    
-    // 🔧 DEBUGGING: Verificar el saldo inicial
-    console.log("🔍 DEBUGGING - Saldo inicial:");
-    console.log("  - arqueo.saldoInicial:", arqueo.saldoInicial);
-    console.log("  - Tipo:", typeof arqueo.saldoInicial);
-    console.log("  - Number(arqueo.saldoInicial):", Number(arqueo.saldoInicial));
-    
+   
     // Calcular totales correctamente
     const totalIngresos = ingresos.reduce((sum, ingreso) => {
       const monto = Number(ingreso.monto) || 0;
@@ -727,16 +697,12 @@ export const getDetallesCierre = async (arqueoId, saldoFinal = null) => {
     if (saldoFinal !== null && saldoFinal !== undefined) {
       const saldoFinalNum = Number(saldoFinal);
       diferencia = saldoFinalNum - saldoCalculado;
-      console.log(`💰 Diferencia calculada: ${saldoFinalNum} - ${saldoCalculado} = ${diferencia}`);
+     
     }
     
-    console.log("💰 Cálculos finales:");
-    console.log(`  - Saldo Inicial: $${saldoInicial.toLocaleString()}`);
-    console.log(`  - Total Ingresos: $${totalIngresos.toLocaleString()}`);
-    console.log(`  - Total Egresos: $${totalEgresos.toLocaleString()}`);
-    console.log(`  - Saldo Calculado: ${saldoInicial} + ${totalIngresos} - ${totalEgresos} = $${saldoCalculado.toLocaleString()}`);
+
     if (diferencia !== null) {
-      console.log(`  - Diferencia: $${diferencia.toLocaleString()}`);
+      
     }
     
     const resultado = {
@@ -753,7 +719,7 @@ export const getDetallesCierre = async (arqueoId, saldoFinal = null) => {
       }
     };
     
-    console.log("✅ Detalles del cierre:", resultado);
+
     return resultado;
     
   } catch (error) {

@@ -71,11 +71,10 @@ const TableCortes = () => {
       try {
         const response = await fetchCuts();
         
-        console.log('Raw response:', response);
-        
+       
         // Asegurar que sea array usando la función auxiliar
         const data = ensureArray(response);
-        console.log('Processed data:', data);
+    
         
         // Validar que data realmente sea un array antes de usar map
         if (!Array.isArray(data)) {
@@ -186,7 +185,7 @@ const TableCortes = () => {
         // Actualización
         response = await updateCut(editingCutId, formDataToSend)
         
-        console.log('Update response:', response);
+     
         
         // Verificar diferentes posibles estructuras de respuesta
         let cutData = null;
@@ -202,7 +201,7 @@ const TableCortes = () => {
           cutData = response.cut;
         } else if (response.success) {
           // Solo confirmación de éxito, recargar datos
-          console.log("Actualización exitosa, recargando datos del servidor...");
+        
           const cortesActualizados = await fetchCuts();
           const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
             ...corte,
@@ -249,12 +248,12 @@ const TableCortes = () => {
         }
       } else {
         // Creación
-        console.log("Enviando creación de nuevo corte");
+    
         
         try {
           response = await createCut(formDataToSend)
           
-          console.log('Create response:', response);
+    
           
           let cutData = null;
           
@@ -266,7 +265,7 @@ const TableCortes = () => {
             cutData = response.cut;
           } else if (response.success || response.message) {
             // Solo confirmación de éxito, recargar datos
-            console.log("Creación exitosa, recargando datos del servidor...");
+        
             const cortesActualizados = await fetchCuts();
             const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
               ...corte,
@@ -293,7 +292,7 @@ const TableCortes = () => {
             toast.success("Corte creado correctamente");
           } else {
             // Fallback: recargar todos los datos
-            console.log("Estructura desconocida en creación, recargando...");
+          
             const cortesActualizados = await fetchCuts();
             const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
               ...corte,
@@ -308,7 +307,7 @@ const TableCortes = () => {
           
           // Intentar recargar datos como fallback
           try {
-            console.log("Error en creación, intentando recargar datos...");
+      
             const cortesActualizados = await fetchCuts();
             const processedCuts = ensureArray(cortesActualizados).map((corte) => ({
               ...corte,

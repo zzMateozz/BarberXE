@@ -26,17 +26,16 @@ export class ArqueoCajaController {
     // Función auxiliar para calcular totales de forma segura
     private calculateTotal(items: any[], field: string = 'monto'): number {
         if (!Array.isArray(items) || items.length === 0) {
-            console.log(`ℹ️ calculateTotal: Array vacío o inválido`);
             return 0;
         }
-        
+
         const total = items.reduce((sum, item) => {
             const value = Number(item[field]) || 0;
-            console.log(`  - Item ${field}: ${value}`);
+
             return sum + value;
         }, 0);
-        
-        console.log(`✅ calculateTotal: Total calculado = ${total}`);
+
+
         return total;
     }
 
@@ -44,7 +43,7 @@ export class ArqueoCajaController {
     private validateNumber(value: any, defaultValue: number = 0): number {
         const num = Number(value);
         const result = isNaN(num) ? defaultValue : num;
-        console.log(`🔢 validateNumber: ${value} -> ${result}`);
+  
         return result;
     }
 
@@ -77,13 +76,13 @@ export class ArqueoCajaController {
         try {
             const id = parseInt(req.params.id);
             const arqueo = await this.arqueoCajaService.findById(id);
-            
+
             // Cálculos seguros
             const totalIngresos = this.calculateTotal(arqueo.ingresos || []);
             const totalEgresos = this.calculateTotal(arqueo.egresos || []);
             const saldoInicial = this.validateNumber(arqueo.saldoInicial);
             const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
-            
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
@@ -114,7 +113,7 @@ export class ArqueoCajaController {
     private formatDetailedArqueo(arqueo: ArqueoCaja): any {
         const totalIngresos = this.calculateTotal(arqueo.ingresos || []);
         const totalEgresos = this.calculateTotal(arqueo.egresos || []);
-        
+
         return {
             id: arqueo.idArqueo,
             fechaInicio: arqueo.fechaInicio,
@@ -137,11 +136,11 @@ export class ArqueoCajaController {
         try {
             const empleadoId = parseInt(req.params.empleadoId);
             const withDetails = req.query.details === 'true';
-            
-            const arqueos = await this.arqueoCajaService.getByEmpleado(empleadoId, { 
-                withRelations: withDetails 
+
+            const arqueos = await this.arqueoCajaService.getByEmpleado(empleadoId, {
+                withRelations: withDetails
             });
-    
+
             if (!arqueos || arqueos.length === 0) {
                 this.httpResponse.NotFound(res, {
                     success: false,
@@ -149,11 +148,11 @@ export class ArqueoCajaController {
                 });
                 return;
             }
-    
-            const responseData = withDetails 
+
+            const responseData = withDetails
                 ? arqueos.map(arqueo => this.formatDetailedArqueo(arqueo))
                 : arqueos.map(arqueo => this.formatBasicArqueo(arqueo));
-    
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: responseData
@@ -177,7 +176,7 @@ export class ArqueoCajaController {
             });
         } catch (error: any) {
             console.error('Error en create:', error);
-            
+
             if (error.message.includes('ID de empleado')) {
                 this.httpResponse.BadRequest(res, {
                     success: false,
@@ -213,18 +212,10 @@ export class ArqueoCajaController {
                 saldoFinal: req.body.saldoFinal,
                 observacion: req.body.observacion || req.body.observaciones || 'Sin observaciones'
             });
-            
-            console.log(`🔍 DEPURACIÓN - Cerrando arqueo ${id}`);
-            console.log(`📝 Datos recibidos:`, closeData);
-            
+
             const arqueo = await this.arqueoCajaService.close(id, closeData);
             const arqueoCompleto = await this.arqueoCajaService.findById(id);
-            
-            console.log(`📊 Arqueo completo obtenido:`, {
-                saldoInicial: arqueoCompleto.saldoInicial,
-                ingresosCantidad: arqueoCompleto.ingresos?.length || 0,
-                egresosCantidad: arqueoCompleto.egresos?.length || 0
-            });
+
 
             // 🔧 CORRECCIÓN: Cálculos seguros para evitar NaN
             const saldoInicial = this.validateNumber(arqueoCompleto.saldoInicial);
@@ -232,10 +223,10 @@ export class ArqueoCajaController {
             const totalEgresos = this.calculateTotal(arqueoCompleto.egresos || []);
             const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
             const saldoFinal = this.validateNumber(arqueoCompleto.saldoFinal);
-            
+
             // 🔧 CORRECCIÓN: Diferencia = Saldo Final - Saldo Calculado
             const diferencia = saldoFinal - saldoCalculado;
-            
+
             // Respuesta mejorada con toda la información
             this.httpResponse.OK(res, {
                 success: true,
@@ -263,13 +254,13 @@ export class ArqueoCajaController {
                         requiereAtencion: Math.abs(diferencia) > 1000
                     }
                 },
-                message: Math.abs(diferencia) > 1000 
-                    ? `Arqueo cerrado con diferencia significativa de $${diferencia.toFixed(2)}` 
+                message: Math.abs(diferencia) > 1000
+                    ? `Arqueo cerrado con diferencia significativa de $${diferencia.toFixed(2)}`
                     : 'Arqueo cerrado exitosamente'
             });
         } catch (error: any) {
             console.error('❌ Error al cerrar arqueo:', error);
-            
+
             if (error.message.includes('no encontrado')) {
                 this.httpResponse.NotFound(res, {
                     success: false,
@@ -295,11 +286,11 @@ export class ArqueoCajaController {
             const empleadoId = req.query.empleadoId ? parseInt(req.query.empleadoId as string) : undefined;
             const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
             const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-            
+
             const dateRange = startDate && endDate ? { start: startDate, end: endDate } : undefined;
-            
+
             const stats = await this.arqueoCajaService.getDifferencesStats(empleadoId, dateRange);
-            
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: stats
@@ -317,16 +308,16 @@ export class ArqueoCajaController {
         try {
             const id = parseInt(req.params.id);
             const arqueoData = req.body;
-            
+
             const arqueo = await this.arqueoCajaService.update(id, arqueoData);
-            
+
             if (!arqueo) {
                 this.httpResponse.NotFound(res, {
                     message: 'Arqueo de caja no encontrado'
                 });
                 return;
             }
-            
+
             this.httpResponse.OK(res, arqueo);
         } catch (error) {
             this.httpResponse.Error(res, {
@@ -340,7 +331,7 @@ export class ArqueoCajaController {
         try {
             const arqueoId = parseInt(req.params.id);
             const incomeData = new CreateIngresoDto(req.body);
-            
+
             const arqueo = await this.arqueoCajaService.findById(arqueoId);
             if (arqueo.fechaCierre) {
                 this.httpResponse.BadRequest(res, {
@@ -378,7 +369,7 @@ export class ArqueoCajaController {
         try {
             const arqueoId = parseInt(req.params.id);
             const expenseData = new CreateEgresoDto(req.body);
-            
+
             const arqueo = await this.arqueoCajaService.findById(arqueoId);
             if (arqueo.fechaCierre) {
                 this.httpResponse.BadRequest(res, {
@@ -416,7 +407,7 @@ export class ArqueoCajaController {
         try {
             const empleadoId = parseInt(req.params.empleadoId);
             const arqueo = await this.arqueoCajaService.findOpenByEmpleado(empleadoId);
-            
+
             if (!arqueo) {
                 this.httpResponse.NotFound(res, {
                     success: false,
@@ -424,7 +415,7 @@ export class ArqueoCajaController {
                 });
                 return;
             }
-            
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: arqueo
@@ -442,9 +433,9 @@ export class ArqueoCajaController {
         try {
             const arqueoId = parseInt(req.params.id);
             const ingresos = await this.ingresoService.findByArqueoId(arqueoId);
-            
+
             const total = this.calculateTotal(ingresos);
-            
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
@@ -466,9 +457,9 @@ export class ArqueoCajaController {
         try {
             const arqueoId = parseInt(req.params.id);
             const egresos = await this.egresoService.findByArqueoId(arqueoId);
-            
+
             const total = this.calculateTotal(egresos);
-            
+
             this.httpResponse.OK(res, {
                 success: true,
                 data: {

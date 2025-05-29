@@ -58,13 +58,11 @@ function CrudEgresos() {
   // Función mejorada para buscar arqueo abierto
   const buscarArqueoAbierto = async (empleadoId) => {
     try {
-      console.log("🔍 Buscando arqueo abierto para empleado:", empleadoId);
-      
+    
       // Método 1: Usar la función getOpenArqueo
       try {
         const { exists, data } = await getOpenArqueo(empleadoId);
         if (exists && data) {
-          console.log("✅ Arqueo encontrado con getOpenArqueo:", data);
           return data;
         }
       } catch (err) {
@@ -72,7 +70,7 @@ function CrudEgresos() {
       }
       
       // Método 2: Buscar en el historial general
-      console.log("🔍 Buscando en historial general...");
+
       const historial = await getHistorial();
       
       if (Array.isArray(historial)) {
@@ -84,7 +82,7 @@ function CrudEgresos() {
            arqueo.idEmpleado === empleadoId)
         );
         
-        console.log("📋 Arqueos abiertos encontrados:", arqueosAbiertos);
+
         
         if (arqueosAbiertos.length > 0) {
           // Tomar el más reciente
@@ -92,19 +90,19 @@ function CrudEgresos() {
             new Date(b.fechaInicio) - new Date(a.fechaInicio)
           )[0];
           
-          console.log("✅ Arqueo activo seleccionado:", arqueoActivo);
+
           return arqueoActivo;
         }
 
         // Si no encontramos por empleado específico, buscar cualquier arqueo abierto
         const cualquierArqueoAbierto = historial.find(arqueo => !arqueo.fechaCierre);
         if (cualquierArqueoAbierto) {
-          console.log("⚠️ Usando cualquier arqueo abierto encontrado:", cualquierArqueoAbierto);
+
           return cualquierArqueoAbierto;
         }
       }
       
-      console.log("❌ No se encontró ningún arqueo abierto");
+
       return null;
       
     } catch (error) {
@@ -118,7 +116,7 @@ function CrudEgresos() {
     try {
       // Usar la función getCurrentEmpleadoId
       let empleadoId = getCurrentEmpleadoId();
-      console.log("🔍 ID desde getCurrentEmpleadoId:", empleadoId);
+
       
       if (empleadoId) {
         return Number(empleadoId);
@@ -132,7 +130,7 @@ function CrudEgresos() {
           const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
           const payload = JSON.parse(atob(base64));
           
-          console.log("🔍 Payload completo del token:", payload);
+
           
           // Buscar el ID en diferentes propiedades posibles
           empleadoId = payload.empleadoId || 
@@ -142,7 +140,7 @@ function CrudEgresos() {
                       payload.sub;
           
           if (empleadoId) {
-            console.log("✅ ID encontrado en token:", empleadoId);
+
             return Number(empleadoId);
           }
         } catch (decodeError) {
@@ -165,7 +163,7 @@ function CrudEgresos() {
         setLoading(true);
         setError(null);
 
-        console.log("🚀 Iniciando carga de datos...");
+     
 
         // 1. Obtener empleado ID
         const empleadoId = obtenerEmpleadoId();
@@ -175,14 +173,14 @@ function CrudEgresos() {
           return;
         }
 
-        console.log("👤 ID del empleado obtenido:", empleadoId);
+  
 
         // 2. Buscar arqueo abierto
         const arqueoData = await buscarArqueoAbierto(empleadoId);
         
         if (arqueoData) {
           setArqueoActual(arqueoData);
-          console.log("📦 Arqueo actual cargado:", arqueoData);
+         
           
           // 3. Cargar egresos del arqueo
           try {
@@ -198,7 +196,7 @@ function CrudEgresos() {
             })) : [];
             
             setEgresos(egresosNormalizados);
-            console.log("💰 Egresos cargados:", egresosNormalizados);
+         
           } catch (egresosError) {
             console.warn("⚠️ Error cargando egresos, continuando con array vacío:", egresosError);
             setEgresos([]);
@@ -275,7 +273,7 @@ function CrudEgresos() {
         arqueoId: arqueoActual.idArqueo || arqueoActual.id
       };
 
-      console.log("💰 Enviando nuevo egreso:", egresoData);
+
 
       const nuevoEgreso = await addEgreso(egresoData);
       
@@ -366,7 +364,6 @@ function CrudEgresos() {
         justificacion: editForm.justificacion.trim()
       };
 
-      console.log("✏️ Actualizando egreso:", id, datosActualizados);
 
       const egresoActualizado = await updateEgreso(id, datosActualizados);
       
@@ -416,8 +413,6 @@ function CrudEgresos() {
       setLoading(true);
       setError(null);
       setSuccess(null);
-      
-      console.log("🗑️ Eliminando egreso:", id);
       
       await deleteEgreso(id);
       

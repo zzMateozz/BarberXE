@@ -34,10 +34,6 @@ const CardServices = () => {
                     fetchServices(),
                     fetchAllCuts()
                 ]);
-
-                console.log('Services data received:', servicesData);
-                console.log('Cuts data received:', cutsData);
-
                 // Validar y normalizar datos de servicios
                 let processedServices = [];
                 if (servicesData) {

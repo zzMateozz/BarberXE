@@ -1,8 +1,6 @@
 const API_BASE_URL = 'http://localhost:3000/api';
 
 const handleResponse = async (response) => {
-  console.log('Response status:', response.status);
-  console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -44,7 +42,7 @@ const getFormDataHeaders = () => {
 // Función para crear usuario (para cajeros que necesitan cuenta)
 export const createUser = async (userData) => {
   try {
-    console.log('Enviando payload a /users:', userData);
+
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
       headers: getHeaders(),
@@ -60,7 +58,7 @@ export const createUser = async (userData) => {
       }),
     });
 
-    console.log('Respuesta HTTP crear usuario:', response.status);
+
     return await handleResponse(response);
 
   } catch (error) {
@@ -97,11 +95,10 @@ export const createEmployee = async (employeeData) => {
 // Función para actualizar empleados
 export const updateEmployee = async (id, employeeData, hasImage = false) => {
   try {
-    console.log('Actualizando empleado:', id, employeeData, 'hasImage:', hasImage);
-    
+  
     // Si hay imagen, usar FormData
     if (hasImage || employeeData.imagen) {
-      console.log('Actualizando con imagen - usando FormData');
+
       
       const formData = new FormData();
       
@@ -116,11 +113,7 @@ export const updateEmployee = async (id, employeeData, hasImage = false) => {
         formData.append('imagenPerfil', employeeData.imagen);
       }
       
-      // Log del contenido del FormData
-      for (let pair of formData.entries()) {
-        console.log(`FormData - ${pair[0]}:`, pair[1]);
-      }
-      
+    
       const response = await fetch(`${API_BASE_URL}/empleados/${id}`, {
         method: 'PUT',
         headers: getFormDataHeaders(), // IMPORTANTE: Usar headers que incluyen Authorization pero NO Content-Type
@@ -130,8 +123,7 @@ export const updateEmployee = async (id, employeeData, hasImage = false) => {
       return await handleResponse(response);
       
     } else {
-      // Si no hay imagen, usar JSON
-      console.log('Actualizando sin imagen - usando JSON');
+     
       
       const response = await fetch(`${API_BASE_URL}/empleados/${id}`, {
         method: 'PUT',
