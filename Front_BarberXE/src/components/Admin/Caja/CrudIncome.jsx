@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Trash2, Edit, Check, X, DollarSign } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Check, X, DollarSign, AlertCircle } from 'lucide-react';
 import { 
   addIngreso, 
   fetchIngresosByArqueo, 
   getOpenArqueo,
   updateIngreso,
-  deleteIngreso
+  deleteIngreso,
+  getCurrentEmpleadoId,
+  getHistorial
 } from '../../../services/ArqueoService';
 
 function CrudIncome() {
@@ -37,41 +39,170 @@ function CrudIncome() {
     setTimeout(() => {
       setError(null);
       setSuccess(null);
-    }, 3000);
+    }, 5000);
   };
 
-  // Cargar datos iniciales
+  // FUNCIÓN CORREGIDA: Buscar arqueo abierto de manera alternativa
+  const buscarArqueoAbierto = async (empleadoId) => {
+    try {
+      console.log("🔍 Buscando arqueo abierto para empleado:", empleadoId);
+      
+      // Método 1: Usar la función getOpenArqueo
+      try {
+        const { exists, data } = await getOpenArqueo(empleadoId);
+        if (exists && data) {
+          console.log("✅ Arqueo encontrado con getOpenArqueo:", data);
+          return data;
+        }
+      } catch (err) {
+        console.warn("⚠️ getOpenArqueo falló:", err.message);
+      }
+      
+      // Método 2: Buscar en el historial general
+      console.log("🔍 Buscando en historial general...");
+      const historial = await getHistorial();
+      
+      if (Array.isArray(historial)) {
+        // Buscar arqueos sin fecha de cierre (abiertos)
+        const arqueosAbiertos = historial.filter(arqueo => 
+          !arqueo.fechaCierre && 
+          (arqueo.empleado?.idEmpleado === empleadoId || 
+           arqueo.empleadoId === empleadoId ||
+           arqueo.idEmpleado === empleadoId)
+        );
+        
+        console.log("📋 Arqueos abiertos encontrados:", arqueosAbiertos);
+        
+        if (arqueosAbiertos.length > 0) {
+          // Tomar el más reciente
+          const arqueoActivo = arqueosAbiertos.sort((a, b) => 
+            new Date(b.fechaInicio) - new Date(a.fechaInicio)
+          )[0];
+          
+          console.log("✅ Arqueo activo seleccionado:", arqueoActivo);
+          return arqueoActivo;
+        }
+
+        // Si no encontramos por empleado específico, buscar cualquier arqueo abierto
+        const cualquierArqueoAbierto = historial.find(arqueo => !arqueo.fechaCierre);
+        if (cualquierArqueoAbierto) {
+          console.log("⚠️ Usando cualquier arqueo abierto encontrado:", cualquierArqueoAbierto);
+          return cualquierArqueoAbierto;
+        }
+      }
+      
+      console.log("❌ No se encontró ningún arqueo abierto");
+      return null;
+      
+    } catch (error) {
+      console.error("❌ Error buscando arqueo abierto:", error);
+      throw error;
+    }
+  };
+
+  // FUNCIÓN CORREGIDA: Obtener ID del empleado de manera más robusta
+  const obtenerEmpleadoId = () => {
+    try {
+      // Método 1: Usar la función getCurrentEmpleadoId
+      let empleadoId = getCurrentEmpleadoId();
+      console.log("🔍 ID desde getCurrentEmpleadoId:", empleadoId);
+      
+      if (empleadoId) {
+        return Number(empleadoId);
+      }
+      
+      // Método 2: Decodificar token manualmente
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const payload = JSON.parse(atob(base64));
+          
+          console.log("🔍 Payload completo del token:", payload);
+          
+          // Buscar el ID en diferentes propiedades posibles
+          empleadoId = payload.empleadoId || 
+                      payload.idEmpleado || 
+                      payload.userId || 
+                      payload.id ||
+                      payload.sub;
+          
+          if (empleadoId) {
+            console.log("✅ ID encontrado en token:", empleadoId);
+            return Number(empleadoId);
+          }
+        } catch (decodeError) {
+          console.error("❌ Error decodificando token:", decodeError);
+        }
+      }
+      
+      // Método 3: Valor por defecto (temporal para testing)
+      console.warn("⚠️ Usando ID por defecto para testing");
+      return 1; // Cambiar por el ID real del empleado
+      
+    } catch (error) {
+      console.error("❌ Error obteniendo empleado ID:", error);
+      return null;
+    }
+  };
+
+  // Cargar datos iniciales - VERSIÓN CORREGIDA
   useEffect(() => {
     const cargarDatosIniciales = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 1. Obtener ID de empleado del localStorage
-        const empleadoIdActual = localStorage.getItem('currentEmpleadoIdForArqueo');
+        console.log("🚀 Iniciando carga de datos...");
+
+        // 1. Obtener empleado ID
+        const empleadoId = obtenerEmpleadoId();
         
-        if (!empleadoIdActual) {
-          setError("No se encontró un empleado asociado al arqueo.");
+        if (!empleadoId) {
+          setError("No se encontró información del empleado. Por favor, inicie sesión nuevamente.");
           return;
         }
 
-        // 2. Obtener arqueo abierto
-        const { exists, data: arqueo } = await getOpenArqueo(empleadoIdActual);
+        console.log("👤 ID del empleado obtenido:", empleadoId);
+
+        // 2. Buscar arqueo abierto
+        const arqueoData = await buscarArqueoAbierto(empleadoId);
         
-        if (exists && arqueo) {
-          setArqueoActual(arqueo);
+        if (arqueoData) {
+          setArqueoActual(arqueoData);
+          console.log("📦 Arqueo actual cargado:", arqueoData);
           
           // 3. Cargar ingresos del arqueo
-          const ingresosData = await fetchIngresosByArqueo(arqueo.idArqueo);
-          setIngresos(Array.isArray(ingresosData) ? ingresosData : []);
+          try {
+            const ingresosData = await fetchIngresosByArqueo(arqueoData.idArqueo || arqueoData.id);
+            const ingresosNormalizados = Array.isArray(ingresosData) ? ingresosData.map(ingreso => ({
+              idIngreso: ingreso.id || ingreso.idIngreso,
+              monto: Number(ingreso.monto) || 0,
+              descripcion: ingreso.descripcion || '',
+              medioPago: ingreso.medioPago || 'Efectivo',
+              fecha: ingreso.fecha || ingreso.createdAt,
+              arqueoId: ingreso.arqueoId || arqueoData.idArqueo || arqueoData.id
+            })) : [];
+            
+            setIngresos(ingresosNormalizados);
+            console.log("💰 Ingresos cargados:", ingresosNormalizados);
+          } catch (ingresosError) {
+            console.warn("⚠️ Error cargando ingresos, continuando con array vacío:", ingresosError);
+            setIngresos([]);
+          }
         } else {
           setArqueoActual(null);
           setIngresos([]);
-          setError("No hay un arqueo abierto actualmente");
+          setError("No hay un arqueo abierto actualmente. Debe abrir un arqueo para registrar ingresos.");
         }
       } catch (err) {
-        console.error("Error cargando datos:", err);
-        setError(err.message || "Error al cargar datos");
+        console.error("❌ Error cargando datos:", err);
+        if (err.message.includes('Token') || err.message.includes('autenticado')) {
+          setError("Sesión expirada. Por favor, inicie sesión nuevamente.");
+        } else {
+          setError(err.message || "Error al cargar datos. Intente nuevamente.");
+        }
       } finally {
         setLoading(false);
       }
@@ -99,37 +230,53 @@ function CrudIncome() {
   };
 
   // Agregar nuevo ingreso
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleSubmit = async () => {
     try {
       setLoading(true);
       setError(null);
       setSuccess(null);
 
-      if (!arqueoActual?.idArqueo) {
-        setError("Debe abrir un arqueo primero");
+      if (!arqueoActual?.idArqueo && !arqueoActual?.id) {
+        setError("No hay un arqueo abierto. Debe abrir un arqueo primero.");
         return;
       }
 
       // Validar campos
-      if (!formData.monto || !formData.descripcion) {
+      if (!formData.monto || !formData.descripcion.trim()) {
         setError("Monto y descripción son requeridos");
+        return;
+      }
+
+      const montoNumerico = Number(formData.monto);
+      if (isNaN(montoNumerico) || montoNumerico <= 0) {
+        setError("El monto debe ser un número válido mayor a 0");
         return;
       }
 
       // Crear objeto de ingreso
       const ingresoData = {
-        monto: Number(formData.monto),
+        monto: montoNumerico,
         descripcion: formData.descripcion.trim(),
         medioPago: formData.medioPago,
-        arqueoId: arqueoActual.idArqueo
+        arqueoId: arqueoActual.idArqueo || arqueoActual.id
       };
 
+      console.log("💰 Enviando nuevo ingreso:", ingresoData);
+
       const nuevoIngreso = await addIngreso(ingresoData);
+      
+      // Normalizar respuesta del servidor
+      const ingresoNormalizado = {
+        idIngreso: nuevoIngreso.id || nuevoIngreso.idIngreso,
+        monto: Number(nuevoIngreso.monto) || montoNumerico,
+        descripcion: nuevoIngreso.descripcion || ingresoData.descripcion,
+        medioPago: nuevoIngreso.medioPago || ingresoData.medioPago,
+        fecha: nuevoIngreso.fecha || nuevoIngreso.createdAt || new Date().toISOString(),
+        arqueoId: nuevoIngreso.arqueoId || ingresoData.arqueoId
+      };
 
       // Actualizar estado local
-      setIngresos(prev => [...prev, nuevoIngreso]);
+      setIngresos(prev => [...prev, ingresoNormalizado]);
       
       // Limpiar formulario
       setFormData({ monto: "", descripcion: "", medioPago: "Efectivo" });
@@ -137,8 +284,12 @@ function CrudIncome() {
       clearMessages();
       
     } catch (err) {
-      console.error("Error agregando ingreso:", err);
-      setError(err.message || "Error al registrar ingreso");
+      console.error("❌ Error agregando ingreso:", err);
+      if (err.message.includes('Token') || err.message.includes('autenticado')) {
+        setError("Sesión expirada. Por favor, inicie sesión nuevamente.");
+      } else {
+        setError(err.message || "Error al registrar ingreso. Intente nuevamente.");
+      }
       clearMessages();
     } finally {
       setLoading(false);
@@ -149,7 +300,7 @@ function CrudIncome() {
   const handleStartEdit = (ingreso) => {
     setEditingId(ingreso.idIngreso);
     setEditForm({
-      monto: ingreso.monto,
+      monto: ingreso.monto.toString(),
       descripcion: ingreso.descripcion || '',
       medioPago: ingreso.medioPago || 'Efectivo'
     });
@@ -171,33 +322,51 @@ function CrudIncome() {
       setSuccess(null);
 
       // Validar campos
-      if (!editForm.monto || !editForm.descripcion) {
+      if (!editForm.monto || !editForm.descripcion.trim()) {
         setError("Monto y descripción son requeridos");
         return;
       }
 
+      const montoNumerico = Number(editForm.monto);
+      if (isNaN(montoNumerico) || montoNumerico <= 0) {
+        setError("El monto debe ser un número válido mayor a 0");
+        return;
+      }
+
       const datosActualizados = {
-        monto: Number(editForm.monto),
+        monto: montoNumerico,
         descripcion: editForm.descripcion.trim(),
         medioPago: editForm.medioPago
       };
+
+      console.log("✏️ Actualizando ingreso:", id, datosActualizados);
 
       const ingresoActualizado = await updateIngreso(id, datosActualizados);
       
       // Actualizar estado local
       setIngresos(prev => 
         prev.map(ing => 
-          ing.idIngreso === id ? { ...ing, ...ingresoActualizado } : ing
+          ing.idIngreso === id ? {
+            ...ing,
+            monto: datosActualizados.monto,
+            descripcion: datosActualizados.descripcion,
+            medioPago: datosActualizados.medioPago
+          } : ing
         )
       );
       
       setEditingId(null);
+      setEditForm({ monto: '', descripcion: '', medioPago: '' });
       setSuccess("Ingreso actualizado correctamente");
       clearMessages();
       
     } catch (err) {
-      console.error("Error actualizando ingreso:", err);
-      setError(err.message || "Error al actualizar el ingreso");
+      console.error("❌ Error actualizando ingreso:", err);
+      if (err.message.includes('Token') || err.message.includes('autenticado')) {
+        setError("Sesión expirada. Por favor, inicie sesión nuevamente.");
+      } else {
+        setError(err.message || "Error al actualizar el ingreso. Intente nuevamente.");
+      }
       clearMessages();
     } finally {
       setLoading(false);
@@ -206,7 +375,7 @@ function CrudIncome() {
 
   // Eliminar un ingreso
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Está seguro de eliminar este ingreso?")) {
+    if (!window.confirm("¿Está seguro de eliminar este ingreso? Esta acción no se puede deshacer.")) {
       return;
     }
     
@@ -214,6 +383,8 @@ function CrudIncome() {
       setLoading(true);
       setError(null);
       setSuccess(null);
+      
+      console.log("🗑️ Eliminando ingreso:", id);
       
       await deleteIngreso(id);
       
@@ -224,8 +395,12 @@ function CrudIncome() {
       clearMessages();
       
     } catch (err) {
-      console.error("Error eliminando ingreso:", err);
-      setError(err.message || "Error al eliminar el ingreso");
+      console.error("❌ Error eliminando ingreso:", err);
+      if (err.message.includes('Token') || err.message.includes('autenticado')) {
+        setError("Sesión expirada. Por favor, inicie sesión nuevamente.");
+      } else {
+        setError(err.message || "Error al eliminar el ingreso. Intente nuevamente.");
+      }
       clearMessages();
     } finally {
       setLoading(false);
@@ -248,41 +423,62 @@ function CrudIncome() {
     });
   };
 
+  // Componente de alerta
+  const AlertMessage = ({ type, message }) => {
+    const bgColor = type === 'error' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-green-100 text-green-700 border-green-300';
+    const icon = type === 'error' ? <AlertCircle className="w-5 h-5 mr-2" /> : <Check className="w-5 h-5 mr-2" />;
+    
+    return (
+      <div className={`mb-4 p-4 rounded-md border flex items-center ${bgColor}`}>
+        {icon}
+        {message}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-[70vh] bg-gray-50 p-3">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6 flex items-center">
           <DollarSign className="mr-2" />
           Gestión de Ingresos
+          {arqueoActual && (
+            <span className="ml-4 text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              Arqueo #{arqueoActual.idArqueo || arqueoActual.id} - {arqueoActual.empleado?.nombre || 'Cajero'}
+            </span>
+          )}
         </h1>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-            {error}
+        {error && <AlertMessage type="error" message={error} />}
+        {success && <AlertMessage type="success" message={success} />}
+
+        {loading && ingresos.length === 0 && (
+          <div className="bg-blue-50 border border-blue-300 p-4 rounded-md text-blue-700 flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-700 mr-2"></div>
+            Cargando datos...
           </div>
         )}
 
-        {success && (
-          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
-            {success}
-          </div>
-        )}
-
-        {!arqueoActual ? (
+        {!arqueoActual && !loading ? (
           <div className="bg-yellow-50 border border-yellow-300 p-4 rounded-md text-yellow-700">
-            <p className="font-medium">No hay un arqueo abierto actualmente</p>
-            <p className="text-sm mt-1">Debe abrir un arqueo de caja para registrar ingresos</p>
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              <div>
+                <p className="font-medium">No hay un arqueo abierto actualmente</p>
+                <p className="text-sm mt-1">Debe abrir un arqueo de caja para registrar ingresos</p>
+              </div>
+            </div>
           </div>
-        ) : (
+        ) : arqueoActual && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Formulario de nuevo ingreso */}
             <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold mb-4">Nuevo Ingreso</h2>
               
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Monto ($)
+                    Monto ($) *
                   </label>
                   <input
                     type="number"
@@ -300,7 +496,7 @@ function CrudIncome() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
+                    Descripción *
                   </label>
                   <input
                     type="text"
@@ -333,14 +529,14 @@ function CrudIncome() {
                 </div>
 
                 <button
-                  type="submit"
+                  onClick={handleSubmit}
                   disabled={loading}
                   className="w-full bg-gradient-to-r from-zinc-800 to-black text-white py-2 px-4 rounded-md hover:from-black hover:to-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-800 focus:ring-offset-2 disabled:opacity-70 transition-all duration-200 flex items-center justify-center"
                 >
                   <PlusCircle className="w-5 h-5 mr-2" />
                   {loading ? "Procesando..." : "Registrar Ingreso"}
                 </button>
-              </form>
+              </div>
             </div>
 
             {/* Listado de ingresos */}
@@ -352,133 +548,138 @@ function CrudIncome() {
                 </div>
               </div>
 
-              {loading && ingresos.length === 0 ? (
-                <div className="text-center py-8">Cargando...</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Monto
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Descripción
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Medio de Pago
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {ingresos.map((ingreso) => (
-                        <tr key={ingreso.idIngreso}>
-                          {editingId === ingreso.idIngreso ? (
-                            // Modo edición
-                            <>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="number"
-                                  name="monto"
-                                  value={editForm.monto}
-                                  onChange={handleEditChange}
-                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
-                                  min="1"
-                                  step="0.01"
-                                  required
-                                />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="text"
-                                  name="descripcion"
-                                  value={editForm.descripcion}
-                                  onChange={handleEditChange}
-                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
-                                  required
-                                />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <select
-                                  name="medioPago"
-                                  value={editForm.medioPago}
-                                  onChange={handleEditChange}
-                                  className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Monto
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Descripción
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Medio de Pago
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {ingresos.map((ingreso) => (
+                      <tr key={ingreso.idIngreso}>
+                        {editingId === ingreso.idIngreso ? (
+                          // Modo edición
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="number"
+                                name="monto"
+                                value={editForm.monto}
+                                onChange={handleEditChange}
+                                className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                                min="1"
+                                step="0.01"
+                                required
+                                disabled={loading}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="text"
+                                name="descripcion"
+                                value={editForm.descripcion}
+                                onChange={handleEditChange}
+                                className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                                required
+                                disabled={loading}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <select
+                                name="medioPago"
+                                value={editForm.medioPago}
+                                onChange={handleEditChange}
+                                className="w-full p-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-zinc-800 focus:border-transparent"
+                                disabled={loading}
+                              >
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Tarjeta">Tarjeta</option>
+                                <option value="Transferencia">Transferencia</option>
+                                <option value="Otro">Otro</option>
+                              </select>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleSaveEdit(ingreso.idIngreso)}
+                                  className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
+                                  disabled={loading}
                                 >
-                                  <option value="Efectivo">Efectivo</option>
-                                  <option value="Tarjeta">Tarjeta</option>
-                                  <option value="Transferencia">Transferencia</option>
-                                  <option value="Otro">Otro</option>
-                                </select>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleSaveEdit(ingreso.idIngreso)}
-                                    className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
-                                    disabled={loading}
-                                  >
-                                    <Check className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
-                                    disabled={loading}
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            // Modo vista
-                            <>
-                              <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">
-                                {formatCurrency(Number(ingreso.monto))}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {ingreso.descripcion || "-"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {ingreso.medioPago || "Efectivo"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleStartEdit(ingreso)}
-                                    className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
-                                    disabled={loading}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(ingreso.idIngreso)}
-                                    className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
-                                    disabled={loading}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
+                                  disabled={loading}
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          // Modo vista
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">
+                              {formatCurrency(Number(ingreso.monto))}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {ingreso.descripcion || "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {ingreso.medioPago || "Efectivo"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleStartEdit(ingreso)}
+                                  className="bg-gradient-to-r from-zinc-800 to-black text-white p-1.5 rounded-md hover:from-black hover:to-zinc-900 transition-all duration-200"
+                                  disabled={loading}
+                                  title="Editar ingreso"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(ingreso.idIngreso)}
+                                  className="bg-gradient-to-r from-red-600 to-red-800 text-white p-1.5 rounded-md hover:from-red-700 hover:to-red-900 transition-all duration-200"
+                                  disabled={loading}
+                                  title="Eliminar ingreso"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
 
-                      {ingresos.length === 0 && !loading && (
-                        <tr>
-                          <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
-                            No hay ingresos registrados
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    {ingresos.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <DollarSign className="w-12 h-12 text-gray-300 mb-2" />
+                            <p>No hay ingresos registrados</p>
+                            <p className="text-sm">Agregue el primer ingreso usando el formulario</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

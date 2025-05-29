@@ -1,36 +1,54 @@
 const API_BASE_URL = 'http://localhost:3000/api';
 
-// Manejo centralizado de respuestas
 const handleResponse = async (response) => {
   if (!response.ok) {
-    let errorMessage = `Error ${response.status}: ${response.statusText}`;
-    
+    let errorData = {};
     try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch (parseError) {
-      console.warn('No se pudo parsear el error del servidor');
+      errorData = await response.json();
+    } catch (e) {
+      console.error("Error parsing error response:", e);
     }
+    
+    const errorMessage = errorData.message || 
+                        errorData.error?.message || 
+                        `Error ${response.status}: ${response.statusText}`;
     
     throw new Error(errorMessage);
   }
-  
-  const data = await response.json();
-  return data;
+  return response.json();
 };
 
-// Headers centralizados con autenticación
 const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
   };
-  
-  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+
+  // Añadir token JWT si está disponible
+  const token = localStorage.getItem('authToken');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   return headers;
+};
+
+export const decodeToken = () => {
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch (error) {
+    console.error("Error decoding token:", error);
+    return null;
+  }
+};
+
+export const getCurrentEmpleadoId = () => {
+  const payload = decodeToken();
+  return payload?.empleadoId || null;
 };
 
 // ============= FUNCIONES DE ARQUEOS =============
@@ -44,86 +62,129 @@ export const getHistorial = async () => {
 
     const data = await handleResponse(response);
     
-    // Normalizar respuesta - puede venir como data.data o directamente
-    const arqueosData = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+    console.log('Respuesta completa del servidor:', data);
+    
+    // Normalizar respuesta - verificar diferentes estructuras posibles
+    let arqueosData;
+    
+    if (Array.isArray(data)) {
+      // Si data es directamente un array
+      arqueosData = data;
+    } else if (data && data.data && Array.isArray(data.data.data)) {
+      // Si data tiene estructura: data.data.data (como en tu caso)
+      arqueosData = data.data.data;
+    } else if (data && Array.isArray(data.data)) {
+      // Si data tiene una propiedad 'data' que es un array
+      arqueosData = data.data;
+    } else if (data && Array.isArray(data.arqueos)) {
+      // Si data tiene una propiedad 'arqueos' que es un array
+      arqueosData = data.arqueos;
+    } else {
+      // Si no encontramos un array válido, retornar array vacío
+      console.warn('Respuesta del servidor no contiene un array válido:', data);
+      arqueosData = [];
+    }
 
-    // Mapeo seguro con valores por defecto
-    return arqueosData.map(arqueo => ({
-       empleado: {
-        idEmpleado: arqueo.empleado?.idEmpleado || arqueo.idEmpleado || 0,
-        nombre: arqueo.empleado?.nombre || 'Cajero no especificado'
-      },
-      fechaInicio: arqueo.fechaInicio || new Date().toISOString(),
-      fechaCierre: arqueo.fechaCierre || null,
-      saldoInicial: Number(arqueo.saldoInicial) || 0,
-      saldoFinal: arqueo.saldoFinal ? Number(arqueo.saldoFinal) : null,
-      observacion: arqueo.observacion || arqueo.observaciones || '',
+    // Verificar que arqueosData sea un array antes de hacer map
+    if (!Array.isArray(arqueosData)) {
+      console.error('arqueosData no es un array:', arqueosData);
+      return [];
+    }
 
-      // Incluir arrays vacíos por defecto
-      ingresos: Array.isArray(arqueo.ingresos) ? arqueo.ingresos : [],
-      egresos: Array.isArray(arqueo.egresos) ? arqueo.egresos : []
-    }));
+    console.log('Array de arqueos encontrado:', arqueosData);
+
+    const arqueosProcessed = arqueosData.map(arqueo => {
+      return {
+        idArqueo: arqueo.idArqueo || arqueo.id,
+        fechaInicio: arqueo.fechaInicio,
+        fechaCierre: arqueo.fechaCierre || null,
+        saldoInicial: arqueo.saldoInicial ? parseFloat(String(arqueo.saldoInicial)) : 0,
+        saldoFinal: arqueo.saldoFinal ? Number(arqueo.saldoFinal) : null,
+        observacion: arqueo.observacion || arqueo.observaciones || 'Sin Observacion',
+        empleado: {
+          idEmpleado: arqueo.empleado?.idEmpleado || arqueo.empleadoId,
+          nombre: arqueo.empleado?.nombre || 'Cajero no especificado'
+        },
+        // Mantén datos originales
+        ...arqueo
+      };
+    });
+
+    return arqueosProcessed;
+
   } catch (error) {
-    console.error("Error en getHistorial:", error);
-    throw new Error(`No se pudo obtener el historial: ${error.message}`);
+    console.error('Error en getHistorial:', error);
+    return []; // Retornar array vacío en caso de error
   }
 };
 
+// CORREGIR LA FUNCIÓN cargarHistorial - ESTABA MAL IMPLEMENTADA
 export const cargarHistorial = async () => {
   try {
-    const response = await getArqueoById(); // Llama al endpoint GET /api/arqueos
-    if (response.data) {
-      setHistorial(response.data); // Actualiza el estado con los datos
-    }
+    const historialData = await getHistorial();
+    return historialData; // Retornar los datos en lugar de usar setHistorial (que no existe aquí)
   } catch (error) {
-    console.error("Error al cargar historial:", error);
+    console.error('Error en cargarHistorial:', error);
+    return [];
   }
 };
 
 export const getArqueoById = async (id) => {
-  if (!id || isNaN(Number(id))) {
-    throw new Error('ID de arqueo inválido');
-  }
-
   try {
+    if (!id) {
+      throw new Error('ID de arqueo requerido');
+    }
+
+    console.log(`🔍 Obteniendo arqueo ID: ${id}`);
+    
     const response = await fetch(`${API_BASE_URL}/arqueos/${id}`, {
-      method: 'GET',
+      method: "GET",
       headers: getHeaders()
     });
-    
-    const data = await handleResponse(response);
-    
-    // Normalizar datos del arqueo
-    const arqueo = data.data || data;
-    return {
+
+    const raw = await handleResponse(response);
+
+    // Verificar estructura real de la respuesta
+    console.log("📦 Respuesta cruda:", raw);
+
+    // Extraer la data del arqueo correctamente
+    const arqueo = raw?.data?.data || raw?.data || raw;
+
+    // Procesar y validar datos
+    const arqueoProcessed = {
       idArqueo: arqueo.idArqueo || arqueo.id,
       fechaInicio: arqueo.fechaInicio,
-      fechaCierre: arqueo.fechaCierre || null,
-      saldoInicial: Number(arqueo.saldoInicial) || 0,
-      saldoFinal: arqueo.saldoFinal ? Number(arqueo.saldoFinal) : null,
-      observacion: arqueo.observacion || arqueo.observaciones || '',
-      empleado: {
-        idEmpleado: arqueo.empleado?.idEmpleado || arqueo.empleadoId,
-        nombre: arqueo.empleado?.nombre || 'Cajero no especificado'
-      }
+      fechaCierre: arqueo.fechaCierre,
+      saldoInicial: arqueo.saldoInicial != null ? parseFloat(arqueo.saldoInicial) : null,
+      saldoFinal: arqueo.saldoFinal != null ? parseFloat(arqueo.saldoFinal) : null,
+      observaciones: arqueo.observaciones || arqueo.observacion || '',
+      empleado: arqueo.empleado || {},
+      diferencia: arqueo.diferencia != null ? parseFloat(arqueo.diferencia) : null,
+      estado: arqueo.estado || 'abierto'
     };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ Arqueo procesado - ID: ${arqueoProcessed.idArqueo}, Saldo: $${arqueoProcessed.saldoInicial}`);
+    }
+
+    return arqueoProcessed;
+
   } catch (error) {
-    console.error('Error en getArqueoById:', error);
+    console.error(`❌ Error al obtener arqueo ${id}:`, error.message);
     throw new Error(`No se pudo obtener el arqueo: ${error.message}`);
   }
 };
 
+
 export const createArqueo = async (arqueoData) => {
   try {
-    // Validación adicional
     if (!arqueoData.empleadoId || !arqueoData.saldoInicial) {
       throw new Error("Faltan campos requeridos");
     }
 
     const body = {
       empleadoId: Number(arqueoData.empleadoId),
-      saldoInicial: Number(arqueoData.saldoInicial),
-      fechaInicio: new Date().toISOString()
+      saldoInicial: Number(arqueoData.saldoInicial)
     };
     
     console.log("Enviando al servidor:", JSON.stringify(body));
@@ -134,29 +195,11 @@ export const createArqueo = async (arqueoData) => {
       body: JSON.stringify(body)
     });
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error("Detalle del error:", data);
-      
-      // Manejo de errores más específico
-      let errorMessage = "Error en la creación";
-      if (data.message) {
-        errorMessage = data.message;
-      } else if (data.error) {
-        errorMessage = data.error;
-      } else if (data.data?.message) {
-        errorMessage = data.data.message;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    return data;
+    return handleResponse(response);
   } catch (error) {
     console.error("Error completo:", error);
     
-    // Si es un error de red o parsing, manejarlo apropiadamente
+    // Manejo específico de errores de conexión
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error("Error de conexión con el servidor");
     }
@@ -165,197 +208,279 @@ export const createArqueo = async (arqueoData) => {
   }
 };
 
+// CORREGIR LA FUNCIÓN closeArqueo - CAMBIAR EL CAMPO DE observaciones A observacion
+// ============= FUNCIÓN CORREGIDA PARA CERRAR ARQUEO =============
+
+
 export const closeArqueo = async (id, { saldoFinal, observacion }) => {
-  if (!id || isNaN(Number(id))) {
-    throw new Error('ID de arqueo inválido');
-  }
-
-  const saldoFinalNum = Number(saldoFinal);
-  if (isNaN(saldoFinalNum) || saldoFinalNum < 0) {
-    throw new Error('Saldo final inválido');
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/arqueos/${id}/close`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({
-        saldoFinal: saldoFinalNum,
-        observaciones: observacion || "Sin observaciones"
-      })
-    });
+    console.log("🚀 INICIANDO CIERRE DE ARQUEO:", id);
+    console.log("📥 Datos de entrada:", { saldoFinal, observacion });
     
+    // Validación básica de parámetros
+    if (!id) throw new Error("ID de arqueo es requerido.");
+    if (isNaN(saldoFinal)) throw new Error("El saldo final debe ser un número válido.");
+
+    const saldoFinalNum = Number(saldoFinal);
+    
+    const detallesCierre = await getDetallesCierre(id, saldoFinalNum);
+    const { arqueo, resumen } = detallesCierre;
+
+    const saldoCalculadoNum = Number(resumen.saldoCalculado);
+    
+    console.log("🔍 DEPURACIÓN - Valores antes del cálculo:");
+    console.log("  - Saldo Inicial:", resumen.saldoInicial);
+    console.log("  - Total Ingresos:", resumen.totalIngresos);
+    console.log("  - Total Egresos:", resumen.totalEgresos);
+    console.log("  - Saldo Calculado:", saldoCalculadoNum);
+    console.log("  - Saldo Final (input):", saldoFinalNum);
+
+    // Calcular diferencia
+    const diferencia = saldoFinalNum - saldoCalculadoNum;
+    console.log(`💰 DIFERENCIA CALCULADA: ${saldoFinalNum} - ${saldoCalculadoNum} = ${diferencia}`);
+    
+    // 🚨 VERIFICACIÓN ESPECÍFICA para tu caso
+    if (resumen.saldoInicial === 0) {
+      console.error("🚨 ERROR: El saldo inicial es 0, esto es incorrecto!");
+      console.error("🚨 Revisa la función getArqueoById o el endpoint del backend");
+    }
+    
+    const validacion = validarCierreArqueo(saldoCalculadoNum, saldoFinalNum);
+
+    //... resto del código permanece igual
+    
+    let observacionFinal = observacion?.trim() || "";
+    
+    if (validacion.diferenciaAbsoluta > 0) {
+      const diferenciaInfo = `Diferencia al cierre: $${Math.abs(diferencia).toLocaleString()} ${
+        validacion.requiereAtencion ? "(DIFERENCIA SIGNIFICATIVA)" : "(diferencia menor)"
+      }`;
+      
+      if (observacionFinal && observacionFinal !== "Sin observaciones") {
+        observacionFinal = `${observacionFinal} - ${diferenciaInfo}`;
+      } else {
+        observacionFinal = diferenciaInfo;
+      }
+    } else {
+      if (!observacionFinal || observacionFinal === "Sin observaciones") {
+        observacionFinal = "Arqueo cuadrado - Sin diferencias";
+      }
+    }
+
+    const payload = {
+      saldoFinal: saldoFinalNum,
+      observacion: observacionFinal
+    };
+
+    console.log("➡️ Datos enviados para cerrar arqueo:", { id, ...payload });
+
+    const response = await fetch(`${API_BASE_URL}/arqueos/${id}/close`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload)
+    });
+
     const data = await handleResponse(response);
-    return data.data || data;
+    console.log("🔍 Respuesta del servidor:", data);
+
+    // ... resto del código de respuesta
+    
+    const arqueoData = data.data || data;
+    
+    const result = {
+      success: data.success !== undefined ? data.success : true,
+      message: data.message || "Arqueo cerrado exitosamente",
+      arqueo: {
+        id: arqueoData.id || arqueoData.idArqueo || id,
+        fechaInicio: arqueoData.fechaInicio,
+        fechaCierre: arqueoData.fechaCierre,
+        saldoInicial: resumen.saldoInicial,
+        saldoFinal: saldoFinalNum,
+        saldoCalculado: saldoCalculadoNum,
+        diferencia: diferencia,
+        observacion: observacionFinal,
+        empleado: arqueoData.empleado || {},
+        resumen: {
+          ...resumen,
+          saldoFinal: saldoFinalNum,
+          diferencia: diferencia
+        },
+        estado: arqueoData.estado || {}
+      },
+      alertas: {
+        hayDiferencia: validacion.diferenciaAbsoluta > 0,
+        diferenciaSignificativa: validacion.requiereAtencion,
+        dentroDeToleranacia: validacion.dentroDeToleranacia,
+        tipoAlerta: validacion.tipoAlerta,
+        mensajeAlerta: validacion.mensaje
+      }
+    };
+
+    console.log("✅ RESULTADO FINAL:", result);
+    return result;
+
   } catch (error) {
-    console.error("Error en closeArqueo:", error);
-    throw new Error(`No se pudo cerrar el arqueo: ${error.message}`);
+    console.error("❌ Error en closeArqueo:", error);
+    throw new Error(error.message || "Ocurrió un error al cerrar el arqueo. Intenta nuevamente.");
   }
 };
 
 export const getOpenArqueo = async (empleadoId) => {
-  if (!empleadoId || isNaN(empleadoId)) {
-      console.error("ID de empleado inválido:", empleadoId);
-      throw new Error("ID de empleado inválido");
-  }
-  
   try {
     const response = await fetch(`${API_BASE_URL}/arqueos/empleados/${empleadoId}/abierto`, {
       headers: getHeaders()
     });
     
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { exists: false, data: null };
-      }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Error ${response.status}`);
+    if (response.status === 404) {
+      return { exists: false, data: null };
     }
     
-    const data = await response.json();
-    const arqueoData = data.data || data; // Manejar respuesta con/sin data wrapper
+    const data = await handleResponse(response);
+    const arqueoData = data.data || data;
     
     if (arqueoData && (arqueoData.idArqueo || arqueoData.id)) {
       return { 
         exists: true, 
         data: {
           ...arqueoData,
-          idArqueo: arqueoData.idArqueo || arqueoData.id
+          idArqueo: arqueoData.idArqueo || arqueoData.id,
+          empleado: {
+            idEmpleado: arqueoData.empleado?.idEmpleado || arqueoData.empleadoId || arqueoData.idEmpleado,
+            nombre: arqueoData.empleado?.nombre || 'Cajero no especificado'
+          }
         }
       };
     }
       
-      return { exists: false, data: null };
+    return { exists: false, data: null };
   } catch (error) {
-      console.error("Error checking open arqueo:", error);
-      throw error;
+    console.error('Error en getOpenArqueo:', error);
+    throw error;
   }
 };
+
 // ============= FUNCIONES DE INGRESOS =============
 
 export const fetchIngresosByArqueo = async (arqueoId) => {
-  if (!arqueoId || isNaN(Number(arqueoId))) {
-    console.warn('ID de arqueo inválido para ingresos');
-    return [];
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/arqueos/${arqueoId}/ingresos`, {
+    console.log("🔍 Obteniendo ingresos para arqueo:", arqueoId);
+    
+    const response = await fetch(`${API_BASE_URL}/ingresos/arqueo/${arqueoId}`, {
       method: 'GET',
       headers: getHeaders()
     });
     
-    // Si no hay ingresos, devolver array vacío
     if (response.status === 404) {
+      console.log("ℹ️ No se encontraron ingresos para el arqueo");
       return [];
     }
     
     const data = await handleResponse(response);
+    console.log("📄 Respuesta raw de ingresos:", data);
     
-    // Normalizar estructura de respuesta
+    // 🔧 CORRECCIÓN: Normalizar estructura de respuesta
     const ingresos = data.data?.items || data.items || data.data || data || [];
     
-    return Array.isArray(ingresos) ? ingresos.map(ingreso => ({
-      id: ingreso.id || ingreso.idIngreso,
-      monto: Number(ingreso.monto) || 0,
-      descripcion: ingreso.descripcion || '',
-      medioPago: ingreso.medioPago || 'efectivo',
-      fecha: ingreso.fecha || ingreso.createdAt,
-      arqueoId: Number(arqueoId)
-    })) : [];
+    const ingresosNormalizados = Array.isArray(ingresos) ? ingresos.map(ingreso => {
+      const ingresoNormalizado = {
+        id: ingreso.id || ingreso.idIngreso,
+        monto: Number(ingreso.monto) || 0, // 🔧 Asegurar conversión a número
+        descripcion: ingreso.descripcion || '',
+        medioPago: ingreso.medioPago || 'efectivo',
+        fecha: ingreso.fecha || ingreso.createdAt,
+        arqueoId: Number(arqueoId)
+      };
+      console.log(`  - Ingreso normalizado:`, ingresoNormalizado);
+      return ingresoNormalizado;
+    }) : [];
+    
+    console.log("✅ Ingresos finales:", ingresosNormalizados);
+    return ingresosNormalizados;
+    
   } catch (error) {
-    console.error('Error en fetchIngresosByArqueo:', error);
-    return []; // Siempre devolver array para evitar errores en el componente
+    console.error('❌ Error en fetchIngresosByArqueo:', error);
+    if (error.message.includes('Token')) {
+      throw error;
+    }
+    return [];
   }
 };
 
 export const addIngreso = async (ingresoData) => {
-  // Validación
-  if (!ingresoData.arqueoId || !ingresoData.monto || !ingresoData.descripcion) {
-    throw new Error("Datos de ingreso incompletos");
-  }
-
-  const monto = Number(ingresoData.monto);
-  if (isNaN(monto) || monto <= 0) {
-    throw new Error("Monto inválido");
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/arqueos/${ingresoData.arqueoId}/ingresos`, {
+    const response = await fetch(`${API_BASE_URL}/ingresos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-        monto: monto,
+        monto: Number(ingresoData.monto),
         descripcion: ingresoData.descripcion.trim(),
         medioPago: ingresoData.medioPago || 'efectivo',
         arqueoId: Number(ingresoData.arqueoId)
       })
     });
 
-    const data = await handleResponse(response);
-    return data.data || data;
+    return handleResponse(response);
   } catch (error) {
     console.error('Error en addIngreso:', error);
-    throw new Error(`No se pudo agregar el ingreso: ${error.message}`);
+    throw error;
   }
 };
 
 // ============= FUNCIONES DE EGRESOS =============
 
 export const fetchEgresosByArqueo = async (arqueoId) => {
-  if (!arqueoId || isNaN(Number(arqueoId))) {
-    console.warn('ID de arqueo inválido para egresos');
-    return [];
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/arqueos/${arqueoId}/egresos`, {
+    console.log("🔍 Obteniendo egresos para arqueo:", arqueoId);
+    
+    const response = await fetch(`${API_BASE_URL}/egresos/arqueo/${arqueoId}`, {
       method: 'GET',
       headers: getHeaders()
     });
     
-    // Si no hay egresos, devolver array vacío
     if (response.status === 404) {
+      console.log("ℹ️ No se encontraron egresos para el arqueo");
       return [];
     }
     
     const data = await handleResponse(response);
+    console.log("📄 Respuesta raw de egresos:", data);
     
-    // Normalizar estructura de respuesta
+    // 🔧 CORRECCIÓN: Normalizar estructura de respuesta
     const egresos = data.data?.items || data.items || data.data || data || [];
     
-    return Array.isArray(egresos) ? egresos.map(egreso => ({
-      id: egreso.id || egreso.idEgreso,
-      monto: Number(egreso.monto) || 0,
-      descripcion: egreso.descripcion || '',
-      categoria: egreso.categoria || 'otros',
-      justificacion: egreso.justificacion || '',
-      fecha: egreso.fecha || egreso.createdAt,
-      arqueoId: Number(arqueoId)
-    })) : [];
+    const egresosNormalizados = Array.isArray(egresos) ? egresos.map(egreso => {
+      const egresoNormalizado = {
+        id: egreso.id || egreso.idEgreso,
+        monto: Number(egreso.monto) || 0, // 🔧 Asegurar conversión a número
+        descripcion: egreso.descripcion || '',
+        categoria: egreso.categoria || 'otros',
+        justificacion: egreso.justificacion || '',
+        fecha: egreso.fecha || egreso.createdAt,
+        arqueoId: Number(arqueoId)
+      };
+      console.log(`  - Egreso normalizado:`, egresoNormalizado);
+      return egresoNormalizado;
+    }) : [];
+    
+    console.log("✅ Egresos finales:", egresosNormalizados);
+    return egresosNormalizados;
+    
   } catch (error) {
-    console.error('Error en fetchEgresosByArqueo:', error);
-    return []; // Siempre devolver array
+    console.error('❌ Error en fetchEgresosByArqueo:', error);
+    if (error.message.includes('Token')) {
+      throw error;
+    }
+    return [];
   }
 };
 
 export const addEgreso = async (egresoData) => {
-  // Validación
-  if (!egresoData.arqueoId || !egresoData.monto || !egresoData.descripcion) {
-    throw new Error("Datos de egreso incompletos");
-  }
-
-  const monto = Number(egresoData.monto);
-  if (isNaN(monto) || monto <= 0) {
-    throw new Error("Monto inválido");
-  }
-
   try {
     const response = await fetch(`${API_BASE_URL}/egresos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-        monto: monto,
+        monto: Number(egresoData.monto),
         descripcion: egresoData.descripcion.trim(),
         arqueoId: Number(egresoData.arqueoId),
         categoria: egresoData.categoria || 'otros',
@@ -363,44 +488,32 @@ export const addEgreso = async (egresoData) => {
       })
     });
 
-    const data = await handleResponse(response);
-    return data.data || data;
+    return handleResponse(response);
   } catch (error) {
     console.error('Error en addEgreso:', error);
-    throw new Error(`No se pudo agregar el egreso: ${error.message}`);
+    throw error;
   }
 };
 
 export const updateEgreso = async (id, egresoData) => {
-  if (!id || isNaN(Number(id))) {
-    throw new Error('ID de egreso inválido');
-  }
-
-  const monto = Number(egresoData.monto);
-  if (isNaN(monto) || monto <= 0) {
-    throw new Error("Monto inválido");
-  }
-
   try {
     const response = await fetch(`${API_BASE_URL}/egresos/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({
-        monto: monto,
+        monto: Number(egresoData.monto),
         descripcion: egresoData.descripcion?.trim() || '',
         categoria: egresoData.categoria || 'otros',
         justificacion: egresoData.justificacion || ''
       })
     });
 
-    const data = await handleResponse(response);
-    return data.data || data;
+    return handleResponse(response);
   } catch (error) {
     console.error('Error en updateEgreso:', error);
-    throw new Error(`No se pudo actualizar el egreso: ${error.message}`);
+    throw error;
   }
 };
-
 // ============= FUNCIONES DE EMPLEADOS =============
 
 export const fetchEmpleados = async () => {
@@ -415,11 +528,7 @@ export const fetchEmpleados = async () => {
     // Normalizar respuesta
     const empleados = data.data || data || [];
     
-    if (!Array.isArray(empleados)) {
-      throw new Error('Respuesta de empleados no es un array válido');
-    }
-    
-    // Filtrar cajeros activos con validación case-insensitive
+    // Filtrar cajeros activos
     return empleados.filter(empleado => 
       empleado && 
       empleado.cargo && 
@@ -434,7 +543,7 @@ export const fetchEmpleados = async () => {
     }));
   } catch (error) {
     console.error('Error en fetchEmpleados:', error);
-    throw new Error(`Error al obtener cajeros: ${error.message}`);
+    return [];
   }
 };
 
@@ -451,11 +560,14 @@ export const fetchAllIngresos = async () => {
     return data.data || data || [];
   } catch (error) {
     console.error('Error en fetchAllIngresos:', error);
-    throw new Error(`Error al obtener todos los ingresos: ${error.message}`);
+    if (error.message.includes('Token')) {
+      throw error;
+    }
+    return [];
   }
 };
 
-export const fetchAllegresos = async () => {
+export const fetchAllEgresos = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/egresos`, {
       method: 'GET',
@@ -466,51 +578,186 @@ export const fetchAllegresos = async () => {
     return data.data || data || [];
   } catch (error) {
     console.error('Error en fetchAllEgresos:', error);
-    throw new Error(`Error al obtener todos los egresos: ${error.message}`);
+    if (error.message.includes('Token')) {
+      throw error;
+    }
+    return [];
   }
 };
 
 export const deleteIngreso = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/ingresos/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders(),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/ingresos/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
 
-  if (response.status === 204) {
-    return {};
+    if (response.status === 204) {
+      return {};
+    }
+
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error en deleteIngreso:', error);
+    throw error;
   }
-
-  return handleResponse(response);
 };
 
 export const deleteEgreso = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/egresos/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders(),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/egresos/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
 
-  if (response.status === 204) {
-    return {};
+    if (response.status === 204) {
+      return {};
+    }
+
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Error en deleteEgreso:', error);
+    throw error;
   }
-
-  return handleResponse(response);
 };
 
-export const updateIngreso = async (id, egresoData) => {
+export const updateIngreso = async (id, ingresoData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/ingresos/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({
-        monto: egresoData.monto,
-        descripcion: egresoData.descripcion,
-        categoria: egresoData.categoria, // Asegurar que está incluido
-        justificacion: egresoData.justificacion // Asegurar que está incluido
+        monto: Number(ingresoData.monto),
+        descripcion: ingresoData.descripcion?.trim() || '',
+        medioPago: ingresoData.medioPago || 'efectivo'
       })
     });
-    return await handleResponse(response);
+    
+    return handleResponse(response);
   } catch (error) {
-    console.error('Error updating egreso:', error);
+    console.error('Error en updateIngreso:', error);
+    throw error;
+  }
+};
+
+
+// ============= FUNCIÓN AUXILIAR PARA VALIDAR CIERRE =============
+
+export const validarCierreArqueo = (saldoCalculado, saldoFinal, tolerancia = 1000) => {
+  // Asegurar que los valores sean números
+  const saldoFinalNum = Number(saldoFinal);
+  const saldoCalculadoNum = Number(saldoCalculado);
+  
+  console.log("🔍 VALIDACIÓN - Entrada:");
+  console.log("  - Saldo Calculado:", saldoCalculadoNum);
+  console.log("  - Saldo Final:", saldoFinalNum);
+  
+  // Diferencia = Saldo Final - Saldo Calculado
+  const diferencia = saldoFinalNum - saldoCalculadoNum;
+  const diferenciaAbsoluta = Math.abs(diferencia);
+  
+  console.log("  - Diferencia:", diferencia);
+  console.log("  - Diferencia Absoluta:", diferenciaAbsoluta);
+  
+  const resultado = {
+    diferencia: Number(diferencia.toFixed(2)),
+    diferenciaAbsoluta: Number(diferenciaAbsoluta.toFixed(2)),
+    dentroDeToleranacia: diferenciaAbsoluta <= tolerancia,
+    requiereAtencion: diferenciaAbsoluta > tolerancia,
+    tipoAlerta: diferenciaAbsoluta > tolerancia ? 'error' : 
+               diferenciaAbsoluta > 0 ? 'warning' : 'success',
+    mensaje: diferenciaAbsoluta > tolerancia 
+      ? `Diferencia significativa de $${diferencia.toFixed(2)} - Requiere justificación`
+      : diferenciaAbsoluta > 0 
+        ? `Diferencia menor de $${diferencia.toFixed(2)} - Dentro de tolerancia`
+        : 'Arqueo cuadrado perfectamente'
+  };
+  
+  console.log("✅ VALIDACIÓN - Resultado:", resultado);
+  return resultado;
+};
+
+// ============= FUNCIÓN PARA OBTENER DETALLES DE CIERRE =============
+
+export const getDetallesCierre = async (arqueoId, saldoFinal = null) => {
+  try {
+    console.log("🔍 Obteniendo detalles del arqueo:", arqueoId);
+    
+    const [arqueo, ingresos, egresos] = await Promise.all([
+      getArqueoById(arqueoId),
+      fetchIngresosByArqueo(arqueoId),
+      fetchEgresosByArqueo(arqueoId)
+    ]);
+    
+    console.log("📊 Datos obtenidos:");
+    console.log("  - Arqueo RAW:", arqueo);
+    console.log("  - Ingresos cantidad:", ingresos.length);
+    console.log("  - Egresos cantidad:", egresos.length);
+    
+    // 🔧 DEBUGGING: Verificar el saldo inicial
+    console.log("🔍 DEBUGGING - Saldo inicial:");
+    console.log("  - arqueo.saldoInicial:", arqueo.saldoInicial);
+    console.log("  - Tipo:", typeof arqueo.saldoInicial);
+    console.log("  - Number(arqueo.saldoInicial):", Number(arqueo.saldoInicial));
+    
+    // Calcular totales correctamente
+    const totalIngresos = ingresos.reduce((sum, ingreso) => {
+      const monto = Number(ingreso.monto) || 0;
+      return sum + monto;
+    }, 0);
+    
+    const totalEgresos = egresos.reduce((sum, egreso) => {
+      const monto = Number(egreso.monto) || 0;
+      return sum + monto;
+    }, 0);
+    
+    // 🔧 CORRECCIÓN CRÍTICA: Asegurar que el saldo inicial sea un número válido
+    const saldoInicial = Number(arqueo.saldoInicial) || 0;
+    
+    // 🚨 ALERTA si el saldo inicial es 0 cuando no debería serlo
+    if (saldoInicial === 0 && arqueo.saldoInicial !== 0 && arqueo.saldoInicial !== '0') {
+      console.warn("⚠️ ADVERTENCIA: El saldo inicial es 0, esto podría ser un error de parseo");
+      console.warn("⚠️ Valor original:", arqueo.saldoInicial);
+    }
+    
+    const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
+    
+    // Calcular diferencia solo si se proporciona saldoFinal
+    let diferencia = null;
+    if (saldoFinal !== null && saldoFinal !== undefined) {
+      const saldoFinalNum = Number(saldoFinal);
+      diferencia = saldoFinalNum - saldoCalculado;
+      console.log(`💰 Diferencia calculada: ${saldoFinalNum} - ${saldoCalculado} = ${diferencia}`);
+    }
+    
+    console.log("💰 Cálculos finales:");
+    console.log(`  - Saldo Inicial: $${saldoInicial.toLocaleString()}`);
+    console.log(`  - Total Ingresos: $${totalIngresos.toLocaleString()}`);
+    console.log(`  - Total Egresos: $${totalEgresos.toLocaleString()}`);
+    console.log(`  - Saldo Calculado: ${saldoInicial} + ${totalIngresos} - ${totalEgresos} = $${saldoCalculado.toLocaleString()}`);
+    if (diferencia !== null) {
+      console.log(`  - Diferencia: $${diferencia.toLocaleString()}`);
+    }
+    
+    const resultado = {
+      arqueo,
+      ingresos,
+      egresos,
+      resumen: {
+        saldoInicial,
+        totalIngresos,
+        totalEgresos,
+        saldoCalculado,
+        ...(diferencia !== null && { diferencia }),
+        cantidadMovimientos: ingresos.length + egresos.length
+      }
+    };
+    
+    console.log("✅ Detalles del cierre:", resultado);
+    return resultado;
+    
+  } catch (error) {
+    console.error('❌ Error al obtener detalles del cierre:', error);
     throw error;
   }
 };

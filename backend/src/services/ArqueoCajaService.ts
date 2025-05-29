@@ -6,9 +6,13 @@ import { Empleado } from '../entity/empleado';
 import { ArqueoCajaRepository } from '../repository/ArqueoCajaRepository';
 
 export class ArqueoCajaService {
+    // Tolerancia configurable
+    private readonly TOLERANCIA_DEFAULT = 1.00;
+    private arqueoRepository = ArqueoCajaRepository;
+
     async findAll(): Promise<ArqueoCaja[]> {
         return await ArqueoCajaRepository.find({
-            relations: ['empleado', 'ingresos', 'egresos', 'cortes'], // CAMBIOS AQUÍ
+            relations: ['empleado', 'ingresos', 'egresos', 'cortes'],
             order: { fechaInicio: 'DESC' }
         });
     }
@@ -96,46 +100,85 @@ export class ArqueoCajaService {
     }
     
     async close(id: number, closeData: CloseArqueoCajaDto): Promise<ArqueoCaja> {
-        const queryRunner = ArqueoCajaRepository.manager.connection.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-    
         try {
-            const arqueo = await ArqueoCajaRepository.findWithDetails(id);
-    
+            // Buscar el arqueo con sus relaciones
+            const arqueo = await this.arqueoRepository.findOne({
+                where: { idArqueo: id },
+                relations: ['ingresos', 'egresos', 'empleado']
+            });
+
             if (!arqueo) {
                 throw new Error('Arqueo de caja no encontrado');
             }
-    
+
             if (arqueo.fechaCierre) {
-                throw new Error('El arqueo de caja ya está cerrado');
+                throw new Error('El arqueo ya está cerrado');
             }
-    
-            // Calcular totales
-            const totalIngresos = arqueo.ingresos.reduce((sum, ing) => sum + ing.monto, 0);
-            const totalEgresos = arqueo.egresos.reduce((sum, eg) => sum + eg.monto, 0);
-            const saldoCalculado = arqueo.saldoInicial + totalIngresos - totalEgresos;
-    
-            // Validar saldo final
-            if (Math.abs(saldoCalculado - closeData.saldoFinal) > 0.01) {
-                throw new Error(`Discrepancia encontrada. Saldo calculado: ${saldoCalculado}, Saldo reportado: ${closeData.saldoFinal}`);
-            }
-            
-    
+
+            // Función auxiliar para calcular totales de forma segura
+            const calculateTotal = (items: any[]): number => {
+                if (!Array.isArray(items) || items.length === 0) {
+                    return 0;
+                }
+                return items.reduce((sum, item) => {
+                    const value = Number(item.monto) || 0;
+                    return sum + value;
+                }, 0);
+            };
+
+            // Función auxiliar para validar números
+            const validateNumber = (value: any): number => {
+                const num = Number(value);
+                return isNaN(num) ? 0 : num;
+            };
+
+            // Calcular valores de forma segura
+            const saldoInicial = validateNumber(arqueo.saldoInicial);
+            const totalIngresos = calculateTotal(arqueo.ingresos || []);
+            const totalEgresos = calculateTotal(arqueo.egresos || []);
+            const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
+            const saldoFinal = validateNumber(closeData.saldoFinal);
+            const diferencia = saldoFinal - saldoCalculado;
+
+            // Actualizar el arqueo
             arqueo.fechaCierre = new Date();
-            arqueo.saldoFinal = closeData.saldoFinal;
-            arqueo.observaciones = closeData.observaciones || null;
-    
-            await queryRunner.manager.save(arqueo);
-            await queryRunner.commitTransaction();
-    
-            return arqueo;
+            arqueo.saldoFinal = saldoFinal;
+            arqueo.saldoCalculado = saldoCalculado;
+            arqueo.diferencia = diferencia;
+            arqueo.observaciones = closeData.observaciones || 'Sin observaciones';
+
+            // Guardar en la base de datos
+            const arqueoActualizado = await this.arqueoRepository.save(arqueo);
+
+            // Retornar con las relaciones
+            const arqueorelacion = await this.arqueoRepository.findOne({
+                where: { idArqueo: arqueoActualizado.idArqueo },
+                relations: ['ingresos', 'egresos', 'empleado']
+                });
+
+                if (!arqueorelacion) {
+                throw new Error('Arqueo no encontrado');
+                }
+            return arqueorelacion;
         } catch (error) {
-            await queryRunner.rollbackTransaction();
+            console.error('Error en ArqueoCajaService.close:', error);
             throw error;
-        } finally {
-            await queryRunner.release();
-        }
+    }
+}
+
+    private generateCloseObservations(
+        userObservations: string | null, 
+        difference: number,
+        tolerance: number
+    ): string {
+        const autoMessage = `Diferencia al cierre: $${difference.toFixed(2)}`;
+        const warning = Math.abs(difference) > tolerance 
+            ? ' (DIFERENCIA SIGNIFICATIVA)' 
+            : ' (Dentro de tolerancia)';
+        
+        return userObservations 
+            ? `${userObservations} | ${autoMessage}${warning}`
+            : `${autoMessage}${warning}`;
     }
 
     async update(id: number, partialData: { observaciones?: string }): Promise<ArqueoCaja> {
@@ -143,4 +186,38 @@ export class ArqueoCajaService {
         return this.findById(id);
     }
 
+    // Método para obtener estadísticas de diferencias
+    async getDifferencesStats(empleadoId?: number, dateRange?: { start: Date, end: Date }) {
+        let query = ArqueoCajaRepository.createQueryBuilder('arqueo')
+            .select('arqueo.diferencia', 'diferencia')
+            .addSelect('arqueo.fechaCierre', 'fechaCierre')
+            .addSelect('arqueo.idArqueo', 'id')
+            .where('arqueo.fechaCierre IS NOT NULL')
+            .andWhere('arqueo.diferencia IS NOT NULL');
+
+        if (empleadoId) {
+            query = query.andWhere('arqueo.empleadoId = :empleadoId', { empleadoId });
+        }
+
+        if (dateRange) {
+            query = query.andWhere('arqueo.fechaCierre BETWEEN :start AND :end', dateRange);
+        }
+
+        const results = await query.getRawMany();
+        
+        const stats = {
+            total: results.length,
+            conDiferencia: results.filter(r => Math.abs(r.diferencia) > this.TOLERANCIA_DEFAULT).length,
+            promedioAbsoluto: results.reduce((sum, r) => sum + Math.abs(r.diferencia), 0) / results.length,
+            mayorDiferencia: Math.max(...results.map(r => Math.abs(r.diferencia))),
+            porcentajeFueraDeToleranacia: results.length > 0 
+                ? (results.filter(r => Math.abs(r.diferencia) > this.TOLERANCIA_DEFAULT).length / results.length) * 100 
+                : 0
+        };
+
+        return {
+            estadisticas: stats,
+            detalles: results
+        };
+    }
 }

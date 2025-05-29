@@ -1,4 +1,3 @@
-
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { Empleado } from "./empleado";
 import { Corte } from "./corte";
@@ -21,6 +20,13 @@ export class ArqueoCaja {
 
     @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
     saldoFinal!: number | null;
+
+    // Nuevos campos para la lógica mejorada
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+    saldoCalculado!: number | null;
+
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+    diferencia!: number | null;
 
     @Column({ type: 'text', nullable: true, charset: 'utf8mb4', collation: 'utf8mb4_unicode_ci' })
     observaciones!: string | null;
