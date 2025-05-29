@@ -17,7 +17,7 @@ import {
 import { ArrowDown, ArrowUp, TrendingUp, Users, DollarSign, Scissors, Calendar, Activity } from "lucide-react"; 
 import {
   fetchAllIngresos,
-  fetchAllegresos
+  fetchAllEgresos
 } from "@/services/ArqueoService";
 import { fetchClients } from "@/services/ClientService";
 import { fetchEmployees } from "@/services/EmployeeService";
@@ -293,7 +293,7 @@ const Home = () => {
           cortesResRaw,    
         ] = await Promise.all([
           fetchAllIngresos(),
-          fetchAllegresos(),
+          fetchAllEgresos(),
           fetchClients(),
           fetchEmployees(),
           fetchServices(), 

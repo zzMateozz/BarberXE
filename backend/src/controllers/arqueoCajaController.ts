@@ -23,6 +23,31 @@ export class ArqueoCajaController {
         this.close = this.close.bind(this);
     }
 
+    // Función auxiliar para calcular totales de forma segura
+    private calculateTotal(items: any[], field: string = 'monto'): number {
+        if (!Array.isArray(items) || items.length === 0) {
+            console.log(`ℹ️ calculateTotal: Array vacío o inválido`);
+            return 0;
+        }
+        
+        const total = items.reduce((sum, item) => {
+            const value = Number(item[field]) || 0;
+            console.log(`  - Item ${field}: ${value}`);
+            return sum + value;
+        }, 0);
+        
+        console.log(`✅ calculateTotal: Total calculado = ${total}`);
+        return total;
+    }
+
+    // Función auxiliar para validar números
+    private validateNumber(value: any, defaultValue: number = 0): number {
+        const num = Number(value);
+        const result = isNaN(num) ? defaultValue : num;
+        console.log(`🔢 validateNumber: ${value} -> ${result}`);
+        return result;
+    }
+
     getAll = async (req: Request, res: Response): Promise<void> => {
         try {
             const arqueos = await this.arqueoCajaService.findAll();
@@ -53,15 +78,19 @@ export class ArqueoCajaController {
             const id = parseInt(req.params.id);
             const arqueo = await this.arqueoCajaService.findById(id);
             
+            // Cálculos seguros
+            const totalIngresos = this.calculateTotal(arqueo.ingresos || []);
+            const totalEgresos = this.calculateTotal(arqueo.egresos || []);
+            const saldoInicial = this.validateNumber(arqueo.saldoInicial);
+            const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
+            
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     ...arqueo,
-                    totalIngresos: arqueo.ingresos.reduce((sum, i) => sum + i.monto, 0),
-                    totalEgresos: arqueo.egresos.reduce((sum, e) => sum + e.monto, 0),
-                    saldoCalculado: arqueo.saldoInicial + 
-                                    arqueo.ingresos.reduce((sum, i) => sum + i.monto, 0) - 
-                                    arqueo.egresos.reduce((sum, e) => sum + e.monto, 0)
+                    totalIngresos,
+                    totalEgresos,
+                    saldoCalculado
                 }
             });
         } catch (error: any) {
@@ -83,19 +112,22 @@ export class ArqueoCajaController {
     }
 
     private formatDetailedArqueo(arqueo: ArqueoCaja): any {
+        const totalIngresos = this.calculateTotal(arqueo.ingresos || []);
+        const totalEgresos = this.calculateTotal(arqueo.egresos || []);
+        
         return {
             id: arqueo.idArqueo,
             fechaInicio: arqueo.fechaInicio,
             fechaCierre: arqueo.fechaCierre,
-            saldoInicial: arqueo.saldoInicial,
-            saldoFinal: arqueo.saldoFinal,
+            saldoInicial: this.validateNumber(arqueo.saldoInicial),
+            saldoFinal: this.validateNumber(arqueo.saldoFinal),
             empleado: {
                 id: arqueo.empleado.idEmpleado,
                 nombre: arqueo.empleado.nombre
             },
             resumen: {
-                totalIngresos: arqueo.ingresos?.reduce((sum, i) => sum + i.monto, 0) || 0,
-                totalEgresos: arqueo.egresos?.reduce((sum, e) => sum + e.monto, 0) || 0,
+                totalIngresos,
+                totalEgresos,
                 cantidadMovimientos: (arqueo.ingresos?.length || 0) + (arqueo.egresos?.length || 0)
             }
         };
@@ -177,21 +209,66 @@ export class ArqueoCajaController {
     public close = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = parseInt(req.params.id);
-            const closeData = new CloseArqueoCajaDto(req.body);
+            const closeData = new CloseArqueoCajaDto({
+                saldoFinal: req.body.saldoFinal,
+                observacion: req.body.observacion || req.body.observaciones || 'Sin observaciones'
+            });
+            
+            console.log(`🔍 DEPURACIÓN - Cerrando arqueo ${id}`);
+            console.log(`📝 Datos recibidos:`, closeData);
             
             const arqueo = await this.arqueoCajaService.close(id, closeData);
+            const arqueoCompleto = await this.arqueoCajaService.findById(id);
             
+            console.log(`📊 Arqueo completo obtenido:`, {
+                saldoInicial: arqueoCompleto.saldoInicial,
+                ingresosCantidad: arqueoCompleto.ingresos?.length || 0,
+                egresosCantidad: arqueoCompleto.egresos?.length || 0
+            });
+
+            // 🔧 CORRECCIÓN: Cálculos seguros para evitar NaN
+            const saldoInicial = this.validateNumber(arqueoCompleto.saldoInicial);
+            const totalIngresos = this.calculateTotal(arqueoCompleto.ingresos || []);
+            const totalEgresos = this.calculateTotal(arqueoCompleto.egresos || []);
+            const saldoCalculado = saldoInicial + totalIngresos - totalEgresos;
+            const saldoFinal = this.validateNumber(arqueoCompleto.saldoFinal);
+            
+            // 🔧 CORRECCIÓN: Diferencia = Saldo Final - Saldo Calculado
+            const diferencia = saldoFinal - saldoCalculado;
+            
+            // Respuesta mejorada con toda la información
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
-                    ...arqueo,
-                    diferencia: closeData.saldoFinal - (arqueo.saldoInicial + 
-                    arqueo.ingresos.reduce((sum, i) => sum + i.monto, 0) - 
-                    arqueo.egresos.reduce((sum, e) => sum + e.monto, 0))
-                }
+                    id: arqueo.idArqueo,
+                    fechaInicio: arqueo.fechaInicio,
+                    fechaCierre: arqueo.fechaCierre,
+                    saldoInicial,
+                    saldoFinal,
+                    saldoCalculado,
+                    diferencia, // 🔧 Esta diferencia ahora es correcta
+                    observaciones: arqueo.observaciones,
+                    empleado: {
+                        id: arqueo.empleado.idEmpleado,
+                        nombre: arqueo.empleado.nombre
+                    },
+                    resumen: {
+                        totalIngresos,
+                        totalEgresos,
+                        cantidadMovimientos: (arqueoCompleto.ingresos?.length || 0) + (arqueoCompleto.egresos?.length || 0)
+                    },
+                    estado: {
+                        cerrado: true,
+                        dentroDeToleranacia: Math.abs(diferencia) <= 1000, // 🔧 Tolerancia ajustada a $1000
+                        requiereAtencion: Math.abs(diferencia) > 1000
+                    }
+                },
+                message: Math.abs(diferencia) > 1000 
+                    ? `Arqueo cerrado con diferencia significativa de $${diferencia.toFixed(2)}` 
+                    : 'Arqueo cerrado exitosamente'
             });
         } catch (error: any) {
-            console.error('Error al cerrar arqueo:', error);
+            console.error('❌ Error al cerrar arqueo:', error);
             
             if (error.message.includes('no encontrado')) {
                 this.httpResponse.NotFound(res, {
@@ -203,17 +280,36 @@ export class ArqueoCajaController {
                     success: false,
                     message: error.message
                 });
-            } else if (error.message.includes('Discrepancia')) {
-                this.httpResponse.BadRequest(res, {
-                    success: false,
-                    message: error.message
-                });
             } else {
                 this.httpResponse.Error(res, {
                     success: false,
                     message: error.message
                 });
             }
+        }
+    }
+
+    // Método adicional para obtener estadísticas de diferencias
+    getStats = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const empleadoId = req.query.empleadoId ? parseInt(req.query.empleadoId as string) : undefined;
+            const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+            const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+            
+            const dateRange = startDate && endDate ? { start: startDate, end: endDate } : undefined;
+            
+            const stats = await this.arqueoCajaService.getDifferencesStats(empleadoId, dateRange);
+            
+            this.httpResponse.OK(res, {
+                success: true,
+                data: stats
+            });
+        } catch (error: any) {
+            this.httpResponse.Error(res, {
+                success: false,
+                message: 'Error al obtener estadísticas',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     }
 
@@ -347,11 +443,13 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const ingresos = await this.ingresoService.findByArqueoId(arqueoId);
             
+            const total = this.calculateTotal(ingresos);
+            
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     count: ingresos.length,
-                    total: ingresos.reduce((sum, i) => sum + i.monto, 0),
+                    total,
                     items: ingresos
                 }
             });
@@ -369,11 +467,13 @@ export class ArqueoCajaController {
             const arqueoId = parseInt(req.params.id);
             const egresos = await this.egresoService.findByArqueoId(arqueoId);
             
+            const total = this.calculateTotal(egresos);
+            
             this.httpResponse.OK(res, {
                 success: true,
                 data: {
                     count: egresos.length,
-                    total: egresos.reduce((sum, e) => sum + e.monto, 0),
+                    total,
                     items: egresos
                 }
             });
