@@ -16,7 +16,7 @@ function Login() {
         confirmPassword: "",
         phone: ""
     });
-    
+
     const [errors, setErrors] = useState({
         name: "",
         lastName: "",
@@ -25,7 +25,7 @@ function Login() {
         confirmPassword: "",
         phone: ""
     });
-    
+
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     // Validaciones
@@ -33,90 +33,90 @@ function Login() {
         // Validación de nombre
         if (formData.name) {
             if (formData.name.length < 3) {
-                setErrors(prev => ({...prev, name: "El nombre debe tener al menos 3 caracteres"}));
+                setErrors(prev => ({ ...prev, name: "El nombre debe tener al menos 3 caracteres" }));
             } else if (formData.name.length > 30) {
-                setErrors(prev => ({...prev, name: "El nombre no debe exceder 30 caracteres"}));
+                setErrors(prev => ({ ...prev, name: "El nombre no debe exceder 30 caracteres" }));
             } else {
-                setErrors(prev => ({...prev, name: ""}));
+                setErrors(prev => ({ ...prev, name: "" }));
             }
         }
-        
+
         // Validación de apellido
         if (formData.lastName) {
             if (formData.lastName.length < 3) {
-                setErrors(prev => ({...prev, lastName: "El apellido debe tener al menos 3 caracteres"}));
+                setErrors(prev => ({ ...prev, lastName: "El apellido debe tener al menos 3 caracteres" }));
             } else if (formData.lastName.length > 30) {
-                setErrors(prev => ({...prev, lastName: "El apellido no debe exceder 30 caracteres"}));
+                setErrors(prev => ({ ...prev, lastName: "El apellido no debe exceder 30 caracteres" }));
             } else {
-                setErrors(prev => ({...prev, lastName: ""}));
+                setErrors(prev => ({ ...prev, lastName: "" }));
             }
         }
-        
+
         // Validación de email
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.com$/;
         if (formData.email) {
             if (!emailRegex.test(formData.email)) {
-                setErrors(prev => ({...prev, email: "Correo inválido. Debe incluir @ y terminar en .com"}));
+                setErrors(prev => ({ ...prev, email: "Correo inválido. Debe incluir @ y terminar en .com" }));
             } else {
-                setErrors(prev => ({...prev, email: ""}));
+                setErrors(prev => ({ ...prev, email: "" }));
             }
         }
-        
+
         // Validación de contraseña
         if (formData.password) {
             if (formData.password.length < 8) {
-                setErrors(prev => ({...prev, password: "La contraseña debe tener al menos 8 caracteres"}));
+                setErrors(prev => ({ ...prev, password: "La contraseña debe tener al menos 8 caracteres" }));
                 return;
             } else if (formData.password.length > 12) {
-                setErrors(prev => ({...prev, password: "La contraseña no debe exceder 12 caracteres"}));
+                setErrors(prev => ({ ...prev, password: "La contraseña no debe exceder 12 caracteres" }));
                 return;
             }
 
             if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(formData.password)) {
-                setErrors(prev => ({...prev, password: "La contraseña contiene caracteres no permitidos"}));
+                setErrors(prev => ({ ...prev, password: "La contraseña contiene caracteres no permitidos" }));
                 return;
             }
 
             let errorMessages = [];
-            
+
             if (!/[A-Z]/.test(formData.password)) {
                 errorMessages.push("al menos una letra mayúscula");
             }
-            
+
             if (!/[0-9]/.test(formData.password)) {
                 errorMessages.push("al menos un número");
             }
-            
+
             if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password)) {
                 errorMessages.push("al menos un carácter especial");
             }
 
             if (errorMessages.length > 0) {
-                setErrors(prev => ({...prev, password: `La contraseña debe contener ${errorMessages.join(", ")}`}));
+                setErrors(prev => ({ ...prev, password: `La contraseña debe contener ${errorMessages.join(", ")}` }));
             } else {
-                setErrors(prev => ({...prev, password: ""}));
+                setErrors(prev => ({ ...prev, password: "" }));
             }
         } else {
-            setErrors(prev => ({...prev, password: ""}));
+            setErrors(prev => ({ ...prev, password: "" }));
         }
-        
+
         // Validación de confirmación de contraseña
         if (formData.confirmPassword) {
             if (formData.confirmPassword !== formData.password) {
-                setErrors(prev => ({...prev, confirmPassword: "Las contraseñas no coinciden"}));
+                setErrors(prev => ({ ...prev, confirmPassword: "Las contraseñas no coinciden" }));
             } else {
-                setErrors(prev => ({...prev, confirmPassword: ""}));
+                setErrors(prev => ({ ...prev, confirmPassword: "" }));
             }
         }
-        
+
         // Validación de teléfono
         if (formData.phone) {
             if (formData.phone.length < 7) {
-                setErrors(prev => ({...prev, phone: "El teléfono debe tener al menos 7 dígitos"}));
+                setErrors(prev => ({ ...prev, phone: "El teléfono debe tener al menos 7 dígitos" }));
             } else if (formData.phone.length > 10) {
-                setErrors(prev => ({...prev, phone: "El teléfono no debe exceder 10 dígitos"}));
+                setErrors(prev => ({ ...prev, phone: "El teléfono no debe exceder 10 dígitos" }));
             } else {
-                setErrors(prev => ({...prev, phone: ""}));
+                setErrors(prev => ({ ...prev, phone: "" }));
             }
         }
     }, [formData]);
@@ -131,19 +131,19 @@ function Login() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (showRegister) {
             // Lógica de registro (sin cambios)
             if (Object.values(errors).some(error => error !== "")) {
                 toast.error("Por favor corrige los errores en el formulario");
                 return;
             }
-            
+
             if (formData.password !== formData.confirmPassword) {
                 toast.error("Las contraseñas no coinciden");
                 return;
             }
-            
+
             try {
                 const newUser = {
                     cliente: {
@@ -157,7 +157,7 @@ function Login() {
 
                 const response = await createUser(newUser);
                 toast.success("Cuenta creada con éxito. Ahora puedes iniciar sesión.");
-                
+
                 setFormData({
                     name: "",
                     lastName: "",
@@ -178,9 +178,9 @@ function Login() {
                     contraseña: formData.password
                 };
 
-                
+
                 const authData = await LoginService.login(credentials);
-           
+
 
                 // Verificación más estricta de la estructura de respuesta
                 if (!authData || !authData.token || !authData.user || !authData.role) {
@@ -195,11 +195,11 @@ function Login() {
                     role: authData.role,
                     token: authData.token
                 };
-                
+
                 localStorage.setItem('authData', JSON.stringify(authInfo));
                 localStorage.setItem('authToken', authData.token);
-                
-              
+
+
 
                 toast.success(`¡Bienvenido ${authData.user.username || authData.user.name || 'Usuario'}!`);
 
@@ -210,30 +210,30 @@ function Login() {
                     cajero: '/cajero',
                     cliente: '/cliente'
                 };
-                
+
                 const userRole = authData.role.toLowerCase();
                 const redirectPath = roleRoutes[userRole];
-                
+
                 if (!redirectPath) {
                     console.error(`Rol no reconocido: ${userRole}`);
                     toast.error("Rol de usuario no válido");
                     return;
                 }
-                  
+
                 // Usar setTimeout para asegurar que el localStorage se haya guardado
                 setTimeout(() => {
                     navigate(redirectPath, { replace: true });
                 }, 100);
-                
+
             } catch (error) {
                 console.error("Error completo de login:", {
                     message: error.message,
                     stack: error.stack,
                     response: error.response
                 });
-                
+
                 let errorMessage = "Error en el servidor";
-                
+
                 if (error.message.includes("401") || error.message.toLowerCase().includes("credenciales")) {
                     errorMessage = "Credenciales incorrectas";
                 } else if (error.message.includes("estructura") || error.message.includes("inválida")) {
@@ -243,9 +243,9 @@ function Login() {
                 } else if (error.message.toLowerCase().includes("cors")) {
                     errorMessage = "Error de configuración del servidor";
                 }
-                
+
                 toast.error(errorMessage);
-                
+
                 // Limpiar localStorage en caso de error
                 localStorage.removeItem('authData');
                 localStorage.removeItem('authToken');
@@ -257,9 +257,8 @@ function Login() {
         if (!message) return null;
 
         return (
-            <div className={`text-xs mt-2 flex items-center transition-all duration-200 ${
-                isValid ? "text-green-500" : "text-red-400"
-            }`}>
+            <div className={`text-xs mt-2 flex items-center transition-all duration-200 ${isValid ? "text-green-500" : "text-red-400"
+                }`}>
                 {isValid ? (
                     <CheckCircle className="w-3 h-3 mr-1.5 flex-shrink-0" />
                 ) : (
@@ -294,7 +293,7 @@ function Login() {
                     <Scissors className="w-full h-full rotate-45" />
                 </div>
             </div>
-            
+
             {/* Geometric Shapes */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -left-40 w-80 h-80 bg-red-100 rounded-full blur-3xl"></div>
@@ -317,13 +316,13 @@ function Login() {
                                 <div className="absolute inset-0 bg-red-500/30 rounded-full blur-xl animate-pulse"></div>
                             </div>
                         </div>
-                        
+
                         <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-3">
                             {showRegister ? "Únete a BarberXE" : "BarberXE"}
                         </h1>
                         <p className="text-gray-600 text-sm leading-relaxed">
-                            {showRegister 
-                                ? "Crea tu cuenta y accede a los mejores servicios de barbería" 
+                            {showRegister
+                                ? "Crea tu cuenta y accede a los mejores servicios de barbería"
                                 : "La experiencia de barbería más exclusiva te espera"
                             }
                         </p>
@@ -334,32 +333,29 @@ function Login() {
                         {/* Card Background Effects */}
                         <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-transparent to-gray-50 rounded-3xl"></div>
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-red-500 to-red-700"></div>
-                        
+
                         <div className="relative z-10">
                             {/* Toggle Buttons */}
                             <div className="flex mb-8 bg-gray-100 rounded-2xl p-1.5 relative overflow-hidden border border-gray-200">
-                                <div 
-                                    className={`absolute top-1.5 bottom-1.5 bg-gradient-to-r from-red-600 to-red-700 rounded-xl transition-all duration-500 shadow-lg ${
-                                        showRegister ? 'left-1/2 right-1.5' : 'left-1.5 right-1/2'
-                                    }`}
+                                <div
+                                    className={`absolute top-1.5 bottom-1.5 bg-gradient-to-r from-red-600 to-red-700 rounded-xl transition-all duration-500 shadow-lg ${showRegister ? 'left-1/2 right-1.5' : 'left-1.5 right-1/2'
+                                        }`}
                                 ></div>
-                                
+
                                 <button
-                                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-sm transition-all duration-300 relative z-10 ${
-                                        !showRegister
+                                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-sm transition-all duration-300 relative z-10 ${!showRegister
                                             ? "text-white shadow-lg"
                                             : "text-gray-600 hover:text-gray-800"
-                                    }`}
+                                        }`}
                                     onClick={() => setShowRegister(false)}
                                 >
                                     Iniciar Sesión
                                 </button>
                                 <button
-                                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-sm transition-all duration-300 relative z-10 ${
-                                        showRegister
+                                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-sm transition-all duration-300 relative z-10 ${showRegister
                                             ? "text-white shadow-lg"
                                             : "text-gray-600 hover:text-gray-800"
-                                    }`}
+                                        }`}
                                     onClick={() => setShowRegister(true)}
                                 >
                                     Registrarse
@@ -424,6 +420,10 @@ function Login() {
                                                     name="phone"
                                                     value={formData.phone}
                                                     onChange={handleInputChange}
+                                                    onInput={(e) => {
+                                                        // Elimina caracteres no numéricos al escribir/pegar
+                                                        e.target.value = e.target.value.replace(/\D/g, '');
+                                                    }}
                                                     className={`w-full pl-12 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-red-500/20 transition-all duration-200 ${getInputBorderClass(formData.phone, errors.phone)}`}
                                                     type="tel"
                                                     placeholder="1234567890"
@@ -522,7 +522,7 @@ function Login() {
                                     >
                                         {/* Button glow effect */}
                                         <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-red-700/20 blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                                        
+
                                         <div className="relative flex items-center justify-center space-x-3">
                                             <span className="text-lg font-bold">
                                                 {showRegister ? "Crear Mi Cuenta" : "Iniciar Sesión"}
